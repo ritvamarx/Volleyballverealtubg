@@ -1,0 +1,111 @@
+/* ==========================================================================
+   SKV Volleyball – App-Router & Initialisierung
+   ========================================================================== */
+(function () {
+  "use strict";
+  const { $, $$ } = U;
+
+  // Navigationsstruktur (Reihenfolge = Menü)
+  const NAV = [
+    { group: "Team" },
+    { id: "dashboard", label: "Übersicht", icon: "🏠" },
+    { id: "players", label: "Spielerverwaltung", icon: "🧑‍🤝‍🧑" },
+    { id: "announcements", label: "Ankündigungen", icon: "📣" },
+    { id: "birthdays", label: "Geburtstage", icon: "🎂" },
+    { id: "consents", label: "Einverständnis", icon: "📝" },
+
+    { group: "Termine & Einsatz" },
+    { id: "calendar", label: "Kalender", icon: "📅" },
+    { id: "training", label: "Trainingsrückmeldung", icon: "🏐" },
+    { id: "drivers", label: "Fahrerplanung", icon: "🚗" },
+    { id: "jobs", label: "Heimspiel-Jobs", icon: "🙌" },
+    { id: "tasks", label: "Aufgaben", icon: "✅" },
+
+    { group: "Verein" },
+    { id: "finances", label: "Finanzen", icon: "💶" },
+    { id: "clothing", label: "Vereinskleidung", icon: "👕" },
+    { id: "sponsors", label: "Sponsoren", icon: "🤝" },
+    { id: "inventory", label: "Material", icon: "📦" },
+
+    { group: "Wissen & Verband" },
+    { id: "standings", label: "Verbandsliga MV", icon: "🏆" },
+    { id: "wiki", label: "Volleyball-Wiki", icon: "📖" },
+  ];
+
+  const titles = {};
+  NAV.forEach((n) => { if (n.id) titles[n.id] = n.label; });
+
+  function buildNav() {
+    const nav = $("#nav");
+    nav.innerHTML = NAV.map((n) => {
+      if (n.group) return `<div class="nav-group-title">${n.group}</div>`;
+      return `<a href="#/${n.id}" data-route="${n.id}"><span class="ic">${n.icon}</span>${n.label}</a>`;
+    }).join("");
+  }
+
+  let current = "dashboard";
+
+  function route() {
+    const hash = (location.hash || "#/dashboard").replace(/^#\//, "");
+    current = Views[hash] ? hash : "dashboard";
+    render(current);
+  }
+
+  function render(id) {
+    const view = $("#view");
+    $("#pageTitle").textContent = titles[id] || "Übersicht";
+    $$("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.route === id));
+    view.scrollTop = 0;
+    window.scrollTo(0, 0);
+    try {
+      Views[id](view);
+    } catch (err) {
+      view.innerHTML = `<div class="card"><h3>Fehler beim Laden</h3><pre style="white-space:pre-wrap">${U.esc(err && err.stack || err)}</pre></div>`;
+      console.error(err);
+    }
+    // Menü auf Mobile schließen
+    $("#sidebar").classList.remove("open");
+    $("#overlay").classList.remove("show");
+  }
+
+  // Öffentliche App-API (von Views genutzt)
+  window.App = {
+    reload() { render(current); },
+    go(id) { location.hash = `#/${id}`; },
+  };
+
+  // ---- Theme ----
+  const THEME_KEY = "skv_theme";
+  function applyTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
+  }
+  function initTheme() {
+    let t = "light";
+    try { t = localStorage.getItem(THEME_KEY) || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); } catch (e) {}
+    applyTheme(t);
+  }
+
+  // ---- Init ----
+  function init() {
+    buildNav();
+    initTheme();
+    window.addEventListener("hashchange", route);
+    if (!location.hash) location.hash = "#/dashboard";
+    route();
+
+    $("#themeToggle").onclick = () => applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
+    $("#resetData").onclick = () => U.confirmDialog("Alle Daten auf die Demo-Beispiele zurücksetzen? Eigene Eingaben gehen verloren.", () => {
+      Store.resetDemo(); U.toast("Demo-Daten wiederhergestellt", "good"); App.reload();
+    }, "Zurücksetzen");
+
+    $("#hamburger").onclick = () => {
+      $("#sidebar").classList.toggle("open");
+      $("#overlay").classList.toggle("show");
+    };
+    $("#overlay").addEventListener("click", () => { $("#sidebar").classList.remove("open"); });
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();

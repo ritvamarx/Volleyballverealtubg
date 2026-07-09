@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SKV Volleyball · Trainer- & Vereinsplattform</title>
+  <meta name="description" content="Verwaltungs- und Kommunikationsplattform für den Volleyballverein SKV: Spieler, Termine, Fahrer, Catering, Finanzen und mehr." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23f97316'/%3E%3Cpath d='M50 4a46 46 0 0 1 0 92M14 25c22 6 40 24 46 46M22 78c8-24 30-42 56-44' stroke='%23fff' stroke-width='4' fill='none'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 100 100" width="40" height="40">
+            <circle cx="50" cy="50" r="46" fill="var(--accent)"/>
+            <path d="M50 4a46 46 0 0 1 0 92M14 25c22 6 40 24 46 46M22 78c8-24 30-42 56-44" stroke="#fff" stroke-width="4" fill="none"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <strong>SKV Volleyball</strong>
+          <span>Trainer-Cockpit</span>
+        </div>
+      </div>
+      <nav class="nav" id="nav"><!-- filled by JS --></nav>
+      <div class="sidebar-foot">
+        <button class="btn-ghost" id="themeToggle" title="Design wechseln">🌓 Design</button>
+        <button class="btn-ghost" id="resetData" title="Beispieldaten zurücksetzen">↺ Demo-Daten</button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <header class="topbar">
+        <button class="hamburger" id="hamburger" aria-label="Menü">☰</button>
+        <div class="topbar-title" id="pageTitle">Übersicht</div>
+        <div class="topbar-actions">
+          <div class="season-badge">Saison 2025/26 · Verbandsliga MV</div>
+        </div>
+      </header>
+      <section class="content" id="view"><!-- view rendered here --></section>
+    </main>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+  <div id="modalRoot"></div>
+  <div id="toastRoot" class="toast-root"></div>
+
+  <script src="assets/js/store.js"></script>
+  <script src="assets/js/utils.js"></script>
+  <script src="assets/js/views.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

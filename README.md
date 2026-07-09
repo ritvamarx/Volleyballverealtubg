@@ -1,0 +1,78 @@
+# 🏐 SKV Volleyball – Trainer- & Vereinsplattform
+
+Eine komplette Verwaltungs- und Kommunikationsplattform für den Volleyballverein
+**SKV** (Verbandsliga Mecklenburg-Vorpommern). Sie hilft dem Trainerteam, den
+Kader zu verwalten, mit den Eltern zu kommunizieren, Einsätze rund um Heim- und
+Auswärtsspiele zu organisieren und den Vereinsalltag zu koordinieren.
+
+Die Anwendung läuft **komplett im Browser** – ohne Server, ohne Installation,
+ohne Build-Schritt. Alle Daten werden lokal im Browser (`localStorage`)
+gespeichert. Beim ersten Start werden realistische Beispieldaten geladen.
+
+## ▶️ Starten
+
+Einfach die Datei **`index.html`** im Browser öffnen (Doppelklick genügt).
+
+> Tipp: Für einen sauberen lokalen Server kann optional
+> `python3 -m http.server` im Projektordner gestartet und
+> `http://localhost:8000` aufgerufen werden.
+
+## ✨ Funktionen
+
+| Bereich | Beschreibung |
+|---|---|
+| **Übersicht** | Trainer-Cockpit mit Kennzahlen, nächsten Terminen, offenen Aufgaben, Geburtstagen und Warnhinweisen. |
+| **Spielerverwaltung** | Kader mit Position, Trikotnummer, Team, Alter sowie Elternkontakt (E-Mail/Telefon) und Status. Direkter „Eltern kontaktieren"-Button (öffnet vorbereitete E-Mail). |
+| **Ankündigungen** | Nachrichten an Team und Eltern zentral veröffentlichen (Zielgruppen-Auswahl). |
+| **Geburtstage** | Automatisch sortierte Geburtstagsliste inkl. „nächste 30 Tage" und Countdown. |
+| **Einverständniserklärungen** | Von den Eltern unterschriebene Formulare hochladen und ablegen (Datei-Upload, lokal gespeichert). Offene Formulare werden angemahnt. |
+| **Kalender** | Monatsansicht aller Trainings und Spieltage, farblich nach Terminart, plus Terminverwaltung. |
+| **Trainingsrückmeldung** | Spielerinnen melden sich **verbindlich** zu, ab oder unsicher – mit Live-Zählung pro Training. |
+| **Fahrerplanung** | Fahrer für Auswärtsspiele eintragen, Plätze zuordnen und offene Mitfahrgelegenheiten erkennen. |
+| **Heimspiel-Jobs** | Catering, Helfer und sonstige Aufgaben für Heimspiele/Events vergeben und abhaken. |
+| **Aufgaben** | Persönliche To-Do-Liste des Trainers mit Priorität und Fälligkeit. |
+| **Finanzen** | Mitgliedsbeiträge, Spenden und Ausgaben verwalten, Saldo, offene Beiträge, „als bezahlt"-Buchung. |
+| **Vereinskleidung** | Kollektion mit Bild (SVG), Preis und Größen – von Spielerinnen direkt anforderbar; Bestellstatus-Verwaltung. |
+| **Sponsoren** | Sponsoren mit Logo, Kategorie und Fördersumme präsentieren – **Platz für weitere Sponsoren** ist eingeplant. |
+| **Material** | Inventar (Bälle, Netze, Ausrüstung) mit Soll/Ist und Nachbestell-Hinweis. |
+| **Verbandsliga MV** | Tabelle/Punktestand der Verbandsliga sowie Direktlinks zum Volleyball-Verband Mecklenburg-Vorpommern (VVMV). |
+| **Volleyball-Wiki** | Regeln, Positionen, Techniken, Trainingsaufbau und Glossar – ideal für neue Spielerinnen und Eltern. |
+
+### Zusätzliche, den Trainer entlastende Funktionen
+Über die ausdrücklich gewünschten Punkte hinaus wurden ergänzt: **Ankündigungs-/
+Eltern-Infoboard**, **Aufgaben-/To-Do-Verwaltung**, **Materialverwaltung**, ein
+zentrales **Trainer-Dashboard** mit Warnhinweisen, **Dark-/Light-Mode** und ein
+**„Eltern kontaktieren"-Assistent**.
+
+## 🔗 Verbands-Links (Verbandsliga Mecklenburg-Vorpommern)
+
+Im Bereich *Verbandsliga MV* sind Direktlinks hinterlegt, u. a. zum
+Volleyball-Verband MV (VVMV), zu Ligen/Tabellen und Spielplänen im
+SAMS-Spielbetrieb sowie zu Regelwerk und Schiedsrichterwesen. Die angezeigte
+Tabelle enthält Beispieldaten und kann an den offiziellen Live-Spielbetrieb
+angebunden werden.
+
+## 🗂️ Projektstruktur
+
+```
+index.html                 App-Shell (Sidebar-Navigation, Layout)
+assets/css/styles.css      Design-System, Layout, Responsive, Dark-Mode
+assets/js/store.js         Datenmodell + Beispieldaten + localStorage
+assets/js/utils.js         Hilfsfunktionen (Datum, Modal, Toast, SVG)
+assets/js/views.js         Alle Ansichten/Bereiche
+assets/js/app.js           Router & Initialisierung
+```
+
+## 🔒 Datenschutz
+
+Es werden **keine Daten an einen Server übertragen** – alles bleibt lokal im
+Browser. Hochgeladene Einverständniserklärungen werden ausschließlich im
+`localStorage` des Geräts abgelegt. Über den Button **„Demo-Daten"** lässt sich
+der Beispieldatenstand jederzeit wiederherstellen.
+
+## 🚀 Weiterentwicklung
+
+Die Datenstruktur in `store.js` ist bewusst so gehalten, dass sie später an eine
+echte API/Datenbank (z. B. für mehrere Nutzer, sichere Dateiablage und
+Live-Verbandsdaten) angebunden werden kann, ohne die Views neu schreiben zu
+müssen.
