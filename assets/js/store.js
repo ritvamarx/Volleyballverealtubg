@@ -7,8 +7,9 @@
 (function () {
   "use strict";
 
-  const KEY = "skv_vb_data_v1";
-  const CLUB = "SKV Volleyball";
+  const KEY = "skv_vb_data_v2";
+  const CLUB = "SKV Müritz";
+  const WEBSITE = "https://www.skv-mueritz.de";
 
   // ---- kleine ID- & Datums-Helfer (deterministisch, ohne Zufall) ----
   let _idc = 1;
@@ -18,6 +19,19 @@
   const SEASON = { year: 2025 };
 
   function seed() {
+    // Abteilungen / Mannschaften des Vereins
+    const departments = [
+      dept("DAM1", "Damen I", "Aktive", "w", "Verbandsliga MV", "Damen", "Katrin Sommer", "damen1@skv-mueritz.de", "Di & Do 19:30–21:30", "Sporthalle SKV, Halle 1"),
+      dept("DAM2", "Damen II", "Aktive", "w", "Bezirksliga Ost", "Damen", "Katrin Sommer", "damen2@skv-mueritz.de", "Mo 19:00–21:00", "Sporthalle SKV, Halle 1"),
+      dept("HER1", "Herren I", "Aktive", "m", "Landesliga MV", "Herren", "Michael Voß", "herren1@skv-mueritz.de", "Mi & Fr 19:30–21:30", "Sporthalle SKV, Halle 2"),
+      dept("WU18", "weibliche U18", "Jugend", "w", "Verbandsliga MV weibl. U18", "U18", "Andrea Berg", "wu18@skv-mueritz.de", "Mo & Fr 18:00–20:00", "Sporthalle SKV, Halle 1"),
+      dept("WU16", "weibliche U16", "Jugend", "w", "Verbandsliga MV weibl. U16", "U16", "Andrea Berg", "wu16@skv-mueritz.de", "Di & Do 17:00–18:30", "Sporthalle SKV, Halle 1"),
+      dept("WU14", "weibliche U14", "Jugend", "w", "Bezirksklasse weibl. U14", "U14", "Sven Lorenz", "wu14@skv-mueritz.de", "Mi 16:30–18:00", "Sporthalle SKV, Halle 2"),
+      dept("MINI", "Mini-Volleyball (U12)", "Nachwuchs", "mix", "Mini-Spielfeste MV", "U12", "Sven Lorenz", "mini@skv-mueritz.de", "Fr 16:00–17:30", "Grundschule am See"),
+      dept("HOBBY", "Hobby & Freizeit", "Breitensport", "mix", "Freizeitrunde Müritz", "Erwachsene", "Team Hobby", "hobby@skv-mueritz.de", "So 18:00–20:00", "Sporthalle SKV, Halle 1"),
+    ];
+    const deptId = (code) => (departments.find((x) => x.code === code) || {}).id || null;
+
     const players = [
       p("Lena", "Bauer", "2009-03-14", "Zuspiel", 3, "U18", "Sabine Bauer", "sabine.bauer@example.de", "0170 1234501", true, "aktiv"),
       p("Mia", "Schulz", "2008-07-02", "Außenangriff", 7, "U18", "Ralf Schulz", "ralf.schulz@example.de", "0170 1234502", true, "aktiv"),
@@ -32,6 +46,13 @@
       p("Paula", "Klein", "2011-04-30", "Außenangriff", 2, "U16", "Bea Klein", "bea.klein@example.de", "0170 1234511", true, "aktiv"),
       p("Ida", "Wolf", "2009-07-08", "Mitte", 14, "U18", "Olaf Wolf", "olaf.wolf@example.de", "0170 1234512", false, "beitragsrückstand"),
     ];
+
+    // Spielerinnen den Abteilungen zuordnen und Passnummern vergeben
+    const teamToDept = { U18: "WU18", U16: "WU16", U14: "WU14", Damen: "DAM1", Herren: "HER1" };
+    players.forEach((pl, i) => {
+      pl.departmentId = deptId(teamToDept[pl.team] || null);
+      pl.passNumber = `MV${SEASON.year}${String(10001 + i)}`;
+    });
 
     const events = [
       ev("training", "Training U18", d(0, 18, 0), d(0, 20, 0), "Sporthalle SKV, Halle 1", ""),
@@ -158,16 +179,36 @@
       st("Waren Volleys", 12, 2, 10, 8, 31, 5),
     ];
 
+    // Beispiel-Verbandsmeldung für die weibliche U18
+    const wu18Id = deptId("WU18");
+    const wu18Players = players.filter((pl) => pl.departmentId === wu18Id);
+    const seasonLabel = `${SEASON.year}/${String(SEASON.year + 1).slice(2)}`;
+    const meldungen = [
+      meldung(seasonLabel, wu18Id, "Verbandsliga MV weibl. U18", "Staffel Nord", "SKV Müritz weibl. U18", "Andrea Berg",
+        wu18Players.map((pl) => ({
+          playerId: pl.id,
+          passNumber: pl.passNumber,
+          jahrgang: new Date(pl.birthDate).getFullYear(),
+          role: pl.position === "Libero" ? "Libero" : (pl.jerseyNumber === 3 ? "Kapitän" : "Spieler"),
+        })), "gemeldet"),
+    ];
+
     return {
-      club: CLUB, season: SEASON,
-      players, events, responses, drivers, jobs, consents, finances,
-      clothing, clothingRequests, sponsors, announcements, tasks, inventory, standings,
+      club: CLUB, website: "https://www.skv-mueritz.de", season: SEASON,
+      departments, players, events, responses, drivers, jobs, consents, finances,
+      clothing, clothingRequests, sponsors, announcements, tasks, inventory, standings, meldungen,
     };
   }
 
   // ---- Entity-Factories ----
   function p(firstName, lastName, birthDate, position, jerseyNumber, team, parentName, parentEmail, parentPhone, consentOnFile, membershipStatus) {
-    return { id: uid("pl"), firstName, lastName, birthDate, position, jerseyNumber, team, parentName, parentEmail, parentPhone, consentOnFile, membershipStatus, notes: "" };
+    return { id: uid("pl"), firstName, lastName, birthDate, position, jerseyNumber, team, parentName, parentEmail, parentPhone, consentOnFile, membershipStatus, notes: "", gender: "w", passNumber: "", departmentId: null };
+  }
+  function dept(code, name, category, gender, league, ageGroup, trainer, email, times, venue) {
+    return { id: uid("de"), code, name, category, gender, league, ageGroup, trainer, email, times, venue, active: true };
+  }
+  function meldung(season, departmentId, league, staffel, teamName, responsible, entries, status) {
+    return { id: uid("vm"), season, departmentId, league, staffel, teamName, responsible, entries: entries || [], status: status || "Entwurf", createdAt: new Date().toISOString() };
   }
   function ev(type, title, start, end, location, opponent) {
     return { id: uid("ev"), type, title, start, end, location, opponent, description: "" };
@@ -243,7 +284,7 @@
 
   // ---- Öffentliche API ----
   const Store = {
-    CLUB,
+    CLUB, WEBSITE,
     get: () => state,
     save,
     resetDemo,

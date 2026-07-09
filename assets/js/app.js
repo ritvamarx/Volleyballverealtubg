@@ -9,6 +9,7 @@
   const NAV = [
     { group: "Team" },
     { id: "dashboard", label: "Übersicht", icon: "🏠" },
+    { id: "departments", label: "Abteilungen", icon: "🏟️" },
     { id: "players", label: "Spielerverwaltung", icon: "🧑‍🤝‍🧑" },
     { id: "announcements", label: "Ankündigungen", icon: "📣" },
     { id: "birthdays", label: "Geburtstage", icon: "🎂" },
@@ -28,6 +29,7 @@
     { id: "inventory", label: "Material", icon: "📦" },
 
     { group: "Wissen & Verband" },
+    { id: "verbandsmeldung", label: "Verbandsmeldung", icon: "📋" },
     { id: "standings", label: "Verbandsliga MV", icon: "🏆" },
     { id: "wiki", label: "Volleyball-Wiki", icon: "📖" },
   ];

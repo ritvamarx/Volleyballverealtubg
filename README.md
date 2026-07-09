@@ -1,7 +1,8 @@
-# 🏐 SKV Volleyball – Trainer- & Vereinsplattform
+# 🏐 SKV Müritz – Trainer- & Vereinsplattform
 
 Eine komplette Verwaltungs- und Kommunikationsplattform für den Volleyballverein
-**SKV** (Verbandsliga Mecklenburg-Vorpommern). Sie hilft dem Trainerteam, den
+**SKV Müritz** ([www.skv-mueritz.de](https://www.skv-mueritz.de), Verbandsliga
+Mecklenburg-Vorpommern). Sie hilft dem Trainerteam, den
 Kader zu verwalten, mit den Eltern zu kommunizieren, Einsätze rund um Heim- und
 Auswärtsspiele zu organisieren und den Vereinsalltag zu koordinieren.
 
@@ -22,7 +23,9 @@ Einfach die Datei **`index.html`** im Browser öffnen (Doppelklick genügt).
 | Bereich | Beschreibung |
 |---|---|
 | **Übersicht** | Trainer-Cockpit mit Kennzahlen, nächsten Terminen, offenen Aufgaben, Geburtstagen und Warnhinweisen. |
-| **Spielerverwaltung** | Kader mit Position, Trikotnummer, Team, Alter sowie Elternkontakt (E-Mail/Telefon) und Status. Direkter „Eltern kontaktieren"-Button (öffnet vorbereitete E-Mail). |
+| **Abteilungen** | Verschiedene Mannschaften/Abteilungen (Damen I/II, Herren I, weibl. U18/U16/U14, Mini-Volleyball, Hobby) mit Liga, Altersklasse, Trainingszeiten, Halle und Ansprechpartner. |
+| **Spielerverwaltung** | Kader mit Position, Trikotnummer, **Abteilung**, **Jahrgang**, **Passnummer**, Geschlecht sowie Elternkontakt (E-Mail/Telefon) und Status. Direkter „Eltern kontaktieren"-Button (öffnet vorbereitete E-Mail). |
+| **Verbandsmeldung** | Mannschaftsmeldung an den VVMV: Abteilung wählen → Kader wird mit **Jahrgang** und **Passnummer** automatisch übernommen; Rolle (Kapitän/Libero/…), Staffel und Status pflegbar; **Druck-/PDF-Ausgabe** und Link zum SAMS-Meldeportal. |
 | **Ankündigungen** | Nachrichten an Team und Eltern zentral veröffentlichen (Zielgruppen-Auswahl). |
 | **Geburtstage** | Automatisch sortierte Geburtstagsliste inkl. „nächste 30 Tage" und Countdown. |
 | **Einverständniserklärungen** | Von den Eltern unterschriebene Formulare hochladen und ablegen (Datei-Upload, lokal gespeichert). Offene Formulare werden angemahnt. |

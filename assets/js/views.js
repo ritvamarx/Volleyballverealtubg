@@ -31,6 +31,12 @@
     const p = Store.byId("players", id);
     return p ? `${p.firstName} ${p.lastName}` : "—";
   }
+  function deptName(id) {
+    const d = Store.byId("departments", id);
+    return d ? d.name : "—";
+  }
+  function jahrgang(birthDate) { return birthDate ? new Date(birthDate).getFullYear() : "—"; }
+  const genderLabel = { w: "weiblich", m: "männlich", mix: "gemischt" };
   const typeLabel = { training: "Training", home: "Heimspiel", away: "Auswärtsspiel", other: "Termin" };
   function eventPill(type) {
     return `<span class="badge pill-type-${type}">${typeLabel[type] || "Termin"}</span>`;
@@ -135,26 +141,31 @@
      ====================================================================== */
   function players(el) {
     const s = S();
-    const teams = ["alle", ...new Set(s.players.map((p) => p.team))];
-    const teamFilter = players._team || "alle";
+    const filter = players._team || "alle";
     let list = s.players.slice().sort((a, b) => a.lastName.localeCompare(b.lastName));
-    if (teamFilter !== "alle") list = list.filter((p) => p.team === teamFilter);
+    if (filter !== "alle") list = list.filter((p) => p.departmentId === filter);
+    const chips = [`<button class="chip ${filter === "alle" ? "active" : ""}" data-team="alle">alle (${s.players.length})</button>`]
+      .concat(s.departments.map((d) => {
+        const n = s.players.filter((p) => p.departmentId === d.id).length;
+        return `<button class="chip ${filter === d.id ? "active" : ""}" data-team="${d.id}">${esc(d.name)} (${n})</button>`;
+      }));
 
     el.innerHTML = `
       ${head("Spielerverwaltung", "Kader, Kontaktdaten der Eltern und Status", `<button class="btn" data-add>＋ Spielerin</button>`)}
-      <div class="chip-row mb">${teams.map((t) => `<button class="chip ${t === teamFilter ? "active" : ""}" data-team="${esc(t)}">${esc(t)}</button>`).join("")}</div>
+      <div class="chip-row mb">${chips.join("")}</div>
       <div class="card" style="padding:0">
         <div class="table-wrap"><table>
-          <thead><tr><th>Name</th><th>Nr.</th><th>Position</th><th>Team</th><th>Alter</th><th>Eltern / Kontakt</th><th>Einverständnis</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Nr.</th><th>Position</th><th>Abteilung</th><th>Jg.</th><th>Pass-Nr.</th><th>Eltern / Kontakt</th><th>Einverst.</th><th>Status</th><th></th></tr></thead>
           <tbody>${list.map((p) => `
             <tr>
               <td><div class="flex">${avatar(p.firstName, p.lastName)}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong></div></td>
               <td>#${esc(p.jerseyNumber)}</td>
               <td>${esc(p.position)}</td>
-              <td><span class="badge info">${esc(p.team)}</span></td>
-              <td>${age(p.birthDate)}</td>
+              <td><span class="badge info">${esc(deptName(p.departmentId))}</span></td>
+              <td>${jahrgang(p.birthDate)}</td>
+              <td class="soft">${esc(p.passNumber || "—")}</td>
               <td class="wrap"><div>${esc(p.parentName)}</div><div class="sub soft">${esc(p.parentEmail)} · ${esc(p.parentPhone)}</div></td>
-              <td>${p.consentOnFile ? '<span class="badge good">vorhanden</span>' : '<span class="badge bad">fehlt</span>'}</td>
+              <td>${p.consentOnFile ? '<span class="badge good">✓</span>' : '<span class="badge bad">fehlt</span>'}</td>
               <td>${statusBadge(p.membershipStatus)}</td>
               <td class="right nowrap">
                 <button class="btn sm ghost" data-mail="${p.id}" title="Eltern kontaktieren">✉️</button>
@@ -186,7 +197,8 @@
 
   function playerForm(p) {
     const isEdit = !!p;
-    p = p || { firstName: "", lastName: "", birthDate: "", position: "Außenangriff", jerseyNumber: "", team: "U18", parentName: "", parentEmail: "", parentPhone: "", membershipStatus: "aktiv", consentOnFile: false, notes: "" };
+    const deps = S().departments;
+    p = p || { firstName: "", lastName: "", birthDate: "", position: "Außenangriff", jerseyNumber: "", team: "U18", departmentId: (deps[0] || {}).id || null, gender: "w", passNumber: "", parentName: "", parentEmail: "", parentPhone: "", membershipStatus: "aktiv", consentOnFile: false, notes: "" };
     const positions = ["Zuspiel", "Außenangriff", "Mitte", "Diagonal", "Libero"];
     modal({
       title: isEdit ? "Spielerin bearbeiten" : "Neue Spielerin",
@@ -196,7 +208,11 @@
         <div class="field"><label>Geburtsdatum</label><input type="date" name="birthDate" value="${esc(p.birthDate)}" required></div>
         <div class="field"><label>Trikotnummer</label><input type="number" name="jerseyNumber" value="${esc(p.jerseyNumber)}"></div>
         <div class="field"><label>Position</label><select name="position">${positions.map((x) => `<option ${x === p.position ? "selected" : ""}>${x}</option>`).join("")}</select></div>
-        <div class="field"><label>Team</label><input name="team" value="${esc(p.team)}"></div>
+        <div class="field"><label>Abteilung / Mannschaft</label><select name="departmentId">
+          ${deps.map((d) => `<option value="${d.id}" ${d.id === p.departmentId ? "selected" : ""}>${esc(d.name)}</option>`).join("")}</select></div>
+        <div class="field"><label>Geschlecht</label><select name="gender">
+          ${Object.entries(genderLabel).map(([k, v]) => `<option value="${k}" ${k === p.gender ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        <div class="field"><label>Passnummer (Verband)</label><input name="passNumber" value="${esc(p.passNumber || "")}" placeholder="z. B. MV202512345"></div>
         <div class="field"><label>Name Elternteil</label><input name="parentName" value="${esc(p.parentName)}"></div>
         <div class="field"><label>Status</label><select name="membershipStatus">
           ${["aktiv", "beitragsrückstand", "inaktiv"].map((x) => `<option ${x === p.membershipStatus ? "selected" : ""}>${x}</option>`).join("")}</select></div>
@@ -1017,6 +1033,7 @@
     const s = S();
     const rows = s.standings.slice().sort((a, b) => b.points - a.points || (b.setsW - b.setsL) - (a.setsW - a.setsL));
     const links = [
+      ["🏠", "Vereinswebsite SKV Müritz", "Offizielle Seite des Vereins", Store.WEBSITE],
       ["🏐", "Volleyball-Verband MV (VVMV)", "Startseite des Landesverbands", "https://www.vvmv.de/"],
       ["📊", "Ligen & Tabellen", "Aktuelle Tabellen im SAMS-Spielbetrieb", "https://mv.sams-ticket.de/public/ranking.html"],
       ["📅", "Spielplan & Termine", "Ansetzungen der Verbandsliga", "https://mv.sams-ticket.de/public/schedule.html"],
@@ -1287,10 +1304,309 @@
     });
   }
 
+  /* ======================================================================
+     ABTEILUNGEN / MANNSCHAFTEN
+     ====================================================================== */
+  const catBadge = { Aktive: "info", Jugend: "accent", Nachwuchs: "good", Breitensport: "warn" };
+  function departments(el) {
+    const s = S();
+    const byCat = {};
+    s.departments.forEach((d) => (byCat[d.category] = byCat[d.category] || []).push(d));
+    el.innerHTML = `
+      ${head("Abteilungen & Mannschaften", `Alle Teams des ${esc(s.club)} – Aktive, Jugend, Nachwuchs und Breitensport`, `<button class="btn" data-add>＋ Abteilung</button>`)}
+      <div class="grid grid-4 mb">
+        ${stat("🏟️", "Abteilungen", s.departments.length)}
+        ${stat("🧑‍🤝‍🧑", "Mitglieder gesamt", s.players.length)}
+        ${stat("🏅", "Aktiven-Teams", s.departments.filter((d) => d.category === "Aktive").length)}
+        ${stat("🧒", "Jugend & Nachwuchs", s.departments.filter((d) => d.category === "Jugend" || d.category === "Nachwuchs").length)}
+      </div>
+      ${Object.keys(byCat).map((cat) => `
+        <h3 style="margin:18px 0 10px">${esc(cat)}</h3>
+        <div class="grid grid-3 mb">
+          ${byCat[cat].map((d) => {
+            const members = s.players.filter((p) => p.departmentId === d.id).length;
+            return `<div class="card">
+              <div class="flex mb"><strong style="font-size:1.05rem">${esc(d.name)}</strong><span class="spacer"></span>
+                <span class="badge ${catBadge[d.category] || ""}">${esc(d.category)}</span></div>
+              <dl class="kv">
+                <dt>Liga/Spielklasse</dt><dd>${esc(d.league)}</dd>
+                <dt>Altersklasse</dt><dd>${esc(d.ageGroup)} · ${genderLabel[d.gender] || d.gender}</dd>
+                <dt>Training</dt><dd>${esc(d.times)}</dd>
+                <dt>Halle</dt><dd>${esc(d.venue)}</dd>
+                <dt>Ansprechpartner</dt><dd>${esc(d.trainer)}${d.email ? `<br><a href="mailto:${esc(d.email)}" class="soft">${esc(d.email)}</a>` : ""}</dd>
+                <dt>Mitglieder</dt><dd><strong>${members}</strong></dd>
+              </dl>
+              <div class="flex mt">
+                <a class="btn sm outline" href="#/verbandsmeldung" data-meld="${d.id}">📋 Verbandsmeldung</a>
+                <span class="spacer"></span>
+                <button class="btn sm ghost" data-dedit="${d.id}">✏️</button>
+                <button class="btn sm ghost" data-ddel="${d.id}">🗑️</button>
+              </div></div>`;
+          }).join("")}
+        </div>`).join("")}`;
+
+    $("[data-add]", el).onclick = () => departmentForm();
+    $$("[data-dedit]", el).forEach((b) => b.onclick = () => departmentForm(Store.byId("departments", b.dataset.dedit)));
+    $$("[data-ddel]", el).forEach((b) => b.onclick = () => {
+      const d = Store.byId("departments", b.dataset.ddel);
+      const members = S().players.filter((p) => p.departmentId === d.id).length;
+      confirmDialog(`Abteilung „${d.name}" löschen?${members ? ` ${members} Spielerin(nen) verlieren die Zuordnung.` : ""}`, () => {
+        S().players.forEach((p) => { if (p.departmentId === d.id) Store.update("players", p.id, { departmentId: null }); });
+        Store.remove("departments", d.id); toast("Abteilung gelöscht"); reload();
+      });
+    });
+    $$("[data-meld]", el).forEach((a) => a.onclick = () => { verbandsmeldung._preselect = a.dataset.meld; });
+  }
+
+  function departmentForm(d) {
+    const isEdit = !!d;
+    d = d || { code: "", name: "", category: "Jugend", gender: "w", league: "", ageGroup: "", trainer: "", email: "", times: "", venue: "Sporthalle SKV, Halle 1", active: true };
+    modal({
+      title: isEdit ? "Abteilung bearbeiten" : "Neue Abteilung",
+      body: `<form id="def"><div class="form-grid">
+        <div class="field"><label>Name</label><input name="name" value="${esc(d.name)}" required></div>
+        <div class="field"><label>Kurzcode</label><input name="code" value="${esc(d.code)}" placeholder="z. B. WU18"></div>
+        <div class="field"><label>Kategorie</label><select name="category">
+          ${["Aktive", "Jugend", "Nachwuchs", "Breitensport"].map((x) => `<option ${x === d.category ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+        <div class="field"><label>Geschlecht</label><select name="gender">
+          ${Object.entries(genderLabel).map(([k, v]) => `<option value="${k}" ${k === d.gender ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        <div class="field"><label>Liga / Spielklasse</label><input name="league" value="${esc(d.league)}"></div>
+        <div class="field"><label>Altersklasse</label><input name="ageGroup" value="${esc(d.ageGroup)}" placeholder="U18, Damen …"></div>
+        <div class="field"><label>Ansprechpartner:in</label><input name="trainer" value="${esc(d.trainer)}"></div>
+        <div class="field"><label>E-Mail</label><input name="email" value="${esc(d.email)}"></div>
+        <div class="field"><label>Trainingszeiten</label><input name="times" value="${esc(d.times)}"></div>
+        <div class="field"><label>Halle</label><input name="venue" value="${esc(d.venue)}"></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#def"); if (!f.reportValidity()) return;
+          const data = formData(f); data.active = true;
+          if (isEdit) Store.update("departments", d.id, data); else Store.add("departments", data);
+          closeModal(); toast("Gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
+
+  /* ======================================================================
+     VERBANDSMELDUNG (Mannschaftsmeldung an den Verband)
+     ====================================================================== */
+  const meldStatus = { Entwurf: "warn", gemeldet: "good", eingereicht: "info" };
+  const meldRoles = ["Spieler", "Kapitän", "Libero", "Ersatz", "Betreuer", "Trainer"];
+
+  function verbandsmeldung(el) {
+    const s = S();
+    if (verbandsmeldung._open && Store.byId("meldungen", verbandsmeldung._open)) {
+      return renderMeldungDetail(el, Store.byId("meldungen", verbandsmeldung._open));
+    }
+    el.innerHTML = `
+      ${head("Verbandsmeldung", "Mannschaftsmeldungen mit Jahrgang und Passnummer für den VVMV erstellen",
+        `<button class="btn" data-add>＋ Neue Meldung</button>`)}
+      <div class="grid grid-3 mb">
+        ${stat("📋", "Meldungen", s.meldungen.length)}
+        ${stat("✅", "Gemeldet", s.meldungen.filter((m) => m.status !== "Entwurf").length)}
+        ${stat("👥", "Gemeldete Spieler:innen", s.meldungen.reduce((a, m) => a + m.entries.length, 0))}
+      </div>
+      <a class="link-card mb" href="https://mv.sams-ticket.de/public/" target="_blank" rel="noopener">
+        <span class="ic">🌐</span><div class="grow"><div class="title">VVMV Meldeportal (SAMS)</div>
+        <div class="sub">Offizielle Online-Meldung des Volleyball-Verbands MV</div></div><span class="arr">↗</span></a>
+      <div class="grid grid-2">
+        ${s.meldungen.length ? s.meldungen.map((m) => `
+          <div class="card">
+            <div class="flex mb"><strong style="font-size:1.05rem">${esc(m.teamName)}</strong><span class="spacer"></span>
+              <span class="badge ${meldStatus[m.status] || ""}">${esc(m.status)}</span></div>
+            <dl class="kv mb">
+              <dt>Saison</dt><dd>${esc(m.season)}</dd>
+              <dt>Spielklasse</dt><dd>${esc(m.league)}</dd>
+              <dt>Staffel</dt><dd>${esc(m.staffel || "—")}</dd>
+              <dt>Verantwortlich</dt><dd>${esc(m.responsible || "—")}</dd>
+              <dt>Spieler:innen</dt><dd><strong>${m.entries.length}</strong></dd>
+            </dl>
+            <div class="flex"><button class="btn sm" data-open="${m.id}">Öffnen & bearbeiten</button>
+              <span class="spacer"></span>
+              <button class="btn sm ghost" data-mdel="${m.id}">🗑️</button></div>
+          </div>`).join("") : empty("📋", "Noch keine Meldungen – jetzt erstellen")}
+      </div>`;
+
+    $("[data-add]", el).onclick = () => meldungForm();
+    $$("[data-open]", el).forEach((b) => b.onclick = () => { verbandsmeldung._open = b.dataset.open; reload(); });
+    $$("[data-mdel]", el).forEach((b) => b.onclick = () => confirmDialog("Meldung löschen?", () => { Store.remove("meldungen", b.dataset.mdel); toast("Gelöscht"); reload(); }));
+  }
+
+  function meldungForm() {
+    const s = S();
+    const preset = verbandsmeldung._preselect;
+    verbandsmeldung._preselect = null;
+    const seasonLabel = `${s.season.year}/${String(s.season.year + 1).slice(2)}`;
+    modal({
+      title: "Neue Verbandsmeldung",
+      body: `<form id="mf"><div class="form-grid">
+        <div class="field"><label>Abteilung / Mannschaft</label><select name="departmentId" id="mdept">
+          ${s.departments.map((d) => `<option value="${d.id}" ${d.id === preset ? "selected" : ""}>${esc(d.name)}</option>`).join("")}</select></div>
+        <div class="field"><label>Saison</label><input name="season" value="${esc(seasonLabel)}"></div>
+        <div class="field"><label>Spielklasse / Liga</label><input name="league" id="mleague"></div>
+        <div class="field"><label>Staffel</label><input name="staffel" placeholder="z. B. Staffel Nord"></div>
+        <div class="field"><label>Mannschaftsname (Meldung)</label><input name="teamName" id="mteam"></div>
+        <div class="field"><label>Verantwortlich</label><input name="responsible" id="mresp"></div>
+      </div>
+      <p class="muted" style="font-size:.82rem">Alle aktiven Spieler:innen der gewählten Abteilung werden automatisch mit Jahrgang und Passnummer übernommen. Danach kannst du die Liste anpassen.</p></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Meldung anlegen</button>`,
+      onOpen(m) {
+        const sync = () => {
+          const d = Store.byId("departments", m.querySelector("#mdept").value);
+          if (!d) return;
+          m.querySelector("#mleague").value = d.league || "";
+          m.querySelector("#mteam").value = `${Store.CLUB} ${d.name}`;
+          m.querySelector("#mresp").value = d.trainer || "";
+        };
+        sync();
+        m.querySelector("#mdept").onchange = sync;
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const data = formData(m.querySelector("#mf"));
+          const roster = S().players.filter((p) => p.departmentId === data.departmentId && p.membershipStatus !== "inaktiv");
+          const entries = roster.map((p) => ({
+            playerId: p.id, passNumber: p.passNumber || "",
+            jahrgang: jahrgang(p.birthDate), role: p.position === "Libero" ? "Libero" : "Spieler",
+          }));
+          const created = Store.add("meldungen", Object.assign({ entries, status: "Entwurf", createdAt: new Date().toISOString() }, data));
+          closeModal(); verbandsmeldung._open = created.id; toast("Meldung angelegt", "good"); reload();
+        };
+      },
+    });
+  }
+
+  function renderMeldungDetail(el, m) {
+    const dep = Store.byId("departments", m.departmentId);
+    el.innerHTML = `
+      <div class="section-head">
+        <div><h2>${esc(m.teamName)}</h2><p>Verbandsmeldung · Saison ${esc(m.season)}</p></div>
+        <div class="spacer"></div>
+        <button class="btn outline" data-back>‹ Zurück</button>
+        <button class="btn secondary" data-print>🖨️ Drucken / PDF</button>
+      </div>
+      <div class="card mb"><div class="form-grid">
+        <div class="field"><label>Spielklasse / Liga</label><input id="f-league" value="${esc(m.league)}"></div>
+        <div class="field"><label>Staffel</label><input id="f-staffel" value="${esc(m.staffel || "")}"></div>
+        <div class="field"><label>Verantwortlich</label><input id="f-resp" value="${esc(m.responsible || "")}"></div>
+        <div class="field"><label>Status</label><select id="f-status">
+          ${Object.keys(meldStatus).map((k) => `<option ${k === m.status ? "selected" : ""}>${k}</option>`).join("")}</select></div>
+      </div></div>
+
+      <div class="card" style="padding:0">
+        <div class="card-head" style="padding:16px 16px 0"><h3>Gemeldete Spieler:innen (${m.entries.length})</h3>
+          <span class="spacer"></span><button class="btn sm" data-addpl>＋ Spieler:in</button></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>#</th><th>Name</th><th>Jahrgang</th><th>Passnummer</th><th>Position</th><th>Rolle</th><th></th></tr></thead>
+          <tbody>${m.entries.map((e, i) => {
+            const p = Store.byId("players", e.playerId);
+            return `<tr>
+              <td>${i + 1}</td>
+              <td><strong>${esc(p ? p.firstName + " " + p.lastName : "unbekannt")}</strong></td>
+              <td>${esc(e.jahrgang || (p ? jahrgang(p.birthDate) : "—"))}</td>
+              <td><input class="e-pass" data-i="${i}" value="${esc(e.passNumber || "")}" style="min-width:150px"></td>
+              <td class="soft">${esc(p ? p.position : "—")}</td>
+              <td><select class="e-role" data-i="${i}">${meldRoles.map((r) => `<option ${r === e.role ? "selected" : ""}>${r}</option>`).join("")}</select></td>
+              <td class="right"><button class="btn sm ghost" data-rm="${i}">🗑️</button></td></tr>`;
+          }).join("") || `<tr><td colspan="7">${empty("👥", "Noch keine Spieler:innen in der Meldung")}</td></tr>`}</tbody>
+        </table></div>
+      </div>
+      <p class="muted mt" style="font-size:.82rem">Änderungen an Passnummer und Rolle werden sofort gespeichert. Für die offizielle Einreichung nutze das VVMV-Meldeportal (SAMS).</p>`;
+
+    const saveField = (k, v) => { Store.update("meldungen", m.id, { [k]: v }); };
+    $("#f-league", el).onchange = (e) => saveField("league", e.target.value);
+    $("#f-staffel", el).onchange = (e) => saveField("staffel", e.target.value);
+    $("#f-resp", el).onchange = (e) => saveField("responsible", e.target.value);
+    $("#f-status", el).onchange = (e) => { saveField("status", e.target.value); toast("Status gespeichert", "good"); };
+
+    $$(".e-pass", el).forEach((inp) => inp.onchange = () => {
+      const entries = m.entries.slice(); entries[+inp.dataset.i].passNumber = inp.value;
+      Store.update("meldungen", m.id, { entries });
+      const pl = Store.byId("players", entries[+inp.dataset.i].playerId);
+      if (pl) Store.update("players", pl.id, { passNumber: inp.value });
+    });
+    $$(".e-role", el).forEach((sel) => sel.onchange = () => {
+      const entries = m.entries.slice(); entries[+sel.dataset.i].role = sel.value;
+      Store.update("meldungen", m.id, { entries });
+    });
+    $$("[data-rm]", el).forEach((b) => b.onclick = () => {
+      const entries = m.entries.filter((_, i) => i !== +b.dataset.rm);
+      Store.update("meldungen", m.id, { entries }); reload();
+    });
+    $("[data-addpl]", el).onclick = () => addMeldungPlayer(m);
+    $("[data-back]", el).onclick = () => { verbandsmeldung._open = null; reload(); };
+    $("[data-print]", el).onclick = () => printMeldung(Store.byId("meldungen", m.id), dep);
+  }
+
+  function addMeldungPlayer(m) {
+    const inList = new Set(m.entries.map((e) => e.playerId));
+    const avail = S().players.filter((p) => !inList.has(p.id))
+      .sort((a, b) => (a.departmentId === m.departmentId ? -1 : 1) - (b.departmentId === m.departmentId ? -1 : 1) || a.lastName.localeCompare(b.lastName));
+    if (!avail.length) { toast("Alle Spieler:innen sind bereits gemeldet"); return; }
+    modal({
+      title: "Spieler:in zur Meldung hinzufügen",
+      body: `<div class="list">${avail.map((p) => `
+        <label class="list-item" style="cursor:pointer">${avatar(p.firstName, p.lastName)}
+          <div class="grow"><div class="title">${esc(p.firstName)} ${esc(p.lastName)}</div>
+          <div class="sub">Jg. ${jahrgang(p.birthDate)} · ${esc(deptName(p.departmentId))} · ${esc(p.passNumber || "ohne Pass-Nr.")}</div></div>
+          <input type="checkbox" data-pl="${p.id}" style="width:auto"></label>`).join("")}</div>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Hinzufügen</button>`,
+      onOpen(mm) {
+        mm.querySelector("[data-x]").onclick = closeModal;
+        mm.querySelector("[data-s]").onclick = () => {
+          const picks = $$("[data-pl]:checked", mm).map((c) => c.dataset.pl);
+          const entries = m.entries.slice();
+          picks.forEach((pid) => {
+            const p = Store.byId("players", pid);
+            entries.push({ playerId: pid, passNumber: p.passNumber || "", jahrgang: jahrgang(p.birthDate), role: p.position === "Libero" ? "Libero" : "Spieler" });
+          });
+          Store.update("meldungen", m.id, { entries });
+          closeModal(); toast(`${picks.length} hinzugefügt`, "good"); reload();
+        };
+      },
+    });
+  }
+
+  function printMeldung(m, dep) {
+    const rows = m.entries.map((e, i) => {
+      const p = Store.byId("players", e.playerId);
+      return `<tr><td>${i + 1}</td><td>${esc(p ? p.lastName + ", " + p.firstName : "—")}</td>
+        <td>${esc(e.jahrgang || "")}</td><td>${esc(e.passNumber || "")}</td>
+        <td>${esc(p ? p.position : "")}</td><td>${esc(e.role || "")}</td></tr>`;
+    }).join("");
+    const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Verbandsmeldung ${esc(m.teamName)}</title>
+      <style>body{font-family:Arial,sans-serif;color:#111;margin:32px}h1{font-size:20px;margin:0 0 2px}
+      .sub{color:#555;margin:0 0 16px}table{width:100%;border-collapse:collapse;font-size:13px}
+      th,td{border:1px solid #999;padding:6px 8px;text-align:left}th{background:#eee}
+      .kv{font-size:13px;margin-bottom:14px}.kv b{display:inline-block;width:150px}
+      .sign{margin-top:40px;display:flex;gap:60px}.sign div{border-top:1px solid #333;padding-top:4px;font-size:12px;flex:1}
+      </style></head><body>
+      <h1>Mannschaftsmeldung – ${esc(Store.CLUB)}</h1>
+      <p class="sub">${esc(Store.WEBSITE)} · Volleyball-Verband Mecklenburg-Vorpommern (VVMV)</p>
+      <div class="kv">
+        <div><b>Mannschaft:</b> ${esc(m.teamName)}</div>
+        <div><b>Saison:</b> ${esc(m.season)}</div>
+        <div><b>Spielklasse:</b> ${esc(m.league)}${m.staffel ? " · " + esc(m.staffel) : ""}</div>
+        <div><b>Altersklasse:</b> ${esc(dep ? dep.ageGroup + " (" + (genderLabel[dep.gender] || dep.gender) + ")" : "—")}</div>
+        <div><b>Verantwortlich:</b> ${esc(m.responsible || "")}</div>
+        <div><b>Status:</b> ${esc(m.status)}</div>
+      </div>
+      <table><thead><tr><th>Nr.</th><th>Name, Vorname</th><th>Jahrgang</th><th>Passnummer</th><th>Position</th><th>Rolle</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6">keine Spieler:innen</td></tr>'}</tbody></table>
+      <div class="sign"><div>Ort, Datum</div><div>Unterschrift Abteilungsleitung</div></div>
+      </body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) { toast("Bitte Pop-ups erlauben, um zu drucken", "bad"); return; }
+    w.document.write(html); w.document.close(); w.focus();
+    setTimeout(() => w.print(), 300);
+  }
+
   // ---- Export ----
   window.Views = {
-    dashboard, players, calendar, training, drivers, jobs, consents,
+    dashboard, players, departments, calendar, training, drivers, jobs, consents,
     birthdays, finances, clothing, sponsors, standings, wiki,
-    announcements, tasks, inventory,
+    announcements, tasks, inventory, verbandsmeldung,
   };
 })();
