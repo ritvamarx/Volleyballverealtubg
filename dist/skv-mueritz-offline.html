@@ -1,0 +1,2620 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SKV Volleyball · Trainer- & Vereinsplattform</title>
+  <meta name="description" content="Verwaltungs- und Kommunikationsplattform für den Volleyballverein SKV: Spieler, Termine, Fahrer, Catering, Finanzen und mehr." />
+  <style>
+/* ==========================================================================
+   SKV Volleyball – Trainer- & Vereinsplattform
+   Design system & layout
+   ========================================================================== */
+:root {
+  --accent: #f97316;         /* Volleyball-Orange */
+  --accent-dark: #ea580c;
+  --primary: #1e3a8a;        /* Vereinsblau */
+  --primary-2: #2563eb;
+  --bg: #f1f5f9;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --text-soft: #475569;
+  --muted: #94a3b8;
+  --good: #16a34a;
+  --warn: #d97706;
+  --bad: #dc2626;
+  --radius: 14px;
+  --radius-sm: 9px;
+  --shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.06);
+  --sidebar-w: 258px;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+[data-theme="dark"] {
+  --bg: #0b1220;
+  --surface: #111a2e;
+  --surface-2: #0f1729;
+  --border: #22304d;
+  --text: #e7edf7;
+  --text-soft: #a9b6cc;
+  --muted: #6b7a99;
+  --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--primary-2); }
+h1,h2,h3,h4 { margin: 0 0 .4em; line-height: 1.2; }
+p { line-height: 1.55; }
+
+#app { display: flex; min-height: 100vh; }
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  width: var(--sidebar-w);
+  flex: 0 0 var(--sidebar-w);
+  background: linear-gradient(180deg, var(--primary) 0%, #0f2260 100%);
+  color: #dbe4ff;
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  z-index: 40;
+}
+.brand { display: flex; align-items: center; gap: 12px; padding: 20px 18px 14px; }
+.brand-logo { background: rgba(255,255,255,.08); border-radius: 12px; padding: 4px; display: grid; place-items: center; }
+.brand-text { display: flex; flex-direction: column; }
+.brand-text strong { font-size: 1.05rem; color: #fff; letter-spacing: .2px; }
+.brand-text span { font-size: .74rem; color: #9db0e6; text-transform: uppercase; letter-spacing: 1px; }
+.brand-link { font-size: .74rem; color: #9db0e6; text-decoration: none; }
+.brand-link:hover { color: #fff; text-decoration: underline; }
+
+.nav { flex: 1; overflow-y: auto; padding: 6px 10px 10px; }
+.nav-group-title {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: 1.2px;
+  color: #7f93cf; padding: 14px 12px 6px; font-weight: 700;
+}
+.nav a {
+  display: flex; align-items: center; gap: 11px;
+  padding: 9px 12px; margin: 1px 0;
+  border-radius: 10px; color: #c7d3f5; text-decoration: none;
+  font-size: .9rem; font-weight: 500; transition: background .15s, color .15s;
+}
+.nav a .ic { width: 20px; text-align: center; font-size: 1rem; }
+.nav a:hover { background: rgba(255,255,255,.07); color: #fff; }
+.nav a.active { background: var(--accent); color: #fff; box-shadow: 0 6px 16px rgba(249,115,22,.35); }
+.nav a .badge { margin-left: auto; }
+
+.sidebar-foot { padding: 10px; display: flex; gap: 8px; border-top: 1px solid rgba(255,255,255,.08); }
+.btn-ghost {
+  flex: 1; background: rgba(255,255,255,.06); color: #dbe4ff; border: none;
+  border-radius: 9px; padding: 8px; font-size: .78rem; cursor: pointer;
+}
+.btn-ghost:hover { background: rgba(255,255,255,.14); }
+
+/* ---------- Main ---------- */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 14px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 22px;
+}
+.topbar-title { font-size: 1.15rem; font-weight: 700; }
+.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.season-badge {
+  font-size: .76rem; font-weight: 600; color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  padding: 6px 12px; border-radius: 999px;
+}
+.hamburger { display: none; background: none; border: none; font-size: 1.4rem; color: var(--text); cursor: pointer; }
+
+.content { padding: 22px; max-width: 1240px; width: 100%; margin: 0 auto; }
+
+/* ---------- Cards & layout ---------- */
+.grid { display: grid; gap: 16px; }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-auto { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px;
+}
+.card h3 { font-size: 1rem; }
+.card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.card-head h3 { margin: 0; }
+.card-head .spacer { flex: 1; }
+
+.section-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+.section-head h2 { font-size: 1.35rem; margin: 0; }
+.section-head p { margin: 2px 0 0; color: var(--text-soft); font-size: .9rem; }
+.section-head .spacer { flex: 1; }
+
+/* Stat tiles */
+.stat { display: flex; flex-direction: column; gap: 4px; }
+.stat .label { font-size: .78rem; color: var(--text-soft); font-weight: 600; text-transform: uppercase; letter-spacing: .4px; }
+.stat .value { font-size: 1.9rem; font-weight: 800; line-height: 1; }
+.stat .sub { font-size: .8rem; color: var(--muted); }
+.icon {
+  width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center;
+  font-size: 1.25rem; flex: 0 0 42px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 7px; justify-content: center;
+  background: var(--accent); color: #fff; border: none; cursor: pointer;
+  border-radius: 10px; padding: 9px 15px; font-size: .88rem; font-weight: 600;
+  transition: transform .05s, background .15s; text-decoration: none;
+}
+.btn:hover { background: var(--accent-dark); }
+.btn:active { transform: translateY(1px); }
+.btn.secondary { background: var(--primary); }
+.btn.secondary:hover { background: #16307a; }
+.btn.outline { background: transparent; color: var(--text); border: 1px solid var(--border); }
+.btn.outline:hover { background: var(--surface-2); }
+.btn.sm { padding: 6px 11px; font-size: .8rem; border-radius: 8px; }
+.btn.danger { background: var(--bad); }
+.btn.ghost { background: transparent; color: var(--text-soft); }
+.btn.ghost:hover { background: var(--surface-2); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ---------- Tables ---------- */
+.table-wrap { overflow-x: auto; border-radius: var(--radius-sm); }
+table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { font-size: .75rem; text-transform: uppercase; letter-spacing: .4px; color: var(--text-soft); font-weight: 700; }
+tbody tr:hover { background: var(--surface-2); }
+td.wrap, th.wrap { white-space: normal; }
+
+/* ---------- Badges & chips ---------- */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: .74rem; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+  background: var(--surface-2); color: var(--text-soft); border: 1px solid var(--border);
+}
+.badge.good { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); border-color: transparent; }
+.badge.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); border-color: transparent; }
+.badge.bad  { background: color-mix(in srgb, var(--bad) 13%, transparent); color: var(--bad); border-color: transparent; }
+.badge.info { background: color-mix(in srgb, var(--primary-2) 14%, transparent); color: var(--primary-2); border-color: transparent; }
+.badge.accent { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-dark); border-color: transparent; }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: .82rem;
+  padding: 5px 11px; border-radius: 999px; background: var(--surface-2);
+  border: 1px solid var(--border); cursor: pointer;
+}
+.chip.active { background: var(--primary); color: #fff; border-color: transparent; }
+.chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.pill-type-training { background: color-mix(in srgb, var(--primary-2) 14%, transparent); color: var(--primary-2); }
+.pill-type-home { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+.pill-type-away { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-dark); }
+.pill-type-other { background: var(--surface-2); color: var(--text-soft); }
+
+/* ---------- Forms ---------- */
+.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field.full { grid-column: 1 / -1; }
+label { font-size: .82rem; font-weight: 600; color: var(--text-soft); }
+input, select, textarea {
+  font: inherit; font-size: .9rem; padding: 9px 11px; border-radius: 9px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text); width: 100%;
+}
+input:focus, select:focus, textarea:focus { outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent); border-color: var(--accent); }
+textarea { resize: vertical; min-height: 72px; }
+
+/* ---------- Modal ---------- */
+.overlay {
+  position: fixed; inset: 0; background: rgba(6,12,28,.55);
+  opacity: 0; visibility: hidden; transition: opacity .2s; z-index: 60;
+}
+.overlay.show { opacity: 1; visibility: visible; }
+.modal {
+  position: fixed; z-index: 70; top: 50%; left: 50%;
+  transform: translate(-50%, -48%); width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px); overflow-y: auto;
+  background: var(--surface); border-radius: 16px; box-shadow: var(--shadow);
+  opacity: 0; visibility: hidden; transition: opacity .2s, transform .2s;
+}
+.modal.show { opacity: 1; visibility: visible; transform: translate(-50%, -50%); }
+.modal-head { display: flex; align-items: center; padding: 18px 20px; border-bottom: 1px solid var(--border); }
+.modal-head h3 { margin: 0; }
+.modal-head .close { margin-left: auto; background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--muted); }
+.modal-body { padding: 20px; }
+.modal-foot { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
+
+/* ---------- Toast ---------- */
+.toast-root { position: fixed; bottom: 20px; right: 20px; z-index: 90; display: flex; flex-direction: column; gap: 10px; }
+.toast {
+  background: var(--text); color: var(--surface); padding: 12px 16px; border-radius: 11px;
+  box-shadow: var(--shadow); font-size: .88rem; font-weight: 500;
+  animation: toastIn .25s ease; max-width: 340px;
+}
+.toast.good { background: var(--good); color: #fff; }
+.toast.bad { background: var(--bad); color: #fff; }
+@keyframes toastIn { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* ---------- Misc utility ---------- */
+.muted { color: var(--muted); }
+.soft { color: var(--text-soft); }
+.right { text-align: right; }
+.center { text-align: center; }
+.flex { display: flex; align-items: center; gap: 10px; }
+.flex-wrap { flex-wrap: wrap; }
+.spacer { flex: 1; }
+.mt { margin-top: 14px; }
+.mt-lg { margin-top: 22px; }
+.mb { margin-bottom: 14px; }
+.nowrap { white-space: nowrap; }
+.empty { text-align: center; color: var(--muted); padding: 34px 10px; }
+.empty .big { font-size: 2rem; display: block; margin-bottom: 8px; }
+.list { display: flex; flex-direction: column; gap: 10px; }
+.list-item {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: 11px; background: var(--surface);
+}
+.list-item .grow { flex: 1; min-width: 0; }
+.list-item .title { font-weight: 600; }
+.list-item .sub { font-size: .82rem; color: var(--text-soft); }
+.avatar {
+  width: 40px; height: 40px; border-radius: 50%; flex: 0 0 40px;
+  display: grid; place-items: center; font-weight: 700; color: #fff; font-size: .85rem;
+}
+.progress { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.progress > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+
+.link-card {
+  display: flex; align-items: center; gap: 12px; padding: 14px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface);
+  text-decoration: none; color: var(--text); transition: border-color .15s, transform .05s;
+}
+.link-card:hover { border-color: var(--accent); }
+.link-card .ic { font-size: 1.4rem; }
+.link-card .grow { flex: 1; }
+.link-card .title { font-weight: 700; }
+.link-card .sub { font-size: .82rem; color: var(--text-soft); }
+.link-card .arr { color: var(--muted); }
+
+/* clothing / product cards */
+.product { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
+.product .img { aspect-ratio: 4/3; background: var(--surface-2); display: grid; place-items: center; }
+.product .img svg { width: 100%; height: 100%; }
+.product .body { padding: 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
+.product .price { font-weight: 800; color: var(--accent-dark); }
+
+.sponsor-card { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.sponsor-logo { width: 100%; aspect-ratio: 16/7; background: var(--surface-2); border-radius: 10px; display: grid; place-items: center; overflow: hidden; }
+.sponsor-logo svg { width: 80%; height: 80%; }
+
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 18px; flex-wrap: wrap; }
+.tab { padding: 9px 15px; border: none; background: none; cursor: pointer; font-weight: 600; color: var(--text-soft); border-bottom: 2px solid transparent; font-size: .9rem; }
+.tab.active { color: var(--accent-dark); border-bottom-color: var(--accent); }
+
+.wiki-toc a { display: block; padding: 6px 0; text-decoration: none; color: var(--text-soft); font-size: .88rem; }
+.wiki-toc a:hover { color: var(--accent-dark); }
+.wiki-article h3 { margin-top: 26px; color: var(--primary); }
+.wiki-article h3:first-child { margin-top: 0; }
+.wiki-article ul { line-height: 1.7; }
+
+/* Calendar */
+.cal-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.cal-dow { font-size: .74rem; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 700; text-align: center; padding: 4px 0; }
+.cal-cell { min-height: 92px; border: 1px solid var(--border); border-radius: 10px; padding: 6px; background: var(--surface); display: flex; flex-direction: column; gap: 4px; }
+.cal-cell.other { opacity: .4; }
+.cal-cell.today { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.cal-daynum { font-size: .78rem; font-weight: 700; color: var(--text-soft); }
+.cal-ev { font-size: .7rem; padding: 2px 5px; border-radius: 5px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.timeline { position: relative; padding-left: 18px; }
+.timeline::before { content: ""; position: absolute; left: 4px; top: 4px; bottom: 4px; width: 2px; background: var(--border); }
+.timeline .tl-item { position: relative; padding: 0 0 16px 10px; }
+.timeline .tl-item::before { content: ""; position: absolute; left: -18px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); }
+
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: .9rem; }
+.kv dt { color: var(--text-soft); font-weight: 600; }
+.kv dd { margin: 0; }
+
+.file-drop {
+  border: 2px dashed var(--border); border-radius: 12px; padding: 22px;
+  text-align: center; color: var(--text-soft); cursor: pointer; background: var(--surface-2);
+}
+.file-drop:hover { border-color: var(--accent); }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1024px) {
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 820px) {
+  .sidebar {
+    position: fixed; left: 0; top: 0; transform: translateX(-100%);
+    transition: transform .25s; box-shadow: var(--shadow);
+  }
+  .sidebar.open { transform: none; }
+  .hamburger { display: block; }
+  .grid-2, .grid-3, .grid-4, .form-grid { grid-template-columns: 1fr; }
+  .content { padding: 16px; }
+}
+@media (max-width: 520px) {
+  .season-badge { display: none; }
+}
+
+</style>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23f97316'/%3E%3Cpath d='M50 4a46 46 0 0 1 0 92M14 25c22 6 40 24 46 46M22 78c8-24 30-42 56-44' stroke='%23fff' stroke-width='4' fill='none'/%3E%3C/svg%3E" />
+</head>
+<body>
+  <div id="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-logo" aria-hidden="true">
+          <svg viewBox="0 0 100 100" width="40" height="40">
+            <circle cx="50" cy="50" r="46" fill="var(--accent)"/>
+            <path d="M50 4a46 46 0 0 1 0 92M14 25c22 6 40 24 46 46M22 78c8-24 30-42 56-44" stroke="#fff" stroke-width="4" fill="none"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <strong>SKV Müritz</strong>
+          <a class="brand-link" href="https://www.skv-mueritz.de" target="_blank" rel="noopener">skv-mueritz.de ↗</a>
+        </div>
+      </div>
+      <nav class="nav" id="nav"><!-- filled by JS --></nav>
+      <div class="sidebar-foot">
+        <button class="btn-ghost" id="themeToggle" title="Design wechseln">🌓 Design</button>
+        <button class="btn-ghost" id="resetData" title="Beispieldaten zurücksetzen">↺ Demo-Daten</button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <header class="topbar">
+        <button class="hamburger" id="hamburger" aria-label="Menü">☰</button>
+        <div class="topbar-title" id="pageTitle">Übersicht</div>
+        <div class="topbar-actions">
+          <div class="season-badge">Saison 2025/26 · Verbandsliga MV</div>
+        </div>
+      </header>
+      <section class="content" id="view"><!-- view rendered here --></section>
+    </main>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+  <div id="modalRoot"></div>
+  <div id="toastRoot" class="toast-root"></div>
+
+  <script>
+/* assets/js/store.js */
+/* ==========================================================================
+   SKV Volleyball – Datenhaltung (localStorage)
+   Kleiner Datenspeicher mit Seed-Daten. Kein Backend nötig – die Plattform
+   läuft komplett im Browser. Für den Produktivbetrieb kann dieselbe
+   Datenstruktur später an eine echte API/Datenbank angebunden werden.
+   ========================================================================== */
+(function () {
+  "use strict";
+
+  const KEY = "skv_vb_data_v2";
+  const CLUB = "SKV Müritz";
+  const WEBSITE = "https://www.skv-mueritz.de";
+
+  // ---- kleine ID- & Datums-Helfer (deterministisch, ohne Zufall) ----
+  let _idc = 1;
+  const uid = (p) => `${p}_${Date.now().toString(36)}_${(_idc++).toString(36)}`;
+
+  // Saison-Anker für die Seed-Daten
+  const SEASON = { year: 2025 };
+
+  function seed() {
+    // Abteilungen / Mannschaften des Vereins
+    const departments = [
+      dept("DAM1", "Damen I", "Aktive", "w", "Verbandsliga MV", "Damen", "Katrin Sommer", "damen1@skv-mueritz.de", "Di & Do 19:30–21:30", "Sporthalle SKV, Halle 1"),
+      dept("DAM2", "Damen II", "Aktive", "w", "Bezirksliga Ost", "Damen", "Katrin Sommer", "damen2@skv-mueritz.de", "Mo 19:00–21:00", "Sporthalle SKV, Halle 1"),
+      dept("HER1", "Herren I", "Aktive", "m", "Landesliga MV", "Herren", "Michael Voß", "herren1@skv-mueritz.de", "Mi & Fr 19:30–21:30", "Sporthalle SKV, Halle 2"),
+      dept("WU18", "weibliche U18", "Jugend", "w", "Verbandsliga MV weibl. U18", "U18", "Andrea Berg", "wu18@skv-mueritz.de", "Mo & Fr 18:00–20:00", "Sporthalle SKV, Halle 1"),
+      dept("WU16", "weibliche U16", "Jugend", "w", "Verbandsliga MV weibl. U16", "U16", "Andrea Berg", "wu16@skv-mueritz.de", "Di & Do 17:00–18:30", "Sporthalle SKV, Halle 1"),
+      dept("WU14", "weibliche U14", "Jugend", "w", "Bezirksklasse weibl. U14", "U14", "Sven Lorenz", "wu14@skv-mueritz.de", "Mi 16:30–18:00", "Sporthalle SKV, Halle 2"),
+      dept("MINI", "Mini-Volleyball (U12)", "Nachwuchs", "mix", "Mini-Spielfeste MV", "U12", "Sven Lorenz", "mini@skv-mueritz.de", "Fr 16:00–17:30", "Grundschule am See"),
+      dept("HOBBY", "Hobby & Freizeit", "Breitensport", "mix", "Freizeitrunde Müritz", "Erwachsene", "Team Hobby", "hobby@skv-mueritz.de", "So 18:00–20:00", "Sporthalle SKV, Halle 1"),
+    ];
+    const deptId = (code) => (departments.find((x) => x.code === code) || {}).id || null;
+
+    const players = [
+      p("Lena", "Bauer", "2009-03-14", "Zuspiel", 3, "U18", "Sabine Bauer", "sabine.bauer@example.de", "0170 1234501", true, "aktiv"),
+      p("Mia", "Schulz", "2008-07-02", "Außenangriff", 7, "U18", "Ralf Schulz", "ralf.schulz@example.de", "0170 1234502", true, "aktiv"),
+      p("Emma", "Wagner", "2009-11-28", "Mitte", 5, "U18", "Petra Wagner", "petra.wagner@example.de", "0170 1234503", false, "aktiv"),
+      p("Hannah", "Krüger", "2010-01-09", "Libero", 11, "U16", "Uwe Krüger", "uwe.krueger@example.de", "0170 1234504", true, "aktiv"),
+      p("Sophie", "Fischer", "2008-05-21", "Diagonal", 9, "U18", "Anke Fischer", "anke.fischer@example.de", "0170 1234505", true, "aktiv"),
+      p("Marie", "Hoffmann", "2010-09-03", "Außenangriff", 4, "U16", "Jens Hoffmann", "jens.hoffmann@example.de", "0170 1234506", false, "aktiv"),
+      p("Leonie", "Weber", "2009-07-08", "Mitte", 8, "U18", "Karin Weber", "karin.weber@example.de", "0170 1234507", true, "aktiv"),
+      p("Clara", "Schneider", "2011-02-17", "Zuspiel", 6, "U16", "Tim Schneider", "tim.schneider@example.de", "0170 1234508", true, "aktiv"),
+      p("Amelie", "Meyer", "2010-12-01", "Libero", 12, "U16", "Nadja Meyer", "nadja.meyer@example.de", "0170 1234509", false, "aktiv"),
+      p("Johanna", "Richter", "2008-08-25", "Diagonal", 10, "U18", "Frank Richter", "frank.richter@example.de", "0170 1234510", true, "aktiv"),
+      p("Paula", "Klein", "2011-04-30", "Außenangriff", 2, "U16", "Bea Klein", "bea.klein@example.de", "0170 1234511", true, "aktiv"),
+      p("Ida", "Wolf", "2009-07-08", "Mitte", 14, "U18", "Olaf Wolf", "olaf.wolf@example.de", "0170 1234512", false, "beitragsrückstand"),
+    ];
+
+    // Spielerinnen den Abteilungen zuordnen und Passnummern vergeben
+    const teamToDept = { U18: "WU18", U16: "WU16", U14: "WU14", Damen: "DAM1", Herren: "HER1" };
+    players.forEach((pl, i) => {
+      pl.departmentId = deptId(teamToDept[pl.team] || null);
+      pl.passNumber = `MV${SEASON.year}${String(10001 + i)}`;
+    });
+
+    const events = [
+      ev("training", "Training U18", d(0, 18, 0), d(0, 20, 0), "Sporthalle SKV, Halle 1", ""),
+      ev("training", "Training U16", d(1, 17, 0), d(1, 18, 30), "Sporthalle SKV, Halle 1", ""),
+      ev("home", "Heimspiel vs. SV Rostock", d(3, 11, 0), d(3, 14, 0), "Sporthalle SKV, Halle 1", "SV Rostock"),
+      ev("training", "Training U18", d(5, 18, 0), d(5, 20, 0), "Sporthalle SKV, Halle 1", ""),
+      ev("away", "Auswärtsspiel @ VC Schwerin", d(7, 14, 0), d(7, 17, 0), "Sport- und Kongresshalle Schwerin", "VC Schwerin"),
+      ev("training", "Training U16", d(8, 17, 0), d(8, 18, 30), "Sporthalle SKV, Halle 1", ""),
+      ev("home", "Heimspiel vs. Stralsunder VV", d(10, 11, 0), d(10, 14, 0), "Sporthalle SKV, Halle 1", "Stralsunder VV"),
+      ev("away", "Auswärtsspiel @ Neubrandenburg", d(14, 13, 0), d(14, 16, 0), "Halle am Datzeberg, Neubrandenburg", "Neubrandenburger SV"),
+      ev("other", "Vereinsfest & Saisonabschluss", d(21, 15, 0), d(21, 20, 0), "Vereinsheim SKV", ""),
+    ];
+
+    // Trainingsrückmeldungen für das erste Training
+    const trainingId = events[0].id;
+    const responses = [
+      resp(trainingId, players[0].id, "yes"),
+      resp(trainingId, players[1].id, "yes"),
+      resp(trainingId, players[2].id, "maybe"),
+      resp(trainingId, players[4].id, "yes"),
+      resp(trainingId, players[6].id, "no"),
+      resp(trainingId, players[9].id, "yes"),
+    ];
+
+    // Fahrer für Auswärtsspiele
+    const awayA = events[4].id;
+    const awayB = events[7].id;
+    const drivers = [
+      drv(awayA, "Ralf Schulz", "0170 1234502", 4, [players[1].id, players[4].id, players[9].id]),
+      drv(awayA, "Anke Fischer", "0170 1234505", 3, [players[0].id, players[6].id]),
+      drv(awayB, "Frank Richter", "0170 1234510", 4, [players[9].id, players[1].id]),
+    ];
+
+    // Jobs / Catering / Helfer für Heimspiele
+    const homeA = events[2].id;
+    const homeB = events[6].id;
+    const jobs = [
+      job(homeA, "catering", "Kuchenbüfett organisieren", "Sabine Bauer", true),
+      job(homeA, "catering", "Kaffee & Getränkeverkauf", "Karin Weber", false),
+      job(homeA, "helper", "Hallenaufbau (Netz & Bänke)", "Uwe Krüger", true),
+      job(homeA, "helper", "Kampfgericht / Anschreiben", "", false),
+      job(homeA, "other", "Hallenschlüssel & Öffnen", "Trainerteam", true),
+      job(homeB, "catering", "Grillstand betreuen", "", false),
+      job(homeB, "helper", "Abbau & Halle reinigen", "", false),
+      job(homeB, "helper", "Sanitätsdienst / Erste Hilfe", "Anke Fischer", true),
+    ];
+
+    // Einverständniserklärungen
+    const consents = [
+      consent(players[0].id, "Datennutzung & Fotorechte", "einverstaendnis_lena.pdf", null, "Sabine Bauer"),
+      consent(players[3].id, "Fahrten & Aufsicht", "einverstaendnis_hannah.pdf", null, "Uwe Krüger"),
+      consent(players[7].id, "Datennutzung & Fotorechte", "einverstaendnis_clara.pdf", null, "Tim Schneider"),
+    ];
+
+    // Finanzen
+    const finances = [
+      fin("fee", "Mitgliedsbeitrag Q3 – Lena Bauer", 45, d(-20), true, players[0].id),
+      fin("fee", "Mitgliedsbeitrag Q3 – Mia Schulz", 45, d(-18), true, players[1].id),
+      fin("fee", "Mitgliedsbeitrag Q3 – Ida Wolf", 45, d(-30), false, players[11].id),
+      fin("fee", "Mitgliedsbeitrag Q3 – Emma Wagner", 45, d(-15), true, players[2].id),
+      fin("donation", "Spende Bäckerei Ostsee", 250, d(-12), true, null),
+      fin("donation", "Spende Elternbeirat", 120, d(-6), true, null),
+      fin("expense", "Neue Trainingsbälle (Satz 6 Stück)", 210, d(-9), true, null),
+      fin("expense", "Turniergebühr Verbandsliga", 90, d(-4), true, null),
+    ];
+
+    // Vereinskleidung
+    const clothing = [
+      cloth("Trikot Heim (orange)", "Offizielles Spieltrikot mit Vereinslogo und Rückennummer.", 34.9, ["S", "M", "L", "XL"], "jersey", "#f97316"),
+      cloth("Trikot Auswärts (blau)", "Auswärtstrikot in Vereinsblau, atmungsaktives Material.", 34.9, ["S", "M", "L", "XL"], "jersey", "#1e3a8a"),
+      cloth("Trainingsjacke", "Warm-up Jacke mit SKV-Emblem, ideal für kühle Hallen.", 49.9, ["XS", "S", "M", "L", "XL"], "jacket", "#1e3a8a"),
+      cloth("Hoodie SKV", "Bequemer Kapuzenpulli für Fahrten und Freizeit.", 39.9, ["S", "M", "L", "XL"], "hoodie", "#334155"),
+      cloth("Sporttasche", "Geräumige Tasche mit Nassfach und Vereinsdruck.", 29.9, ["Einheit"], "bag", "#0ea5e9"),
+      cloth("Knieschoner (Paar)", "Gepolsterte Knieschoner für sicheres Abtauchen.", 19.9, ["S", "M", "L"], "pads", "#111827"),
+    ];
+
+    const clothingRequests = [
+      clothReq(clothing[0].id, players[3].id, "M", 1, "offen"),
+      clothReq(clothing[2].id, players[7].id, "S", 1, "bestellt"),
+    ];
+
+    // Sponsoren
+    const sponsors = [
+      sponsor("Ostsee Bäckerei GmbH", "Hauptsponsor", "https://www.example.de", "info@ostsee-baeckerei.de", 1500, "#f59e0b"),
+      sponsor("Sanitätshaus Nordlicht", "Premium", "https://www.example.de", "kontakt@nordlicht.de", 800, "#0ea5e9"),
+      sponsor("Autohaus Küstenweg", "Partner", "https://www.example.de", "team@kuestenweg.de", 500, "#16a34a"),
+    ];
+
+    // Ankündigungen
+    const announcements = [
+      ann("Willkommen im Trainer-Cockpit", "Alle Termine, Rückmeldungen und Aufgaben findet ihr ab sofort hier gebündelt. Bitte tragt eure Trainingsrückmeldungen bis 24h vorher ein.", "alle"),
+      ann("Fahrergesuch Auswärtsspiel Schwerin", "Für das Spiel in Schwerin brauchen wir noch 1–2 Fahrer:innen. Bitte im Bereich Fahrerplanung eintragen.", "eltern"),
+      ann("Einverständniserklärungen", "Bitte die unterschriebenen Formulare zum nächsten Training mitbringen oder digital hochladen.", "eltern"),
+    ];
+
+    // Aufgaben Trainer
+    const tasks = [
+      task("Aufstellung für Heimspiel Rostock festlegen", d(2), "hoch", false),
+      task("Fehlende Einverständniserklärungen anmahnen", d(1), "hoch", false),
+      task("Bälle für Auswärtsspiel einpacken", d(6), "mittel", false),
+      task("Beitragsrückstand Ida Wolf klären", d(3), "mittel", false),
+      task("Hallenschlüssel-Übergabe organisieren", d(-1), "niedrig", true),
+    ];
+
+    // Material / Inventar
+    const inventory = [
+      inv("Spielbälle (Molten)", 12, 15, "Ballwagen Halle 1"),
+      inv("Trainingsbälle", 18, 20, "Ballwagen Halle 1"),
+      inv("Netzgarnituren", 2, 2, "Materialraum"),
+      inv("Antennen (Paar)", 3, 3, "Materialraum"),
+      inv("Erste-Hilfe-Koffer", 1, 2, "Trainerbank"),
+      inv("Leibchen (Satz)", 2, 3, "Materialraum"),
+    ];
+
+    // Verbandsliga-Tabelle MV (Beispieldaten)
+    const standings = [
+      st("VC Schwerin", 12, 10, 2, 30, 5, 29),
+      st("SKV Volleyball", 12, 9, 3, 28, 8, 27),
+      st("Stralsunder VV", 12, 8, 4, 26, 12, 24),
+      st("Neubrandenburger SV", 12, 6, 6, 20, 18, 18),
+      st("SV Rostock", 12, 5, 7, 17, 22, 15),
+      st("VfL Wismar", 12, 4, 8, 15, 25, 12),
+      st("TSG Güstrow", 12, 2, 10, 9, 30, 6),
+      st("Waren Volleys", 12, 2, 10, 8, 31, 5),
+    ];
+
+    // Beispiel-Verbandsmeldung für die weibliche U18
+    const wu18Id = deptId("WU18");
+    const wu18Players = players.filter((pl) => pl.departmentId === wu18Id);
+    const seasonLabel = `${SEASON.year}/${String(SEASON.year + 1).slice(2)}`;
+    const meldungen = [
+      meldung(seasonLabel, wu18Id, "Verbandsliga MV weibl. U18", "Staffel Nord", "SKV Müritz weibl. U18", "Andrea Berg",
+        wu18Players.map((pl) => ({
+          playerId: pl.id,
+          passNumber: pl.passNumber,
+          jahrgang: new Date(pl.birthDate).getFullYear(),
+          role: pl.position === "Libero" ? "Libero" : (pl.jerseyNumber === 3 ? "Kapitän" : "Spieler"),
+        })), "gemeldet"),
+    ];
+
+    return {
+      club: CLUB, website: "https://www.skv-mueritz.de", season: SEASON,
+      departments, players, events, responses, drivers, jobs, consents, finances,
+      clothing, clothingRequests, sponsors, announcements, tasks, inventory, standings, meldungen,
+    };
+  }
+
+  // ---- Entity-Factories ----
+  function p(firstName, lastName, birthDate, position, jerseyNumber, team, parentName, parentEmail, parentPhone, consentOnFile, membershipStatus) {
+    return { id: uid("pl"), firstName, lastName, birthDate, position, jerseyNumber, team, parentName, parentEmail, parentPhone, consentOnFile, membershipStatus, notes: "", gender: "w", passNumber: "", departmentId: null };
+  }
+  function dept(code, name, category, gender, league, ageGroup, trainer, email, times, venue) {
+    return { id: uid("de"), code, name, category, gender, league, ageGroup, trainer, email, times, venue, active: true };
+  }
+  function meldung(season, departmentId, league, staffel, teamName, responsible, entries, status) {
+    return { id: uid("vm"), season, departmentId, league, staffel, teamName, responsible, entries: entries || [], status: status || "Entwurf", createdAt: new Date().toISOString() };
+  }
+  function ev(type, title, start, end, location, opponent) {
+    return { id: uid("ev"), type, title, start, end, location, opponent, description: "" };
+  }
+  function resp(eventId, playerId, status) {
+    return { id: uid("rs"), eventId, playerId, status, at: new Date().toISOString() };
+  }
+  function drv(eventId, name, phone, seats, playerIds) {
+    return { id: uid("dr"), eventId, name, phone, seats, playerIds: playerIds || [], notes: "" };
+  }
+  function job(eventId, category, title, assignee, done) {
+    return { id: uid("jb"), eventId, category, title, assignee: assignee || "", done: !!done };
+  }
+  function consent(playerId, type, fileName, dataUrl, signedBy) {
+    return { id: uid("co"), playerId, type, fileName, dataUrl: dataUrl || null, signedBy, uploadedAt: new Date().toISOString() };
+  }
+  function fin(type, description, amount, date, paid, playerId) {
+    return { id: uid("fi"), type, description, amount, date, paid: !!paid, playerId: playerId || null };
+  }
+  function cloth(name, description, price, sizes, kind, color) {
+    return { id: uid("cl"), name, description, price, sizes, kind, color };
+  }
+  function clothReq(itemId, playerId, size, qty, status) {
+    return { id: uid("cr"), itemId, playerId, size, qty, status, at: new Date().toISOString() };
+  }
+  function sponsor(name, tier, website, contact, contribution, color) {
+    return { id: uid("sp"), name, tier, website, contact, contribution, color };
+  }
+  function ann(title, body, audience) {
+    return { id: uid("an"), title, body, audience, date: new Date().toISOString() };
+  }
+  function task(title, due, priority, done) {
+    return { id: uid("ta"), title, due, priority, done: !!done };
+  }
+  function inv(name, count, target, location) {
+    return { id: uid("in"), name, count, target, location };
+  }
+  function st(team, games, win, loss, setsW, setsL, points) {
+    return { team, games, win, loss, setsW, setsL, points };
+  }
+
+  // relative date helper: dayOffset from "now", with optional hour/minute
+  function d(dayOffset, hour, minute) {
+    const base = new Date();
+    base.setHours(hour == null ? 12 : hour, minute == null ? 0 : minute, 0, 0);
+    base.setDate(base.getDate() + dayOffset);
+    return base.toISOString();
+  }
+
+  // ---- Persistenz ----
+  let state = load();
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (e) { /* ignore */ }
+    const s = seed();
+    persist(s);
+    return s;
+  }
+  function persist(s) {
+    try { localStorage.setItem(KEY, JSON.stringify(s || state)); } catch (e) { /* quota */ }
+  }
+  function save() { persist(state); }
+
+  function resetDemo() {
+    _idc = 1;
+    state = seed();
+    persist(state);
+    return state;
+  }
+
+  // ---- Öffentliche API ----
+  const Store = {
+    CLUB, WEBSITE,
+    get: () => state,
+    save,
+    resetDemo,
+    uid,
+    // generische CRUD-Helfer für eine Collection
+    add(coll, obj) { obj.id = obj.id || uid(coll.slice(0, 2)); state[coll].push(obj); save(); return obj; },
+    update(coll, id, patch) {
+      const it = state[coll].find((x) => x.id === id);
+      if (it) { Object.assign(it, patch); save(); }
+      return it;
+    },
+    remove(coll, id) {
+      state[coll] = state[coll].filter((x) => x.id !== id);
+      save();
+    },
+    byId(coll, id) { return state[coll].find((x) => x.id === id); },
+  };
+
+  window.Store = Store;
+})();
+
+</script>
+  <script>
+/* assets/js/utils.js */
+/* ==========================================================================
+   SKV Volleyball – Hilfsfunktionen (DOM, Formatierung, Modal, Toast, SVG)
+   ========================================================================== */
+(function () {
+  "use strict";
+
+  // ---- DOM ----
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+
+  // sichere HTML-Escapes
+  function esc(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  // ---- Datum / Uhrzeit (deutsch) ----
+  const DOW = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
+  const MON = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
+
+  function fmtDate(iso) {
+    const d = new Date(iso);
+    return `${DOW[d.getDay()]}, ${d.getDate()}. ${MON[d.getMonth()]} ${d.getFullYear()}`;
+  }
+  function fmtDateShort(iso) {
+    const d = new Date(iso);
+    return `${String(d.getDate()).padStart(2, "0")}.${String(d.getMonth() + 1).padStart(2, "0")}.${d.getFullYear()}`;
+  }
+  function fmtTime(iso) {
+    const d = new Date(iso);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+  function fmtDateTime(iso) { return `${fmtDate(iso)} · ${fmtTime(iso)} Uhr`; }
+  function fmtMoney(n) {
+    return new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(n || 0);
+  }
+  function daysUntil(iso) {
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    const d = new Date(iso); d.setHours(0, 0, 0, 0);
+    return Math.round((d - now) / 86400000);
+  }
+  function relDays(iso) {
+    const n = daysUntil(iso);
+    if (n === 0) return "heute";
+    if (n === 1) return "morgen";
+    if (n === -1) return "gestern";
+    if (n > 1) return `in ${n} Tagen`;
+    return `vor ${Math.abs(n)} Tagen`;
+  }
+  function age(iso) {
+    const b = new Date(iso), now = new Date();
+    let a = now.getFullYear() - b.getFullYear();
+    const m = now.getMonth() - b.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < b.getDate())) a--;
+    return a;
+  }
+
+  // ---- Farb-Avatar aus Namen ----
+  const AV_COLORS = ["#f97316", "#2563eb", "#16a34a", "#db2777", "#7c3aed", "#0891b2", "#ca8a04", "#dc2626"];
+  function avatarColor(name) {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % AV_COLORS.length;
+    return AV_COLORS[h];
+  }
+  function initials(first, last) {
+    return `${(first || "?")[0]}${(last || "")[0] || ""}`.toUpperCase();
+  }
+  function avatar(first, last) {
+    const c = avatarColor(`${first}${last}`);
+    return `<div class="avatar" style="background:${c}">${esc(initials(first, last))}</div>`;
+  }
+
+  // ---- Toast ----
+  function toast(msg, kind = "") {
+    const root = $("#toastRoot");
+    const el = document.createElement("div");
+    el.className = `toast ${kind}`;
+    el.textContent = msg;
+    root.appendChild(el);
+    setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity .3s"; }, 2600);
+    setTimeout(() => el.remove(), 3000);
+  }
+
+  // ---- Modal ----
+  function modal({ title, body, footer, onOpen, wide }) {
+    const root = $("#modalRoot");
+    root.innerHTML = "";
+    const m = document.createElement("div");
+    m.className = "modal";
+    if (wide) m.style.width = "min(860px, calc(100vw - 32px))";
+    m.innerHTML = `
+      <div class="modal-head"><h3>${esc(title)}</h3><button class="close" aria-label="Schließen">×</button></div>
+      <div class="modal-body">${body}</div>
+      ${footer ? `<div class="modal-foot">${footer}</div>` : ""}`;
+    root.appendChild(m);
+    const overlay = $("#overlay");
+    requestAnimationFrame(() => { overlay.classList.add("show"); m.classList.add("show"); });
+    const close = () => closeModal();
+    $(".close", m).addEventListener("click", close);
+    overlay.onclick = close;
+    if (onOpen) onOpen(m);
+    return m;
+  }
+  function closeModal() {
+    const overlay = $("#overlay");
+    const m = $(".modal");
+    overlay.classList.remove("show");
+    if (m) { m.classList.remove("show"); setTimeout(() => { $("#modalRoot").innerHTML = ""; }, 200); }
+  }
+
+  function confirmDialog(message, onYes, yesLabel = "Löschen") {
+    modal({
+      title: "Bestätigen",
+      body: `<p>${esc(message)}</p>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn danger" data-y>${esc(yesLabel)}</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-y]").onclick = () => { closeModal(); onYes(); };
+      },
+    });
+  }
+
+  // Formular-Werte einsammeln
+  function formData(form) {
+    const data = {};
+    $$("[name]", form).forEach((el) => {
+      if (el.type === "checkbox") data[el.name] = el.checked;
+      else data[el.name] = el.value;
+    });
+    return data;
+  }
+
+  // ---- Produkt-SVGs für Vereinskleidung (selbstenthaltend, keine externen Bilder) ----
+  function clothingSVG(kind, color) {
+    const c = color || "#f97316";
+    const logo = `<circle cx="128" cy="98" r="9" fill="#fff" opacity=".9"/>`;
+    const shapes = {
+      jersey: `<path d="M78 60 L58 78 L74 96 L88 84 L88 168 Q128 178 168 168 L168 84 L182 96 L198 78 L178 60 Q160 74 128 74 Q96 74 78 60 Z" fill="${c}"/><text x="128" y="150" font-size="34" font-weight="800" fill="#fff" text-anchor="middle" opacity=".85">7</text>`,
+      jacket: `<path d="M78 60 L58 78 L74 96 L86 86 L86 176 L170 176 L170 86 L182 96 L198 78 L178 60 Q160 74 128 74 Q96 74 78 60 Z" fill="${c}"/><line x1="128" y1="76" x2="128" y2="176" stroke="#fff" stroke-width="3" opacity=".7"/>`,
+      hoodie: `<path d="M80 66 Q128 44 176 66 L196 84 L180 100 L170 92 L170 176 L86 176 L86 92 L76 100 L60 84 Z" fill="${c}"/><path d="M108 66 Q128 84 148 66" fill="none" stroke="#fff" stroke-width="3" opacity=".6"/>`,
+      bag: `<rect x="60" y="96" width="136" height="72" rx="14" fill="${c}"/><path d="M96 96 Q96 78 128 78 Q160 78 160 96" fill="none" stroke="#fff" stroke-width="6" opacity=".8"/><rect x="118" y="120" width="20" height="24" rx="4" fill="#fff" opacity=".8"/>`,
+      pads: `<rect x="78" y="80" width="46" height="96" rx="20" fill="${c}"/><rect x="132" y="80" width="46" height="96" rx="20" fill="${c}"/><ellipse cx="101" cy="118" rx="14" ry="16" fill="#fff" opacity=".35"/><ellipse cx="155" cy="118" rx="14" ry="16" fill="#fff" opacity=".35"/>`,
+    };
+    return `<svg viewBox="0 0 256 220" xmlns="http://www.w3.org/2000/svg">
+      <rect width="256" height="220" fill="#f1f5f9"/>
+      ${shapes[kind] || shapes.jersey}
+      ${kind === "jersey" ? "" : logo}
+    </svg>`;
+  }
+
+  // Sponsor-Logo-SVG (Platzhalter aus Initialen)
+  function sponsorSVG(name, color) {
+    const c = color || "#0ea5e9";
+    const words = name.split(" ");
+    const ini = words.slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+    return `<svg viewBox="0 0 300 130" xmlns="http://www.w3.org/2000/svg">
+      <rect width="300" height="130" fill="#fff"/>
+      <rect x="26" y="35" width="60" height="60" rx="14" fill="${c}"/>
+      <text x="56" y="76" font-size="30" font-weight="800" fill="#fff" text-anchor="middle">${esc(ini)}</text>
+      <text x="104" y="66" font-size="19" font-weight="700" fill="#0f172a">${esc(words[0] || "")}</text>
+      <text x="104" y="90" font-size="14" fill="#64748b">${esc(words.slice(1).join(" "))}</text>
+    </svg>`;
+  }
+
+  window.U = {
+    $, $$, esc, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtMoney,
+    daysUntil, relDays, age, avatar, avatarColor, initials,
+    toast, modal, closeModal, confirmDialog, formData,
+    clothingSVG, sponsorSVG, DOW, MON,
+  };
+})();
+
+</script>
+  <script>
+/* assets/js/views.js */
+/* ==========================================================================
+   SKV Volleyball – Views (Ansichten)
+   Jede View ist eine Funktion(el), die das Ziel-Element füllt und Events bindet.
+   Nach Änderungen wird über App.reload() die aktuelle Ansicht neu gerendert.
+   ========================================================================== */
+(function () {
+  "use strict";
+  const { $, $$, esc, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtMoney,
+    daysUntil, relDays, age, avatar, toast, modal, closeModal, confirmDialog,
+    formData, clothingSVG, sponsorSVG, DOW, MON } = U;
+
+  const S = () => Store.get();
+  const reload = () => App.reload();
+
+  // ---- gemeinsame Bausteine ----
+  function head(title, subtitle, actionsHTML) {
+    return `<div class="section-head">
+      <div><h2>${esc(title)}</h2>${subtitle ? `<p>${esc(subtitle)}</p>` : ""}</div>
+      <div class="spacer"></div>${actionsHTML || ""}</div>`;
+  }
+  function stat(icon, label, value, sub) {
+    return `<div class="card"><div class="flex" style="align-items:flex-start">
+      <div class="icon">${icon}</div>
+      <div class="stat"><span class="label">${esc(label)}</span>
+      <span class="value">${value}</span>${sub ? `<span class="sub">${sub}</span>` : ""}</div></div></div>`;
+  }
+  function empty(icon, text) {
+    return `<div class="empty"><span class="big">${icon}</span>${esc(text)}</div>`;
+  }
+  function playerName(id) {
+    const p = Store.byId("players", id);
+    return p ? `${p.firstName} ${p.lastName}` : "—";
+  }
+  function deptName(id) {
+    const d = Store.byId("departments", id);
+    return d ? d.name : "—";
+  }
+  function jahrgang(birthDate) { return birthDate ? new Date(birthDate).getFullYear() : "—"; }
+  const genderLabel = { w: "weiblich", m: "männlich", mix: "gemischt" };
+  const typeLabel = { training: "Training", home: "Heimspiel", away: "Auswärtsspiel", other: "Termin" };
+  function eventPill(type) {
+    return `<span class="badge pill-type-${type}">${typeLabel[type] || "Termin"}</span>`;
+  }
+  function upcomingEvents(limit) {
+    return S().events
+      .filter((e) => daysUntil(e.start) >= -1)
+      .sort((a, b) => new Date(a.start) - new Date(b.start))
+      .slice(0, limit || 999);
+  }
+
+  /* ======================================================================
+     DASHBOARD
+     ====================================================================== */
+  function dashboard(el) {
+    const s = S();
+    const openConsents = s.players.filter((p) => !p.consentOnFile).length;
+    const openFees = s.finances.filter((f) => f.type === "fee" && !f.paid);
+    const openJobs = s.jobs.filter((j) => !j.assignee || !j.done).length;
+    const next = upcomingEvents(5);
+    const openTasks = s.tasks.filter((t) => !t.done);
+    const bdays = birthdaysWithin(30);
+
+    el.innerHTML = `
+      ${head("Übersicht", `Willkommen zurück im Trainer-Cockpit des ${esc(s.club)}`)}
+      <div class="grid grid-4 mb">
+        ${stat("🏐", "Aktive Spielerinnen", s.players.filter((p) => p.membershipStatus !== "inaktiv").length, `${s.players.length} gesamt`)}
+        ${stat("📅", "Nächste Termine", next.length, next[0] ? `${typeLabel[next[0].type]} ${relDays(next[0].start)}` : "—")}
+        ${stat("📝", "Offene Einverständnis.", openConsents, openConsents ? "Bitte einholen" : "alles vollständig")}
+        ${stat("💶", "Offene Beiträge", fmtMoney(openFees.reduce((a, f) => a + f.amount, 0)), `${openFees.length} Positionen`)}
+      </div>
+
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-head"><h3>📆 Anstehende Termine</h3><span class="spacer"></span>
+            <a class="btn sm outline" href="#/calendar">Kalender</a></div>
+          <div class="timeline">
+            ${next.length ? next.map((e) => `
+              <div class="tl-item">
+                <div class="flex"><strong>${esc(e.title)}</strong> ${eventPill(e.type)}</div>
+                <div class="sub soft">${fmtDate(e.start)} · ${fmtTime(e.start)} Uhr · ${esc(e.location)}</div>
+              </div>`).join("") : empty("🗓️", "Keine anstehenden Termine")}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>✅ Meine Aufgaben</h3><span class="spacer"></span>
+            <a class="btn sm outline" href="#/tasks">Alle</a></div>
+          <div class="list">
+            ${openTasks.length ? openTasks.slice(0, 5).map((t) => `
+              <label class="list-item" style="cursor:pointer">
+                <input type="checkbox" data-task="${t.id}" style="width:auto">
+                <div class="grow"><div class="title">${esc(t.title)}</div>
+                <div class="sub">fällig ${relDays(t.due)} · ${prioBadge(t.priority)}</div></div>
+              </label>`).join("") : empty("🎉", "Keine offenen Aufgaben")}
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-3 mt">
+        <div class="card">
+          <div class="card-head"><h3>📣 Ankündigungen</h3></div>
+          <div class="list">
+            ${s.announcements.slice(0, 3).map((a) => `
+              <div class="list-item"><div class="grow">
+                <div class="title">${esc(a.title)}</div>
+                <div class="sub">${fmtDateShort(a.date)}</div></div></div>`).join("")}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>🎂 Geburtstage (30 Tage)</h3></div>
+          <div class="list">
+            ${bdays.length ? bdays.slice(0, 4).map((b) => `
+              <div class="list-item">${avatar(b.firstName, b.lastName)}
+                <div class="grow"><div class="title">${esc(b.firstName)} ${esc(b.lastName)}</div>
+                <div class="sub">${fmtDateShort(b.next)} · wird ${b.turns}</div></div></div>`).join("")
+              : empty("🎈", "Keine in den nächsten 30 Tagen")}
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>⚠️ Zu erledigen</h3></div>
+          <div class="list">
+            <a class="list-item" href="#/consents"><div class="grow"><div class="title">${openConsents} offene Einverständnis.</div><div class="sub">Formulare einholen</div></div><span class="arr">›</span></a>
+            <a class="list-item" href="#/jobs"><div class="grow"><div class="title">${openJobs} offene Jobs</div><div class="sub">Catering & Helfer</div></div><span class="arr">›</span></a>
+            <a class="list-item" href="#/finances"><div class="grow"><div class="title">${openFees.length} offene Beiträge</div><div class="sub">Zahlungen prüfen</div></div><span class="arr">›</span></a>
+          </div>
+        </div>
+      </div>`;
+
+    $$("[data-task]", el).forEach((cb) => cb.addEventListener("change", () => {
+      Store.update("tasks", cb.dataset.task, { done: true });
+      toast("Aufgabe erledigt", "good"); reload();
+    }));
+  }
+  function prioBadge(p) {
+    const m = { hoch: "bad", mittel: "warn", niedrig: "" };
+    return `<span class="badge ${m[p] || ""}">${esc(p)}</span>`;
+  }
+
+  /* ======================================================================
+     SPIELERVERWALTUNG
+     ====================================================================== */
+  function players(el) {
+    const s = S();
+    const filter = players._team || "alle";
+    let list = s.players.slice().sort((a, b) => a.lastName.localeCompare(b.lastName));
+    if (filter !== "alle") list = list.filter((p) => p.departmentId === filter);
+    const chips = [`<button class="chip ${filter === "alle" ? "active" : ""}" data-team="alle">alle (${s.players.length})</button>`]
+      .concat(s.departments.map((d) => {
+        const n = s.players.filter((p) => p.departmentId === d.id).length;
+        return `<button class="chip ${filter === d.id ? "active" : ""}" data-team="${d.id}">${esc(d.name)} (${n})</button>`;
+      }));
+
+    el.innerHTML = `
+      ${head("Spielerverwaltung", "Kader, Kontaktdaten der Eltern und Status", `<button class="btn" data-add>＋ Spielerin</button>`)}
+      <div class="chip-row mb">${chips.join("")}</div>
+      <div class="card" style="padding:0">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Name</th><th>Nr.</th><th>Position</th><th>Abteilung</th><th>Jg.</th><th>Pass-Nr.</th><th>Eltern / Kontakt</th><th>Einverst.</th><th>Status</th><th></th></tr></thead>
+          <tbody>${list.map((p) => `
+            <tr>
+              <td><div class="flex">${avatar(p.firstName, p.lastName)}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong></div></td>
+              <td>#${esc(p.jerseyNumber)}</td>
+              <td>${esc(p.position)}</td>
+              <td><span class="badge info">${esc(deptName(p.departmentId))}</span></td>
+              <td>${jahrgang(p.birthDate)}</td>
+              <td class="soft">${esc(p.passNumber || "—")}</td>
+              <td class="wrap"><div>${esc(p.parentName)}</div><div class="sub soft">${esc(p.parentEmail)} · ${esc(p.parentPhone)}</div></td>
+              <td>${p.consentOnFile ? '<span class="badge good">✓</span>' : '<span class="badge bad">fehlt</span>'}</td>
+              <td>${statusBadge(p.membershipStatus)}</td>
+              <td class="right nowrap">
+                <button class="btn sm ghost" data-mail="${p.id}" title="Eltern kontaktieren">✉️</button>
+                <button class="btn sm ghost" data-edit="${p.id}">✏️</button>
+                <button class="btn sm ghost" data-del="${p.id}">🗑️</button>
+              </td>
+            </tr>`).join("")}</tbody>
+        </table></div>
+      </div>`;
+
+    $$("[data-team]", el).forEach((c) => c.onclick = () => { players._team = c.dataset.team; reload(); });
+    $("[data-add]", el).onclick = () => playerForm();
+    $$("[data-edit]", el).forEach((b) => b.onclick = () => playerForm(Store.byId("players", b.dataset.edit)));
+    $$("[data-del]", el).forEach((b) => b.onclick = () => {
+      const p = Store.byId("players", b.dataset.del);
+      confirmDialog(`Spielerin „${p.firstName} ${p.lastName}“ wirklich löschen?`, () => {
+        Store.remove("players", p.id); toast("Spielerin gelöscht"); reload();
+      });
+    });
+    $$("[data-mail]", el).forEach((b) => b.onclick = () => contactParent(Store.byId("players", b.dataset.mail)));
+  }
+
+  function statusBadge(st) {
+    if (st === "aktiv") return '<span class="badge good">aktiv</span>';
+    if (st === "beitragsrückstand") return '<span class="badge warn">Rückstand</span>';
+    if (st === "inaktiv") return '<span class="badge">inaktiv</span>';
+    return `<span class="badge">${esc(st)}</span>`;
+  }
+
+  function playerForm(p) {
+    const isEdit = !!p;
+    const deps = S().departments;
+    p = p || { firstName: "", lastName: "", birthDate: "", position: "Außenangriff", jerseyNumber: "", team: "U18", departmentId: (deps[0] || {}).id || null, gender: "w", passNumber: "", parentName: "", parentEmail: "", parentPhone: "", membershipStatus: "aktiv", consentOnFile: false, notes: "" };
+    const positions = ["Zuspiel", "Außenangriff", "Mitte", "Diagonal", "Libero"];
+    modal({
+      title: isEdit ? "Spielerin bearbeiten" : "Neue Spielerin",
+      body: `<form id="pf"><div class="form-grid">
+        <div class="field"><label>Vorname</label><input name="firstName" value="${esc(p.firstName)}" required></div>
+        <div class="field"><label>Nachname</label><input name="lastName" value="${esc(p.lastName)}" required></div>
+        <div class="field"><label>Geburtsdatum</label><input type="date" name="birthDate" value="${esc(p.birthDate)}" required></div>
+        <div class="field"><label>Trikotnummer</label><input type="number" name="jerseyNumber" value="${esc(p.jerseyNumber)}"></div>
+        <div class="field"><label>Position</label><select name="position">${positions.map((x) => `<option ${x === p.position ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+        <div class="field"><label>Abteilung / Mannschaft</label><select name="departmentId">
+          ${deps.map((d) => `<option value="${d.id}" ${d.id === p.departmentId ? "selected" : ""}>${esc(d.name)}</option>`).join("")}</select></div>
+        <div class="field"><label>Geschlecht</label><select name="gender">
+          ${Object.entries(genderLabel).map(([k, v]) => `<option value="${k}" ${k === p.gender ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        <div class="field"><label>Passnummer (Verband)</label><input name="passNumber" value="${esc(p.passNumber || "")}" placeholder="z. B. MV202512345"></div>
+        <div class="field"><label>Name Elternteil</label><input name="parentName" value="${esc(p.parentName)}"></div>
+        <div class="field"><label>Status</label><select name="membershipStatus">
+          ${["aktiv", "beitragsrückstand", "inaktiv"].map((x) => `<option ${x === p.membershipStatus ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+        <div class="field"><label>E-Mail Eltern</label><input type="email" name="parentEmail" value="${esc(p.parentEmail)}"></div>
+        <div class="field"><label>Telefon Eltern</label><input name="parentPhone" value="${esc(p.parentPhone)}"></div>
+        <div class="field full"><label>Notizen</label><textarea name="notes">${esc(p.notes)}</textarea></div>
+        <div class="field full"><label><input type="checkbox" name="consentOnFile" ${p.consentOnFile ? "checked" : ""} style="width:auto"> Einverständniserklärung liegt vor</label></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#pf");
+          if (!f.reportValidity()) return;
+          const data = formData(f);
+          data.jerseyNumber = Number(data.jerseyNumber) || "";
+          if (isEdit) Store.update("players", p.id, data);
+          else Store.add("players", data);
+          closeModal(); toast(isEdit ? "Gespeichert" : "Spielerin angelegt", "good"); reload();
+        };
+      },
+    });
+  }
+
+  function contactParent(p) {
+    modal({
+      title: `Eltern kontaktieren – ${esc(p.firstName)} ${esc(p.lastName)}`,
+      body: `<div class="kv mb">
+          <dt>Elternteil</dt><dd>${esc(p.parentName || "—")}</dd>
+          <dt>E-Mail</dt><dd>${p.parentEmail ? `<a href="mailto:${esc(p.parentEmail)}">${esc(p.parentEmail)}</a>` : "—"}</dd>
+          <dt>Telefon</dt><dd>${p.parentPhone ? `<a href="tel:${esc(p.parentPhone)}">${esc(p.parentPhone)}</a>` : "—"}</dd>
+        </div>
+        <form id="cf"><div class="field"><label>Betreff</label><input name="subject" value="SKV Volleyball – Info zu ${esc(p.firstName)}"></div>
+        <div class="field mt"><label>Nachricht</label><textarea name="msg" rows="5">Liebe/r ${esc(p.parentName)},\n\n</textarea></div></form>`,
+      footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn" data-send>E-Mail öffnen</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-send]").onclick = () => {
+          const d = formData(m.querySelector("#cf"));
+          const href = `mailto:${encodeURIComponent(p.parentEmail || "")}?subject=${encodeURIComponent(d.subject)}&body=${encodeURIComponent(d.msg)}`;
+          window.location.href = href;
+          closeModal(); toast("E-Mail-Programm geöffnet");
+        };
+      },
+    });
+  }
+
+  /* ======================================================================
+     KALENDER
+     ====================================================================== */
+  function calendar(el) {
+    const cur = calendar._month ? new Date(calendar._month) : new Date();
+    cur.setDate(1);
+    const y = cur.getFullYear(), mo = cur.getMonth();
+    const first = new Date(y, mo, 1);
+    const startDow = (first.getDay() + 6) % 7; // Montag=0
+    const daysInMonth = new Date(y, mo + 1, 0).getDate();
+    const evByDay = {};
+    S().events.forEach((e) => {
+      const d = new Date(e.start);
+      if (d.getFullYear() === y && d.getMonth() === mo) {
+        const k = d.getDate(); (evByDay[k] = evByDay[k] || []).push(e);
+      }
+    });
+    const today = new Date();
+    const cells = [];
+    for (let i = 0; i < startDow; i++) cells.push(`<div class="cal-cell other"></div>`);
+    for (let day = 1; day <= daysInMonth; day++) {
+      const isToday = today.getFullYear() === y && today.getMonth() === mo && today.getDate() === day;
+      const evs = (evByDay[day] || []).sort((a, b) => new Date(a.start) - new Date(b.start));
+      cells.push(`<div class="cal-cell ${isToday ? "today" : ""}">
+        <span class="cal-daynum">${day}</span>
+        ${evs.map((e) => `<div class="cal-ev pill-type-${e.type}" data-ev="${e.id}" title="${esc(e.title)}">${fmtTime(e.start)} ${esc(e.title)}</div>`).join("")}
+      </div>`);
+    }
+    const dows = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+    const upcoming = upcomingEvents(8);
+
+    el.innerHTML = `
+      ${head("Kalender", "Alle Trainings und Spieltage auf einen Blick", `<button class="btn" data-add>＋ Termin</button>`)}
+      <div class="grid" style="grid-template-columns: 1fr 340px; gap:16px; align-items:start">
+        <div class="card">
+          <div class="cal-head">
+            <button class="btn sm outline" data-prev>‹</button>
+            <strong style="font-size:1.05rem">${MON[mo]} ${y}</strong>
+            <button class="btn sm outline" data-next>›</button>
+            <span class="spacer"></span>
+            <button class="btn sm ghost" data-today>Heute</button>
+          </div>
+          <div class="cal-grid">${dows.map((d) => `<div class="cal-dow">${d}</div>`).join("")}${cells.join("")}</div>
+          <div class="chip-row mt">
+            <span class="chip pill-type-training">Training</span>
+            <span class="chip pill-type-home">Heimspiel</span>
+            <span class="chip pill-type-away">Auswärts</span>
+            <span class="chip pill-type-other">Sonstiges</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Nächste Termine</h3></div>
+          <div class="list">
+            ${upcoming.map((e) => `
+              <div class="list-item" data-ev="${e.id}" style="cursor:pointer">
+                <div class="grow"><div class="title">${esc(e.title)} ${eventPill(e.type)}</div>
+                <div class="sub">${fmtDateShort(e.start)} · ${fmtTime(e.start)} Uhr · ${esc(e.location)}</div></div></div>`).join("")}
+          </div>
+        </div>
+      </div>`;
+
+    $("[data-prev]", el).onclick = () => { calendar._month = new Date(y, mo - 1, 1).toISOString(); reload(); };
+    $("[data-next]", el).onclick = () => { calendar._month = new Date(y, mo + 1, 1).toISOString(); reload(); };
+    $("[data-today]", el).onclick = () => { calendar._month = null; reload(); };
+    $("[data-add]", el).onclick = () => eventForm();
+    $$("[data-ev]", el).forEach((n) => n.onclick = () => eventDetail(n.dataset.ev));
+  }
+
+  function eventDetail(id) {
+    const e = Store.byId("events", id);
+    if (!e) return;
+    const responses = S().responses.filter((r) => r.eventId === id);
+    const drivers = S().drivers.filter((d) => d.eventId === id);
+    const jobs = S().jobs.filter((j) => j.eventId === id);
+    modal({
+      title: e.title,
+      wide: true,
+      body: `
+        <div class="flex flex-wrap mb">${eventPill(e.type)}<span class="badge">${fmtDateTime(e.start)}</span><span class="badge">bis ${fmtTime(e.end)} Uhr</span></div>
+        <dl class="kv mb">
+          <dt>Ort</dt><dd>${esc(e.location)}</dd>
+          ${e.opponent ? `<dt>Gegner</dt><dd>${esc(e.opponent)}</dd>` : ""}
+          ${e.description ? `<dt>Info</dt><dd>${esc(e.description)}</dd>` : ""}
+        </dl>
+        ${e.type === "training" ? `<p class="soft">${responses.filter((r) => r.status === "yes").length} Zusagen · ${responses.filter((r) => r.status === "no").length} Absagen. Details unter „Training“.</p>` : ""}
+        ${e.type === "away" ? `<p class="soft">${drivers.length} Fahrer eingetragen (${drivers.reduce((a, d) => a + d.seats, 0)} Plätze). Details unter „Fahrerplanung“.</p>` : ""}
+        ${e.type === "home" ? `<p class="soft">${jobs.filter((j) => j.assignee).length}/${jobs.length} Jobs vergeben. Details unter „Heimspiel-Jobs“.</p>` : ""}`,
+      footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn danger" data-del>Löschen</button><button class="btn" data-edit>Bearbeiten</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-edit]").onclick = () => { closeModal(); eventForm(e); };
+        m.querySelector("[data-del]").onclick = () => confirmDialog("Termin wirklich löschen?", () => {
+          Store.remove("events", id); closeModal(); toast("Termin gelöscht"); reload();
+        });
+      },
+    });
+  }
+
+  function eventForm(e) {
+    const isEdit = !!e;
+    e = e || { type: "training", title: "", start: "", end: "", location: "Sporthalle SKV, Halle 1", opponent: "", description: "" };
+    const toLocal = (iso) => iso ? new Date(new Date(iso).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "";
+    modal({
+      title: isEdit ? "Termin bearbeiten" : "Neuer Termin",
+      body: `<form id="ef"><div class="form-grid">
+        <div class="field"><label>Art</label><select name="type">
+          ${Object.entries(typeLabel).map(([k, v]) => `<option value="${k}" ${k === e.type ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        <div class="field"><label>Titel</label><input name="title" value="${esc(e.title)}" required></div>
+        <div class="field"><label>Beginn</label><input type="datetime-local" name="start" value="${toLocal(e.start)}" required></div>
+        <div class="field"><label>Ende</label><input type="datetime-local" name="end" value="${toLocal(e.end)}"></div>
+        <div class="field full"><label>Ort</label><input name="location" value="${esc(e.location)}"></div>
+        <div class="field full"><label>Gegner (bei Spielen)</label><input name="opponent" value="${esc(e.opponent)}"></div>
+        <div class="field full"><label>Beschreibung</label><textarea name="description">${esc(e.description)}</textarea></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#ef");
+          if (!f.reportValidity()) return;
+          const d = formData(f);
+          d.start = new Date(d.start).toISOString();
+          d.end = d.end ? new Date(d.end).toISOString() : d.start;
+          if (isEdit) Store.update("events", e.id, d); else Store.add("events", d);
+          closeModal(); toast("Termin gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
+
+  /* ======================================================================
+     TRAININGSRÜCKMELDUNG
+     ====================================================================== */
+  function training(el) {
+    const trainings = S().events.filter((e) => e.type === "training")
+      .sort((a, b) => new Date(a.start) - new Date(b.start));
+    const upcoming = trainings.filter((e) => daysUntil(e.start) >= -1);
+    const sel = training._sel && trainings.find((t) => t.id === training._sel) ? training._sel : (upcoming[0] || trainings[0] || {}).id;
+    const evt = Store.byId("events", sel);
+
+    el.innerHTML = `
+      ${head("Trainingsrückmeldung", "Spielerinnen melden sich verbindlich zu, ab oder unsicher")}
+      <div class="field" style="max-width:520px">
+        <label>Trainingstermin</label>
+        <select id="tsel">${trainings.map((t) => `<option value="${t.id}" ${t.id === sel ? "selected" : ""}>${fmtDateShort(t.start)} · ${fmtTime(t.start)} · ${esc(t.title)}</option>`).join("")}</select>
+      </div>
+      <div id="tbody" class="mt-lg"></div>`;
+
+    $("#tsel", el).onchange = (ev) => { training._sel = ev.target.value; reload(); };
+    renderTrainingBody($("#tbody", el), evt);
+  }
+
+  function renderTrainingBody(box, evt) {
+    if (!evt) { box.innerHTML = empty("🏐", "Kein Training vorhanden"); return; }
+    const roster = S().players.filter((p) => p.membershipStatus !== "inaktiv")
+      .sort((a, b) => a.lastName.localeCompare(b.lastName));
+    const resp = {};
+    S().responses.filter((r) => r.eventId === evt.id).forEach((r) => resp[r.playerId] = r.status);
+    const count = { yes: 0, no: 0, maybe: 0, open: 0 };
+    roster.forEach((p) => { const st = resp[p.id]; if (st) count[st]++; else count.open++; });
+
+    box.innerHTML = `
+      <div class="grid grid-4 mb">
+        ${stat("✅", "Zusagen", count.yes)}
+        ${stat("❌", "Absagen", count.no)}
+        ${stat("❔", "Unsicher", count.maybe)}
+        ${stat("⏳", "Keine Rückmeldung", count.open)}
+      </div>
+      <div class="card" style="padding:0"><div class="table-wrap"><table>
+        <thead><tr><th>Spielerin</th><th>Team</th><th>Rückmeldung</th><th class="right">Aktion</th></tr></thead>
+        <tbody>${roster.map((p) => {
+          const st = resp[p.id] || "open";
+          return `<tr>
+            <td><div class="flex">${avatar(p.firstName, p.lastName)}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong></div></td>
+            <td><span class="badge info">${esc(p.team)}</span></td>
+            <td>${rmBadge(st)}</td>
+            <td class="right nowrap">
+              <button class="btn sm ${st === "yes" ? "" : "outline"}" data-set="yes" data-pl="${p.id}">Zusagen</button>
+              <button class="btn sm ${st === "maybe" ? "secondary" : "outline"}" data-set="maybe" data-pl="${p.id}">Unsicher</button>
+              <button class="btn sm ${st === "no" ? "danger" : "outline"}" data-set="no" data-pl="${p.id}">Absagen</button>
+            </td></tr>`;
+        }).join("")}</tbody>
+      </table></div></div>`;
+
+    $$("[data-set]", box).forEach((b) => b.onclick = () => {
+      setResponse(evt.id, b.dataset.pl, b.dataset.set); reload();
+    });
+  }
+  function rmBadge(st) {
+    return ({ yes: '<span class="badge good">Zugesagt</span>', no: '<span class="badge bad">Abgesagt</span>',
+      maybe: '<span class="badge warn">Unsicher</span>', open: '<span class="badge">offen</span>' })[st] || "";
+  }
+  function setResponse(eventId, playerId, status) {
+    const ex = S().responses.find((r) => r.eventId === eventId && r.playerId === playerId);
+    if (ex) Store.update("responses", ex.id, { status, at: new Date().toISOString() });
+    else Store.add("responses", { eventId, playerId, status, at: new Date().toISOString() });
+  }
+
+  /* ======================================================================
+     FAHRERPLANUNG (Auswärtsspiele)
+     ====================================================================== */
+  function drivers(el) {
+    const away = S().events.filter((e) => e.type === "away").sort((a, b) => new Date(a.start) - new Date(b.start));
+    const sel = drivers._sel && away.find((a) => a.id === drivers._sel) ? drivers._sel : (away[0] || {}).id;
+    const evt = Store.byId("events", sel);
+
+    el.innerHTML = `
+      ${head("Fahrerplanung", "Fahrer für Auswärtsspiele koordinieren und Plätze zuordnen",
+        `<button class="btn" data-add ${evt ? "" : "disabled"}>＋ Fahrer</button>`)}
+      <div class="field" style="max-width:520px">
+        <label>Auswärtsspiel</label>
+        <select id="asel">${away.map((a) => `<option value="${a.id}" ${a.id === sel ? "selected" : ""}>${fmtDateShort(a.start)} · ${esc(a.title)}</option>`).join("")}</select>
+      </div>
+      <div id="dbody" class="mt-lg"></div>`;
+
+    $("#asel", el).onchange = (ev) => { drivers._sel = ev.target.value; reload(); };
+    if ($("[data-add]", el)) $("[data-add]", el).onclick = () => driverForm(evt.id);
+    renderDriversBody($("#dbody", el), evt);
+  }
+
+  function renderDriversBody(box, evt) {
+    if (!evt) { box.innerHTML = empty("🚗", "Kein Auswärtsspiel vorhanden"); return; }
+    const list = S().drivers.filter((d) => d.eventId === evt.id);
+    const seats = list.reduce((a, d) => a + Number(d.seats || 0), 0);
+    const assigned = list.reduce((a, d) => a + d.playerIds.length, 0);
+    const roster = S().players.filter((p) => p.membershipStatus !== "inaktiv");
+    const assignedIds = new Set(list.flatMap((d) => d.playerIds));
+    const needRide = roster.filter((p) => !assignedIds.has(p.id));
+
+    box.innerHTML = `
+      <div class="grid grid-3 mb">
+        ${stat("🚗", "Fahrer", list.length, `${seats} Plätze`)}
+        ${stat("🧍", "Zugeordnet", assigned, `von ${roster.length} Spielerinnen`)}
+        ${stat("⚠️", "Ohne Fahrt", needRide.length, needRide.length ? "noch offen" : "alle versorgt")}
+      </div>
+      <div class="grid grid-2">
+        ${list.length ? list.map((d) => `
+          <div class="card">
+            <div class="card-head"><h3>🚗 ${esc(d.name)}</h3><span class="spacer"></span>
+              <span class="badge ${d.playerIds.length >= d.seats ? "warn" : "good"}">${d.playerIds.length}/${d.seats} Plätze</span></div>
+            <div class="sub soft mb">${esc(d.phone || "")}</div>
+            <div class="list mb">
+              ${d.playerIds.length ? d.playerIds.map((pid) => `
+                <div class="list-item" style="padding:8px 10px">${avatar(...pn(pid))}
+                  <div class="grow title">${esc(playerName(pid))}</div>
+                  <button class="btn sm ghost" data-unassign="${d.id}:${pid}">✕</button></div>`).join("")
+                : `<div class="muted" style="padding:6px">Noch keine Mitfahrerinnen</div>`}
+            </div>
+            <div class="flex">
+              <button class="btn sm outline" data-assign="${d.id}" ${d.playerIds.length >= d.seats ? "disabled" : ""}>＋ Mitfahrerin</button>
+              <span class="spacer"></span>
+              <button class="btn sm ghost" data-dedit="${d.id}">✏️</button>
+              <button class="btn sm ghost" data-ddel="${d.id}">🗑️</button>
+            </div>
+          </div>`).join("") : empty("🚙", "Noch keine Fahrer eingetragen")}
+      </div>
+      ${needRide.length ? `<div class="card mt"><div class="card-head"><h3>⚠️ Spielerinnen ohne Fahrt (${needRide.length})</h3></div>
+        <div class="chip-row">${needRide.map((p) => `<span class="chip">${esc(p.firstName)} ${esc(p.lastName)}</span>`).join("")}</div></div>` : ""}`;
+
+    $$("[data-ddel]", box).forEach((b) => b.onclick = () => confirmDialog("Fahrer entfernen?", () => { Store.remove("drivers", b.dataset.ddel); toast("Fahrer entfernt"); reload(); }));
+    $$("[data-dedit]", box).forEach((b) => b.onclick = () => driverForm(evt.id, Store.byId("drivers", b.dataset.dedit)));
+    $$("[data-unassign]", box).forEach((b) => b.onclick = () => {
+      const [did, pid] = b.dataset.unassign.split(":");
+      const d = Store.byId("drivers", did);
+      Store.update("drivers", did, { playerIds: d.playerIds.filter((x) => x !== pid) });
+      reload();
+    });
+    $$("[data-assign]", box).forEach((b) => b.onclick = () => assignRider(evt, Store.byId("drivers", b.dataset.assign)));
+  }
+  function pn(pid) { const p = Store.byId("players", pid); return p ? [p.firstName, p.lastName] : ["?", ""]; }
+
+  function driverForm(eventId, d) {
+    const isEdit = !!d;
+    d = d || { name: "", phone: "", seats: 4, playerIds: [], notes: "" };
+    modal({
+      title: isEdit ? "Fahrer bearbeiten" : "Fahrer hinzufügen",
+      body: `<form id="df"><div class="form-grid">
+        <div class="field"><label>Name Fahrer:in</label><input name="name" value="${esc(d.name)}" required></div>
+        <div class="field"><label>Telefon</label><input name="phone" value="${esc(d.phone)}"></div>
+        <div class="field"><label>Freie Plätze</label><input type="number" name="seats" min="1" max="8" value="${esc(d.seats)}"></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#df"); if (!f.reportValidity()) return;
+          const data = formData(f); data.seats = Number(data.seats) || 1;
+          if (isEdit) Store.update("drivers", d.id, data);
+          else Store.add("drivers", Object.assign({ eventId, playerIds: [] }, data));
+          closeModal(); toast("Gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
+
+  function assignRider(evt, d) {
+    const list = S().drivers.filter((x) => x.eventId === evt.id);
+    const assigned = new Set(list.flatMap((x) => x.playerIds));
+    const avail = S().players.filter((p) => p.membershipStatus !== "inaktiv" && !assigned.has(p.id));
+    if (!avail.length) { toast("Alle Spielerinnen sind bereits zugeordnet"); return; }
+    modal({
+      title: `Mitfahrerin → ${esc(d.name)}`,
+      body: `<div class="list">${avail.map((p) => `
+        <label class="list-item" style="cursor:pointer">${avatar(p.firstName, p.lastName)}
+          <div class="grow title">${esc(p.firstName)} ${esc(p.lastName)}</div>
+          <input type="checkbox" data-pl="${p.id}" style="width:auto"></label>`).join("")}</div>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Zuordnen</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const picks = $$("[data-pl]:checked", m).map((c) => c.dataset.pl);
+          const free = d.seats - d.playerIds.length;
+          if (picks.length > free) { toast(`Nur noch ${free} Platz/Plätze frei`, "bad"); return; }
+          Store.update("drivers", d.id, { playerIds: d.playerIds.concat(picks) });
+          closeModal(); toast("Zugeordnet", "good"); reload();
+        };
+      },
+    });
+  }
+
+  /* ======================================================================
+     HEIMSPIEL-JOBS (Catering, Helfer, sonstige)
+     ====================================================================== */
+  function jobs(el) {
+    const events = S().events.filter((e) => e.type === "home" || e.type === "other")
+      .sort((a, b) => new Date(a.start) - new Date(b.start));
+    const sel = jobs._sel && events.find((e) => e.id === jobs._sel) ? jobs._sel : (events[0] || {}).id;
+    const evt = Store.byId("events", sel);
+
+    el.innerHTML = `
+      ${head("Heimspiel-Jobs", "Catering, Helfer und weitere Aufgaben für Heimspiele & Events vergeben",
+        `<button class="btn" data-add ${evt ? "" : "disabled"}>＋ Job</button>`)}
+      <div class="field" style="max-width:520px">
+        <label>Veranstaltung</label>
+        <select id="jsel">${events.map((e) => `<option value="${e.id}" ${e.id === sel ? "selected" : ""}>${fmtDateShort(e.start)} · ${esc(e.title)}</option>`).join("")}</select>
+      </div>
+      <div id="jbody" class="mt-lg"></div>`;
+
+    $("#jsel", el).onchange = (ev) => { jobs._sel = ev.target.value; reload(); };
+    if ($("[data-add]", el)) $("[data-add]", el).onclick = () => jobForm(evt.id);
+    renderJobsBody($("#jbody", el), evt);
+  }
+
+  const jobCat = { catering: { label: "Catering", icon: "🍰" }, helper: { label: "Helfer", icon: "🙌" }, other: { label: "Sonstiges", icon: "🔧" } };
+  function renderJobsBody(box, evt) {
+    if (!evt) { box.innerHTML = empty("🙌", "Keine Veranstaltung vorhanden"); return; }
+    const list = S().jobs.filter((j) => j.eventId === evt.id);
+    const done = list.filter((j) => j.assignee).length;
+
+    box.innerHTML = `
+      <div class="grid grid-3 mb">
+        ${stat("📋", "Jobs gesamt", list.length)}
+        ${stat("✅", "Vergeben", done, `${list.length - done} offen`)}
+        ${stat("📊", "Abdeckung", list.length ? Math.round(done / list.length * 100) + "%" : "—")}
+      </div>
+      <div class="grid grid-3">
+        ${Object.keys(jobCat).map((cat) => {
+          const items = list.filter((j) => j.category === cat);
+          return `<div class="card">
+            <div class="card-head"><h3>${jobCat[cat].icon} ${jobCat[cat].label}</h3><span class="badge">${items.length}</span></div>
+            <div class="list">
+              ${items.length ? items.map((j) => `
+                <div class="list-item" style="padding:10px">
+                  <div class="grow"><div class="title" style="${j.done ? "text-decoration:line-through;opacity:.6" : ""}">${esc(j.title)}</div>
+                    <div class="sub">${j.assignee ? `👤 ${esc(j.assignee)}` : '<span class="badge warn">unbesetzt</span>'}</div></div>
+                  <button class="btn sm ghost" data-jdone="${j.id}" title="Erledigt">${j.done ? "↺" : "✔"}</button>
+                  <button class="btn sm ghost" data-jedit="${j.id}">✏️</button>
+                  <button class="btn sm ghost" data-jdel="${j.id}">🗑️</button>
+                </div>`).join("") : `<div class="muted" style="padding:6px">Keine Jobs</div>`}
+            </div>
+            <button class="btn sm outline mt" data-jadd="${cat}">＋ ${jobCat[cat].label}-Job</button>
+          </div>`;
+        }).join("")}
+      </div>`;
+
+    $$("[data-jdone]", box).forEach((b) => b.onclick = () => { const j = Store.byId("jobs", b.dataset.jdone); Store.update("jobs", j.id, { done: !j.done }); reload(); });
+    $$("[data-jedit]", box).forEach((b) => b.onclick = () => jobForm(evt.id, Store.byId("jobs", b.dataset.jedit)));
+    $$("[data-jdel]", box).forEach((b) => b.onclick = () => confirmDialog("Job löschen?", () => { Store.remove("jobs", b.dataset.jdel); toast("Job gelöscht"); reload(); }));
+    $$("[data-jadd]", box).forEach((b) => b.onclick = () => jobForm(evt.id, null, b.dataset.jadd));
+  }
+
+  function jobForm(eventId, j, presetCat) {
+    const isEdit = !!j;
+    j = j || { category: presetCat || "catering", title: "", assignee: "", done: false };
+    modal({
+      title: isEdit ? "Job bearbeiten" : "Neuer Job",
+      body: `<form id="jf"><div class="form-grid">
+        <div class="field"><label>Kategorie</label><select name="category">
+          ${Object.entries(jobCat).map(([k, v]) => `<option value="${k}" ${k === j.category ? "selected" : ""}>${v.label}</option>`).join("")}</select></div>
+        <div class="field"><label>Zuständig (Name)</label><input name="assignee" value="${esc(j.assignee)}" placeholder="offen lassen = unbesetzt"></div>
+        <div class="field full"><label>Aufgabe</label><input name="title" value="${esc(j.title)}" required></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#jf"); if (!f.reportValidity()) return;
+          const d = formData(f);
+          if (isEdit) Store.update("jobs", j.id, d); else Store.add("jobs", Object.assign({ eventId, done: false }, d));
+          closeModal(); toast("Gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
+
+  /* ======================================================================
+     EINVERSTÄNDNISERKLÄRUNGEN
+     ====================================================================== */
+  function consents(el) {
+    const s = S();
+    const missing = s.players.filter((p) => !p.consentOnFile);
+    el.innerHTML = `
+      ${head("Einverständniserklärungen", "Von den Eltern unterschriebene Formulare erfassen und ablegen",
+        `<button class="btn" data-add>⬆️ Formular hochladen</button>`)}
+      <div class="grid grid-3 mb">
+        ${stat("📄", "Erfasste Formulare", s.consents.length)}
+        ${stat("✅", "Vollständig", s.players.filter((p) => p.consentOnFile).length, `von ${s.players.length}`)}
+        ${stat("⚠️", "Noch offen", missing.length, missing.length ? "bitte einholen" : "vollständig")}
+      </div>
+
+      ${missing.length ? `<div class="card mb"><div class="card-head"><h3>⚠️ Fehlende Einverständniserklärungen</h3></div>
+        <div class="table-wrap"><table><thead><tr><th>Spielerin</th><th>Eltern</th><th>Kontakt</th><th class="right">Aktion</th></tr></thead>
+        <tbody>${missing.map((p) => `<tr>
+          <td>${esc(p.firstName)} ${esc(p.lastName)}</td><td>${esc(p.parentName)}</td>
+          <td class="soft">${esc(p.parentEmail)}</td>
+          <td class="right"><button class="btn sm outline" data-remind="${p.id}">Erinnern</button>
+          <button class="btn sm" data-upload="${p.id}">Hochladen</button></td></tr>`).join("")}</tbody></table></div></div>` : ""}
+
+      <div class="card" style="padding:0"><div class="card-head" style="padding:18px 18px 0"><h3>📁 Abgelegte Formulare</h3></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Spielerin</th><th>Art</th><th>Datei</th><th>Unterschrift</th><th>Erfasst am</th><th class="right"></th></tr></thead>
+          <tbody>${s.consents.map((c) => `<tr>
+            <td><strong>${esc(playerName(c.playerId))}</strong></td>
+            <td>${esc(c.type)}</td>
+            <td>${c.dataUrl ? `<a href="${c.dataUrl}" download="${esc(c.fileName)}">📎 ${esc(c.fileName)}</a>` : `📎 ${esc(c.fileName)} <span class="badge">Demo</span>`}</td>
+            <td>${esc(c.signedBy)}</td>
+            <td class="soft">${fmtDateShort(c.uploadedAt)}</td>
+            <td class="right"><button class="btn sm ghost" data-cdel="${c.id}">🗑️</button></td></tr>`).join("")
+            || `<tr><td colspan="6">${empty("📄", "Noch keine Formulare erfasst")}</td></tr>`}</tbody>
+        </table></div></div>`;
+
+    $("[data-add]", el).onclick = () => consentForm();
+    $$("[data-upload]", el).forEach((b) => b.onclick = () => consentForm(b.dataset.upload));
+    $$("[data-remind]", el).forEach((b) => b.onclick = () => {
+      const p = Store.byId("players", b.dataset.remind); contactParent(p);
+    });
+    $$("[data-cdel]", el).forEach((b) => b.onclick = () => confirmDialog("Formular-Eintrag löschen?", () => {
+      Store.remove("consents", b.dataset.cdel); toast("Eintrag gelöscht"); reload();
+    }));
+  }
+
+  function consentForm(preselectPlayer) {
+    const s = S();
+    modal({
+      title: "Einverständniserklärung hochladen",
+      body: `<form id="cf"><div class="form-grid">
+        <div class="field"><label>Spielerin</label><select name="playerId">
+          ${s.players.map((p) => `<option value="${p.id}" ${p.id === preselectPlayer ? "selected" : ""}>${esc(p.firstName)} ${esc(p.lastName)}</option>`).join("")}</select></div>
+        <div class="field"><label>Art der Erklärung</label><select name="type">
+          ${["Datennutzung & Fotorechte", "Fahrten & Aufsicht", "Medizinische Notfallversorgung", "Teilnahme Trainingslager"].map((x) => `<option>${x}</option>`).join("")}</select></div>
+        <div class="field"><label>Unterschrieben von</label><input name="signedBy" placeholder="Name Elternteil"></div>
+        <div class="field full"><label>Datei (PDF/Bild)</label>
+          <label class="file-drop" id="fd">📎 Klicken zum Auswählen<div class="sub" id="fdname"></div>
+          <input type="file" name="file" accept="application/pdf,image/*" hidden></label></div>
+      </div><p class="muted" style="font-size:.8rem">Die Datei wird lokal im Browser gespeichert (DSGVO-konform ohne Server). Für den Vereinsbetrieb kann eine sichere Serverablage angebunden werden.</p></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        const fileInput = m.querySelector('input[name="file"]');
+        m.querySelector("#fd").onclick = () => fileInput.click();
+        let dataUrl = null, fileName = "";
+        fileInput.onchange = () => {
+          const f = fileInput.files[0]; if (!f) return;
+          if (f.size > 4 * 1024 * 1024) { toast("Datei zu groß (max. 4 MB)", "bad"); return; }
+          fileName = f.name; m.querySelector("#fdname").textContent = f.name;
+          const rd = new FileReader(); rd.onload = () => dataUrl = rd.result; rd.readAsDataURL(f);
+        };
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const d = formData(m.querySelector("#cf"));
+          if (!fileName && !d.signedBy) { toast("Bitte Datei oder Unterschrift angeben", "bad"); return; }
+          Store.add("consents", { playerId: d.playerId, type: d.type, signedBy: d.signedBy || "—",
+            fileName: fileName || "manuell_erfasst.txt", dataUrl, uploadedAt: new Date().toISOString() });
+          Store.update("players", d.playerId, { consentOnFile: true });
+          closeModal(); toast("Einverständnis abgelegt", "good"); reload();
+        };
+      },
+    });
+  }
+
+  /* ======================================================================
+     GEBURTSTAGE
+     ====================================================================== */
+  function birthdaysWithin(days) {
+    const now = new Date(); now.setHours(0, 0, 0, 0);
+    return S().players.map((p) => {
+      const b = new Date(p.birthDate);
+      const next = new Date(now.getFullYear(), b.getMonth(), b.getDate());
+      if (next < now) next.setFullYear(now.getFullYear() + 1);
+      const inDays = Math.round((next - now) / 86400000);
+      return { ...p, next: next.toISOString(), inDays, turns: next.getFullYear() - b.getFullYear() };
+    }).filter((p) => p.inDays <= days).sort((a, b) => a.inDays - b.inDays);
+  }
+  function birthdays(el) {
+    const all = S().players.map((p) => {
+      const b = new Date(p.birthDate);
+      const now = new Date(); now.setHours(0, 0, 0, 0);
+      const next = new Date(now.getFullYear(), b.getMonth(), b.getDate());
+      if (next < now) next.setFullYear(now.getFullYear() + 1);
+      return { ...p, next: next.toISOString(), inDays: Math.round((next - now) / 86400000), turns: next.getFullYear() - b.getFullYear() };
+    }).sort((a, b) => a.inDays - b.inDays);
+    const soon = all.filter((p) => p.inDays <= 30);
+
+    el.innerHTML = `
+      ${head("Geburtstagsliste", "Damit kein Geburtstag im Team vergessen wird")}
+      ${soon.length ? `<div class="card mb"><div class="card-head"><h3>🎉 Die nächsten 30 Tage</h3></div>
+        <div class="grid grid-4">${soon.map((p) => `
+          <div class="list-item">${avatar(p.firstName, p.lastName)}
+            <div class="grow"><div class="title">${esc(p.firstName)} ${esc(p.lastName)}</div>
+            <div class="sub">${p.inDays === 0 ? "🎂 heute!" : fmtDateShort(p.next)} · wird ${p.turns}</div></div></div>`).join("")}</div></div>` : ""}
+      <div class="card" style="padding:0"><div class="table-wrap"><table>
+        <thead><tr><th>Spielerin</th><th>Geburtstag</th><th>Alter</th><th>Nächster</th><th>In Tagen</th></tr></thead>
+        <tbody>${all.map((p) => `<tr>
+          <td><div class="flex">${avatar(p.firstName, p.lastName)}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong></div></td>
+          <td>${fmtDateShort(p.birthDate)}</td>
+          <td>${age(p.birthDate)} Jahre</td>
+          <td>${DOW[new Date(p.next).getDay()]}, ${fmtDateShort(p.next)}</td>
+          <td>${p.inDays === 0 ? '<span class="badge accent">heute 🎂</span>' : `${p.inDays} Tage`}</td></tr>`).join("")}</tbody>
+      </table></div></div>`;
+  }
+
+  /* ======================================================================
+     FINANZEN
+     ====================================================================== */
+  function finances(el) {
+    const s = S();
+    const fees = s.finances.filter((f) => f.type === "fee");
+    const donations = s.finances.filter((f) => f.type === "donation");
+    const expenses = s.finances.filter((f) => f.type === "expense");
+    const income = fees.filter((f) => f.paid).reduce((a, f) => a + f.amount, 0) + donations.filter((f) => f.paid).reduce((a, f) => a + f.amount, 0);
+    const spent = expenses.filter((f) => f.paid).reduce((a, f) => a + f.amount, 0);
+    const openFees = fees.filter((f) => !f.paid);
+    const tab = finances._tab || "all";
+    const rows = tab === "all" ? s.finances : s.finances.filter((f) => f.type === tab);
+
+    el.innerHTML = `
+      ${head("Finanzen", "Mitgliedsbeiträge, Spenden und Ausgaben verwalten", `<button class="btn" data-add>＋ Buchung</button>`)}
+      <div class="grid grid-4 mb">
+        ${stat("💶", "Einnahmen", fmtMoney(income), "bezahlt")}
+        ${stat("🧾", "Ausgaben", fmtMoney(spent))}
+        ${stat("📈", "Saldo", fmtMoney(income - spent))}
+        ${stat("⚠️", "Offene Beiträge", fmtMoney(openFees.reduce((a, f) => a + f.amount, 0)), `${openFees.length} offen`)}
+      </div>
+      <div class="tabs">
+        ${[["all", "Alle"], ["fee", "Mitgliedsbeiträge"], ["donation", "Spenden"], ["expense", "Ausgaben"]].map(([k, l]) =>
+          `<button class="tab ${tab === k ? "active" : ""}" data-tab="${k}">${l}</button>`).join("")}
+      </div>
+      <div class="card" style="padding:0"><div class="table-wrap"><table>
+        <thead><tr><th>Beschreibung</th><th>Art</th><th>Zuordnung</th><th>Datum</th><th class="right">Betrag</th><th>Status</th><th class="right"></th></tr></thead>
+        <tbody>${rows.sort((a, b) => new Date(b.date) - new Date(a.date)).map((f) => `<tr>
+          <td class="wrap">${esc(f.description)}</td>
+          <td>${finType(f.type)}</td>
+          <td class="soft">${f.playerId ? esc(playerName(f.playerId)) : "—"}</td>
+          <td class="soft">${fmtDateShort(f.date)}</td>
+          <td class="right ${f.type === "expense" ? "" : ""}"><strong>${f.type === "expense" ? "−" : "+"}${fmtMoney(f.amount)}</strong></td>
+          <td>${f.paid ? '<span class="badge good">bezahlt</span>' : '<span class="badge warn">offen</span>'}</td>
+          <td class="right nowrap">
+            ${!f.paid ? `<button class="btn sm outline" data-paid="${f.id}">als bezahlt</button>` : ""}
+            <button class="btn sm ghost" data-fdel="${f.id}">🗑️</button></td></tr>`).join("")}</tbody>
+      </table></div></div>`;
+
+    $$("[data-tab]", el).forEach((b) => b.onclick = () => { finances._tab = b.dataset.tab; reload(); });
+    $("[data-add]", el).onclick = () => financeForm();
+    $$("[data-paid]", el).forEach((b) => b.onclick = () => {
+      const f = Store.update("finances", b.dataset.paid, { paid: true });
+      if (f.type === "fee" && f.playerId) {
+        const p = Store.byId("players", f.playerId);
+        if (p && p.membershipStatus === "beitragsrückstand") Store.update("players", p.id, { membershipStatus: "aktiv" });
+      }
+      toast("Als bezahlt markiert", "good"); reload();
+    });
+    $$("[data-fdel]", el).forEach((b) => b.onclick = () => confirmDialog("Buchung löschen?", () => { Store.remove("finances", b.dataset.fdel); toast("Gelöscht"); reload(); }));
+  }
+  function finType(t) {
+    return ({ fee: '<span class="badge info">Beitrag</span>', donation: '<span class="badge good">Spende</span>', expense: '<span class="badge warn">Ausgabe</span>' })[t] || t;
+  }
+  function financeForm() {
+    const s = S();
+    modal({
+      title: "Neue Buchung",
+      body: `<form id="ff"><div class="form-grid">
+        <div class="field"><label>Art</label><select name="type" id="ftype">
+          <option value="fee">Mitgliedsbeitrag</option><option value="donation">Spende</option><option value="expense">Ausgabe</option></select></div>
+        <div class="field"><label>Betrag (€)</label><input type="number" step="0.01" name="amount" required></div>
+        <div class="field full"><label>Beschreibung</label><input name="description" required></div>
+        <div class="field"><label>Datum</label><input type="date" name="date" value="${new Date().toISOString().slice(0, 10)}"></div>
+        <div class="field"><label>Spielerin (optional)</label><select name="playerId"><option value="">—</option>
+          ${s.players.map((p) => `<option value="${p.id}">${esc(p.firstName)} ${esc(p.lastName)}</option>`).join("")}</select></div>
+        <div class="field full"><label><input type="checkbox" name="paid" style="width:auto"> bereits bezahlt / eingegangen</label></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#ff"); if (!f.reportValidity()) return;
+          const d = formData(f); d.amount = Number(d.amount) || 0;
+          d.date = new Date(d.date).toISOString();
+          if (!d.playerId) d.playerId = null;
+          Store.add("finances", d); closeModal(); toast("Buchung gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
+
+  /* ======================================================================
+     VEREINSKLEIDUNG
+     ====================================================================== */
+  function clothing(el) {
+    const s = S();
+    el.innerHTML = `
+      ${head("Vereinskleidung", "Kollektion ansehen und direkt anfordern", `<button class="btn outline" data-add>＋ Artikel</button>`)}
+      <div class="grid grid-3 mb">
+        ${s.clothing.map((c) => `
+          <div class="card product">
+            <div class="img">${clothingSVG(c.kind, c.color)}</div>
+            <div class="body">
+              <div class="flex"><strong>${esc(c.name)}</strong><span class="spacer"></span><span class="price">${fmtMoney(c.price)}</span></div>
+              <p class="soft" style="font-size:.85rem;margin:0">${esc(c.description)}</p>
+              <div class="chip-row" style="gap:5px">${c.sizes.map((sz) => `<span class="badge">${esc(sz)}</span>`).join("")}</div>
+              <button class="btn sm mt" data-req="${c.id}">🛒 Anfordern</button>
+            </div></div>`).join("")}
+      </div>
+
+      <div class="card"><div class="card-head"><h3>📦 Bestellungen & Anforderungen</h3></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Artikel</th><th>Spielerin</th><th>Größe</th><th>Menge</th><th>Status</th><th class="right"></th></tr></thead>
+          <tbody>${s.clothingRequests.length ? s.clothingRequests.map((r) => {
+            const item = Store.byId("clothing", r.itemId);
+            return `<tr><td>${esc(item ? item.name : "—")}</td><td>${esc(playerName(r.playerId))}</td>
+              <td>${esc(r.size)}</td><td>${r.qty}×</td>
+              <td>${reqStatus(r.status)}</td>
+              <td class="right nowrap">
+                <select class="rstat" data-r="${r.id}" style="width:auto;display:inline-block">
+                  ${["offen", "bestellt", "geliefert"].map((st) => `<option ${st === r.status ? "selected" : ""}>${st}</option>`).join("")}</select>
+                <button class="btn sm ghost" data-rdel="${r.id}">🗑️</button></td></tr>`;
+          }).join("") : `<tr><td colspan="6">${empty("🛒", "Noch keine Anforderungen")}</td></tr>`}</tbody>
+        </table></div></div>`;
+
+    $$("[data-req]", el).forEach((b) => b.onclick = () => clothingRequestForm(b.dataset.req));
+    $("[data-add]", el).onclick = () => clothingItemForm();
+    $$(".rstat", el).forEach((s2) => s2.onchange = () => { Store.update("clothingRequests", s2.dataset.r, { status: s2.value }); toast("Status aktualisiert"); reload(); });
+    $$("[data-rdel]", el).forEach((b) => b.onclick = () => confirmDialog("Anforderung löschen?", () => { Store.remove("clothingRequests", b.dataset.rdel); toast("Gelöscht"); reload(); }));
+  }
+  function reqStatus(s) {
+    return ({ offen: '<span class="badge warn">offen</span>', bestellt: '<span class="badge info">bestellt</span>', geliefert: '<span class="badge good">geliefert</span>' })[s] || s;
+  }
+  function clothingRequestForm(itemId) {
+    const item = Store.byId("clothing", itemId); const s = S();
+    modal({
+      title: `Anfordern – ${esc(item.name)}`,
+      body: `<div class="flex mb"><div style="width:120px">${clothingSVG(item.kind, item.color)}</div>
+        <div><strong>${esc(item.name)}</strong><div class="price">${fmtMoney(item.price)}</div><p class="soft" style="font-size:.85rem">${esc(item.description)}</p></div></div>
+        <form id="rf"><div class="form-grid">
+        <div class="field"><label>Spielerin</label><select name="playerId">${s.players.map((p) => `<option value="${p.id}">${esc(p.firstName)} ${esc(p.lastName)}</option>`).join("")}</select></div>
+        <div class="field"><label>Größe</label><select name="size">${item.sizes.map((sz) => `<option>${esc(sz)}</option>`).join("")}</select></div>
+        <div class="field"><label>Menge</label><input type="number" name="qty" min="1" value="1"></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Anfordern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const d = formData(m.querySelector("#rf")); d.qty = Number(d.qty) || 1;
+          Store.add("clothingRequests", { itemId, playerId: d.playerId, size: d.size, qty: d.qty, status: "offen", at: new Date().toISOString() });
+          closeModal(); toast("Anforderung gesendet", "good"); reload();
+        };
+      },
+    });
+  }
+  function clothingItemForm() {
+    modal({
+      title: "Neuer Artikel",
+      body: `<form id="cif"><div class="form-grid">
+        <div class="field"><label>Name</label><input name="name" required></div>
+        <div class="field"><label>Preis (€)</label><input type="number" step="0.01" name="price" value="0"></div>
+        <div class="field"><label>Typ (Bild)</label><select name="kind">
+          ${["jersey", "jacket", "hoodie", "bag", "pads"].map((k) => `<option value="${k}">${k}</option>`).join("")}</select></div>
+        <div class="field"><label>Farbe</label><input type="color" name="color" value="#f97316"></div>
+        <div class="field full"><label>Größen (Komma-getrennt)</label><input name="sizes" value="S, M, L, XL"></div>
+        <div class="field full"><label>Beschreibung</label><textarea name="description"></textarea></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#cif"); if (!f.reportValidity()) return;
+          const d = formData(f); d.price = Number(d.price) || 0;
+          d.sizes = d.sizes.split(",").map((x) => x.trim()).filter(Boolean);
+          Store.add("clothing", d); closeModal(); toast("Artikel angelegt", "good"); reload();
+        };
+      },
+    });
+  }
+
+  /* ======================================================================
+     SPONSOREN
+     ====================================================================== */
+  function sponsors(el) {
+    const s = S();
+    const total = s.sponsors.reduce((a, x) => a + Number(x.contribution || 0), 0);
+    el.innerHTML = `
+      ${head("Sponsoren", "Partner des Vereins verwalten und präsentieren", `<button class="btn" data-add>＋ Sponsor</button>`)}
+      <div class="grid grid-3 mb">
+        ${stat("🤝", "Sponsoren", s.sponsors.length)}
+        ${stat("💶", "Fördersumme / Saison", fmtMoney(total))}
+        ${stat("⭐", "Hauptsponsor", s.sponsors.find((x) => /haupt/i.test(x.tier)) ? esc(s.sponsors.find((x) => /haupt/i.test(x.tier)).name) : "—")}
+      </div>
+      <div class="grid grid-3">
+        ${s.sponsors.map((sp) => `
+          <div class="card sponsor-card">
+            <div class="sponsor-logo">${sponsorSVG(sp.name, sp.color)}</div>
+            <div class="flex" style="width:100%"><strong>${esc(sp.name)}</strong><span class="spacer"></span><span class="badge accent">${esc(sp.tier)}</span></div>
+            <dl class="kv" style="width:100%">
+              <dt>Beitrag</dt><dd>${fmtMoney(sp.contribution)}</dd>
+              <dt>Kontakt</dt><dd class="soft">${esc(sp.contact || "—")}</dd>
+              <dt>Web</dt><dd>${sp.website ? `<a href="${esc(sp.website)}" target="_blank" rel="noopener">Website ↗</a>` : "—"}</dd>
+            </dl>
+            <div class="flex" style="width:100%"><span class="spacer"></span>
+              <button class="btn sm ghost" data-sedit="${sp.id}">✏️</button>
+              <button class="btn sm ghost" data-sdel="${sp.id}">🗑️</button></div>
+          </div>`).join("")}
+        <div class="card" style="display:grid;place-items:center;border-style:dashed;min-height:200px;cursor:pointer" data-add2>
+          <div class="center soft"><div style="font-size:2rem">＋</div>Platz für weitere Sponsoren</div></div>
+      </div>`;
+
+    const addFn = () => sponsorForm();
+    $("[data-add]", el).onclick = addFn;
+    $("[data-add2]", el).onclick = addFn;
+    $$("[data-sedit]", el).forEach((b) => b.onclick = () => sponsorForm(Store.byId("sponsors", b.dataset.sedit)));
+    $$("[data-sdel]", el).forEach((b) => b.onclick = () => confirmDialog("Sponsor löschen?", () => { Store.remove("sponsors", b.dataset.sdel); toast("Gelöscht"); reload(); }));
+  }
+  function sponsorForm(sp) {
+    const isEdit = !!sp;
+    sp = sp || { name: "", tier: "Partner", website: "", contact: "", contribution: 0, color: "#0ea5e9" };
+    modal({
+      title: isEdit ? "Sponsor bearbeiten" : "Neuer Sponsor",
+      body: `<form id="sf"><div class="form-grid">
+        <div class="field"><label>Name</label><input name="name" value="${esc(sp.name)}" required></div>
+        <div class="field"><label>Kategorie</label><select name="tier">
+          ${["Hauptsponsor", "Premium", "Partner", "Förderer"].map((t) => `<option ${t === sp.tier ? "selected" : ""}>${t}</option>`).join("")}</select></div>
+        <div class="field"><label>Fördersumme (€/Saison)</label><input type="number" name="contribution" value="${esc(sp.contribution)}"></div>
+        <div class="field"><label>Logo-Farbe</label><input type="color" name="color" value="${esc(sp.color)}"></div>
+        <div class="field"><label>Website</label><input name="website" value="${esc(sp.website)}" placeholder="https://"></div>
+        <div class="field"><label>Kontakt</label><input name="contact" value="${esc(sp.contact)}"></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#sf"); if (!f.reportValidity()) return;
+          const d = formData(f); d.contribution = Number(d.contribution) || 0;
+          if (isEdit) Store.update("sponsors", sp.id, d); else Store.add("sponsors", d);
+          closeModal(); toast("Gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
+
+  /* ======================================================================
+     VERBAND & TABELLE (Verbandsliga Mecklenburg-Vorpommern)
+     ====================================================================== */
+  function standings(el) {
+    const s = S();
+    const rows = s.standings.slice().sort((a, b) => b.points - a.points || (b.setsW - b.setsL) - (a.setsW - a.setsL));
+    const links = [
+      ["🏠", "Vereinswebsite SKV Müritz", "Offizielle Seite des Vereins", Store.WEBSITE],
+      ["🏐", "Volleyball-Verband MV (VVMV)", "Startseite des Landesverbands", "https://www.vvmv.de/"],
+      ["📊", "Ligen & Tabellen", "Aktuelle Tabellen im SAMS-Spielbetrieb", "https://mv.sams-ticket.de/public/ranking.html"],
+      ["📅", "Spielplan & Termine", "Ansetzungen der Verbandsliga", "https://mv.sams-ticket.de/public/schedule.html"],
+      ["📋", "Spielbetrieb / Meldung", "Infos zum Spielbetrieb des VVMV", "https://www.vvmv.de/spielbetrieb/"],
+      ["⚖️", "Regeln & Ordnungen", "Spielordnung und Regelwerk", "https://www.volleyball-verband.de/regelwerk"],
+      ["🧑‍⚖️", "Schiedsrichterwesen", "Ansetzungen & Ausbildung", "https://www.vvmv.de/schiedsrichter/"],
+    ];
+    const ourPos = rows.findIndex((r) => /skv/i.test(r.team)) + 1;
+
+    el.innerHTML = `
+      ${head("Verbandsliga MV – Tabelle & Links", "Punktestand der Verbandsliga Mecklenburg-Vorpommern und Direktlinks zum Verband")}
+      <div class="grid grid-4 mb">
+        ${stat("🏆", "Tabellenplatz SKV", ourPos ? ourPos + "." : "—", `${rows.length} Teams`)}
+        ${stat("⭐", "Punkte SKV", (rows.find((r) => /skv/i.test(r.team)) || {}).points ?? "—")}
+        ${stat("🎽", "Spiele", (rows.find((r) => /skv/i.test(r.team)) || {}).games ?? "—")}
+        ${stat("📈", "Satzverhältnis", (() => { const t = rows.find((r) => /skv/i.test(r.team)); return t ? `${t.setsW}:${t.setsL}` : "—"; })())}
+      </div>
+
+      <div class="grid" style="grid-template-columns: 1.4fr 1fr; gap:16px; align-items:start">
+        <div class="card" style="padding:0">
+          <div class="card-head" style="padding:18px 18px 0"><h3>📊 Tabelle Verbandsliga MV</h3></div>
+          <div class="table-wrap"><table>
+            <thead><tr><th>#</th><th>Team</th><th>Sp.</th><th>S</th><th>N</th><th>Sätze</th><th class="right">Pkt.</th></tr></thead>
+            <tbody>${rows.map((r, i) => `<tr style="${/skv/i.test(r.team) ? "background:color-mix(in srgb,var(--accent) 10%,transparent)" : ""}">
+              <td><strong>${i + 1}</strong></td>
+              <td>${/skv/i.test(r.team) ? "🏐 " : ""}<strong>${esc(r.team)}</strong></td>
+              <td>${r.games}</td><td>${r.win}</td><td>${r.loss}</td>
+              <td class="soft">${r.setsW}:${r.setsL}</td>
+              <td class="right"><strong>${r.points}</strong></td></tr>`).join("")}</tbody>
+          </table></div>
+          <p class="muted" style="padding:12px 18px;font-size:.78rem">Beispieldaten – für Live-Stände bitte den offiziellen SAMS-Spielbetrieb des VVMV verlinken.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h3>🔗 Verbands-Links</h3></div>
+          <div class="list">
+            ${links.map(([ic, t, sub, url]) => `
+              <a class="link-card" href="${esc(url)}" target="_blank" rel="noopener">
+                <span class="ic">${ic}</span><div class="grow"><div class="title">${esc(t)}</div><div class="sub">${esc(sub)}</div></div><span class="arr">↗</span></a>`).join("")}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  /* ======================================================================
+     WIKI (Volleyball erklärt)
+     ====================================================================== */
+  function wiki(el) {
+    const articles = [
+      { id: "grundlagen", h: "🏐 Grundlagen & Ziel des Spiels", html: `
+        <p>Volleyball wird von zwei Teams zu je sechs Spielerinnen über ein Netz gespielt. Ziel ist es, den Ball so über das Netz ins gegnerische Feld zu spielen, dass ihn die Gegnerinnen nicht regelkonform zurückspielen können. Ein Team darf den Ball maximal <strong>dreimal</strong> berühren (plus möglicher Block), bevor er über das Netz muss.</p>
+        <ul><li>Feldgröße: 18 × 9 Meter, geteilt durch das Netz.</li>
+        <li>Netzhöhe: 2,24 m (Damen) bzw. 2,43 m (Herren).</li>
+        <li>Ein Satz wird bis <strong>25 Punkte</strong> gespielt (mind. 2 Punkte Vorsprung).</li>
+        <li>Gewonnen hat, wer zuerst <strong>3 Sätze</strong> gewinnt (Tie-Break bis 15).</li></ul>` },
+      { id: "zaehlweise", h: "🔢 Zählweise (Rally-Point-System)", html: `
+        <p>Es gilt das Rally-Point-System: <strong>Jeder Ballwechsel</strong> bringt einen Punkt – egal welches Team aufgeschlagen hat. Gewinnt das annehmende Team den Ballwechsel, erhält es den Punkt <em>und</em> das Aufschlagrecht (Seitenwechsel der Aufschlagreihe → „Rotation").</p>` },
+      { id: "positionen", h: "📍 Positionen & Rotation", html: `
+        <p>Auf dem Feld stehen sechs Positionen. Nach Gewinn des Aufschlagrechts rotieren alle im Uhrzeigersinn um eine Position.</p>
+        <ul>
+        <li><strong>Zuspiel (Steller):</strong> organisiert den Angriff, spielt den zweiten Ball.</li>
+        <li><strong>Außenangriff (Annahme/Außen):</strong> Hauptangriff über Position 4, stark in der Annahme.</li>
+        <li><strong>Mittelblocker (Mitte):</strong> blockt in der Mitte, schnelle Angriffe.</li>
+        <li><strong>Diagonal:</strong> Hauptangreiferin gegenüber dem Zuspiel.</li>
+        <li><strong>Libero:</strong> Abwehrspezialistin (anderes Trikot), darf nicht angreifen/aufschlagen im Vorderfeld.</li></ul>` },
+      { id: "techniken", h: "🖐️ Grundtechniken", html: `
+        <ul>
+        <li><strong>Pritschen (oberes Zuspiel):</strong> Ball wird mit den Fingerspitzen über dem Kopf gespielt – Basis des Zuspiels.</li>
+        <li><strong>Baggern (unteres Zuspiel):</strong> Ball wird mit den gestreckten Unterarmen angenommen – für Aufschlagannahme und Abwehr.</li>
+        <li><strong>Aufschlag (Service):</strong> von unten (Kinder/Anfänger) oder von oben (Tennisaufschlag, Sprungaufschlag).</li>
+        <li><strong>Angriff (Schmetterschlag):</strong> Anlauf, Absprung, Schlag über das Netz.</li>
+        <li><strong>Block:</strong> Sprung an der Netzkante, um den Angriff abzuwehren.</li></ul>` },
+      { id: "regeln", h: "⚖️ Wichtige Regeln & typische Fehler", html: `
+        <ul>
+        <li><strong>Vierschlag:</strong> Ball mehr als dreimal berührt (Block zählt nicht mit).</li>
+        <li><strong>Doppelberührung:</strong> zweimal hintereinander durch dieselbe Spielerin (außer beim Block).</li>
+        <li><strong>Netzberührung</strong> im Spielgeschehen ist ein Fehler.</li>
+        <li><strong>Übertreten der Mittellinie</strong> mit dem ganzen Fuß.</li>
+        <li><strong>Rotationsfehler:</strong> falsche Position beim Aufschlag.</li>
+        <li><strong>Fußfehler</strong> beim Aufschlag (Übertreten der Grundlinie).</li></ul>` },
+      { id: "training", h: "🎯 Trainingsaufbau (für Trainer)", html: `
+        <p>Ein ausgewogenes Jugendtraining kombiniert Technik, Spielformen und Athletik:</p>
+        <ul>
+        <li><strong>Aufwärmen (15 min):</strong> Lauf-ABC, Ballgewöhnung, Mobilisation.</li>
+        <li><strong>Technikblock (25 min):</strong> Fokus auf 1–2 Techniken, viele Wiederholungen.</li>
+        <li><strong>Spielformen (30 min):</strong> Kleinfeld 2:2/3:3, Situationsspiele.</li>
+        <li><strong>Abschlussspiel (15 min):</strong> 6:6 mit Aufgabenstellung.</li>
+        <li><strong>Cool-down (5 min):</strong> Dehnen, Feedback, Ausblick.</li></ul>` },
+      { id: "begriffe", h: "📖 Glossar", html: `
+        <dl class="kv">
+        <dt>Ass</dt><dd>Direkter Punkt durch den Aufschlag.</dd>
+        <dt>Block</dt><dd>Abwehr des gegnerischen Angriffs am Netz.</dd>
+        <dt>Dig</dt><dd>Abwehr eines harten Angriffsballs.</dd>
+        <dt>Lob / Finte</dt><dd>Angetäuschter Angriff, Ball wird kurz gelegt.</dd>
+        <dt>Side-Out</dt><dd>Das annehmende Team gewinnt den Ballwechsel.</dd>
+        <dt>Tie-Break</dt><dd>Entscheidungssatz bis 15 Punkte.</dd></dl>` },
+    ];
+
+    el.innerHTML = `
+      ${head("Volleyball-Wiki", "Regeln, Techniken und Begriffe – ideal für neue Spielerinnen und Eltern")}
+      <div class="grid" style="grid-template-columns: 240px 1fr; gap:16px; align-items:start">
+        <div class="card wiki-toc" style="position:sticky;top:80px">
+          <h3 style="font-size:.9rem">Inhalt</h3>
+          ${articles.map((a) => `<a href="#/wiki" data-goto="${a.id}">${esc(a.h)}</a>`).join("")}
+          <hr style="border:none;border-top:1px solid var(--border);margin:10px 0">
+          <a href="https://www.volleyball-verband.de/regelwerk" target="_blank" rel="noopener">📘 Offizielles Regelwerk (DVV) ↗</a>
+        </div>
+        <div class="card wiki-article">
+          ${articles.map((a) => `<div id="wiki-${a.id}"><h3>${esc(a.h)}</h3>${a.html}</div>`).join("")}
+        </div>
+      </div>`;
+
+    $$("[data-goto]", el).forEach((a) => a.onclick = (e) => {
+      e.preventDefault();
+      const t = el.querySelector(`#wiki-${a.dataset.goto}`);
+      if (t) t.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  /* ======================================================================
+     ANKÜNDIGUNGEN (Eltern-Kommunikation)
+     ====================================================================== */
+  function announcements(el) {
+    const s = S();
+    el.innerHTML = `
+      ${head("Ankündigungen & Eltern-Info", "Nachrichten an Team und Eltern zentral veröffentlichen", `<button class="btn" data-add>＋ Ankündigung</button>`)}
+      <div class="list">
+        ${s.announcements.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).map((a) => `
+          <div class="card">
+            <div class="flex mb"><h3 style="margin:0">${esc(a.title)}</h3><span class="spacer"></span>
+              <span class="badge ${a.audience === "eltern" ? "info" : "accent"}">${a.audience === "eltern" ? "👪 Eltern" : "👥 Alle"}</span>
+              <span class="badge">${fmtDateShort(a.date)}</span></div>
+            <p style="margin:0" class="soft">${esc(a.body)}</p>
+            <div class="flex mt"><span class="spacer"></span>
+              <button class="btn sm ghost" data-adel="${a.id}">🗑️ Löschen</button></div>
+          </div>`).join("") || empty("📣", "Noch keine Ankündigungen")}
+      </div>`;
+
+    $("[data-add]", el).onclick = () => announcementForm();
+    $$("[data-adel]", el).forEach((b) => b.onclick = () => confirmDialog("Ankündigung löschen?", () => { Store.remove("announcements", b.dataset.adel); toast("Gelöscht"); reload(); }));
+  }
+  function announcementForm() {
+    modal({
+      title: "Neue Ankündigung",
+      body: `<form id="af"><div class="form-grid">
+        <div class="field full"><label>Titel</label><input name="title" required></div>
+        <div class="field"><label>Zielgruppe</label><select name="audience"><option value="alle">Alle</option><option value="eltern">Eltern</option></select></div>
+        <div class="field full"><label>Nachricht</label><textarea name="body" rows="5" required></textarea></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Veröffentlichen</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#af"); if (!f.reportValidity()) return;
+          const d = formData(f); d.date = new Date().toISOString();
+          Store.add("announcements", d); closeModal(); toast("Veröffentlicht", "good"); reload();
+        };
+      },
+    });
+  }
+
+  /* ======================================================================
+     AUFGABEN (Trainer To-Do)
+     ====================================================================== */
+  function tasks(el) {
+    const s = S();
+    const open = s.tasks.filter((t) => !t.done).sort((a, b) => new Date(a.due) - new Date(b.due));
+    const done = s.tasks.filter((t) => t.done);
+    el.innerHTML = `
+      ${head("Aufgaben", "Deine To-Do-Liste rund um das Team", `<button class="btn" data-add>＋ Aufgabe</button>`)}
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-head"><h3>Offen (${open.length})</h3></div>
+          <div class="list">${open.length ? open.map((t) => taskRow(t)).join("") : empty("🎉", "Alles erledigt!")}</div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Erledigt (${done.length})</h3></div>
+          <div class="list">${done.map((t) => taskRow(t)).join("") || empty("—", "Noch nichts erledigt")}</div>
+        </div>
+      </div>`;
+
+    $("[data-add]", el).onclick = () => taskForm();
+    $$("[data-tdone]", el).forEach((cb) => cb.onchange = () => { Store.update("tasks", cb.dataset.tdone, { done: cb.checked }); reload(); });
+    $$("[data-tdel]", el).forEach((b) => b.onclick = () => { Store.remove("tasks", b.dataset.tdel); toast("Gelöscht"); reload(); });
+  }
+  function taskRow(t) {
+    const overdue = !t.done && daysUntil(t.due) < 0;
+    return `<label class="list-item" style="cursor:pointer">
+      <input type="checkbox" data-tdone="${t.id}" ${t.done ? "checked" : ""} style="width:auto">
+      <div class="grow"><div class="title" style="${t.done ? "text-decoration:line-through;opacity:.6" : ""}">${esc(t.title)}</div>
+        <div class="sub">${t.done ? "erledigt" : `fällig ${relDays(t.due)}`} · ${prioBadge(t.priority)} ${overdue ? '<span class="badge bad">überfällig</span>' : ""}</div></div>
+      <button class="btn sm ghost" data-tdel="${t.id}">🗑️</button></label>`;
+  }
+  function taskForm() {
+    modal({
+      title: "Neue Aufgabe",
+      body: `<form id="tf"><div class="form-grid">
+        <div class="field full"><label>Aufgabe</label><input name="title" required></div>
+        <div class="field"><label>Fällig am</label><input type="date" name="due" value="${new Date().toISOString().slice(0, 10)}"></div>
+        <div class="field"><label>Priorität</label><select name="priority"><option>hoch</option><option selected>mittel</option><option>niedrig</option></select></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#tf"); if (!f.reportValidity()) return;
+          const d = formData(f); d.due = new Date(d.due).toISOString(); d.done = false;
+          Store.add("tasks", d); closeModal(); toast("Aufgabe angelegt", "good"); reload();
+        };
+      },
+    });
+  }
+
+  /* ======================================================================
+     MATERIAL / INVENTAR
+     ====================================================================== */
+  function inventory(el) {
+    const s = S();
+    el.innerHTML = `
+      ${head("Materialverwaltung", "Bestand an Bällen, Netzen und Ausrüstung im Blick behalten", `<button class="btn" data-add>＋ Position</button>`)}
+      <div class="grid grid-auto">
+        ${s.inventory.map((it) => {
+          const pct = it.target ? Math.min(100, Math.round(it.count / it.target * 100)) : 100;
+          const low = it.count < it.target;
+          return `<div class="card">
+            <div class="flex mb"><strong>${esc(it.name)}</strong><span class="spacer"></span>
+              ${low ? '<span class="badge warn">nachbestellen</span>' : '<span class="badge good">ok</span>'}</div>
+            <div class="flex" style="align-items:flex-end"><span class="value" style="font-size:1.6rem;font-weight:800">${it.count}</span><span class="soft">/ ${it.target} Soll</span></div>
+            <div class="progress mt" style="margin-top:8px"><span style="width:${pct}%;background:${low ? "var(--warn)" : "var(--good)"}"></span></div>
+            <div class="sub soft mt" style="margin-top:8px">📍 ${esc(it.location)}</div>
+            <div class="flex mt">
+              <button class="btn sm outline" data-minus="${it.id}">−</button>
+              <button class="btn sm outline" data-plus="${it.id}">＋</button>
+              <span class="spacer"></span>
+              <button class="btn sm ghost" data-iedit="${it.id}">✏️</button>
+              <button class="btn sm ghost" data-idel="${it.id}">🗑️</button>
+            </div></div>`;
+        }).join("")}
+      </div>`;
+
+    $("[data-add]", el).onclick = () => inventoryForm();
+    $$("[data-plus]", el).forEach((b) => b.onclick = () => { const it = Store.byId("inventory", b.dataset.plus); Store.update("inventory", it.id, { count: it.count + 1 }); reload(); });
+    $$("[data-minus]", el).forEach((b) => b.onclick = () => { const it = Store.byId("inventory", b.dataset.minus); Store.update("inventory", it.id, { count: Math.max(0, it.count - 1) }); reload(); });
+    $$("[data-iedit]", el).forEach((b) => b.onclick = () => inventoryForm(Store.byId("inventory", b.dataset.iedit)));
+    $$("[data-idel]", el).forEach((b) => b.onclick = () => confirmDialog("Position löschen?", () => { Store.remove("inventory", b.dataset.idel); toast("Gelöscht"); reload(); }));
+  }
+  function inventoryForm(it) {
+    const isEdit = !!it;
+    it = it || { name: "", count: 0, target: 1, location: "Materialraum" };
+    modal({
+      title: isEdit ? "Position bearbeiten" : "Neue Position",
+      body: `<form id="if"><div class="form-grid">
+        <div class="field full"><label>Bezeichnung</label><input name="name" value="${esc(it.name)}" required></div>
+        <div class="field"><label>Bestand</label><input type="number" name="count" value="${esc(it.count)}"></div>
+        <div class="field"><label>Soll</label><input type="number" name="target" value="${esc(it.target)}"></div>
+        <div class="field full"><label>Lagerort</label><input name="location" value="${esc(it.location)}"></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#if"); if (!f.reportValidity()) return;
+          const d = formData(f); d.count = Number(d.count) || 0; d.target = Number(d.target) || 0;
+          if (isEdit) Store.update("inventory", it.id, d); else Store.add("inventory", d);
+          closeModal(); toast("Gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
+
+  /* ======================================================================
+     ABTEILUNGEN / MANNSCHAFTEN
+     ====================================================================== */
+  const catBadge = { Aktive: "info", Jugend: "accent", Nachwuchs: "good", Breitensport: "warn" };
+  function departments(el) {
+    const s = S();
+    const byCat = {};
+    s.departments.forEach((d) => (byCat[d.category] = byCat[d.category] || []).push(d));
+    el.innerHTML = `
+      ${head("Abteilungen & Mannschaften", `Alle Teams des ${esc(s.club)} – Aktive, Jugend, Nachwuchs und Breitensport`, `<button class="btn" data-add>＋ Abteilung</button>`)}
+      <div class="grid grid-4 mb">
+        ${stat("🏟️", "Abteilungen", s.departments.length)}
+        ${stat("🧑‍🤝‍🧑", "Mitglieder gesamt", s.players.length)}
+        ${stat("🏅", "Aktiven-Teams", s.departments.filter((d) => d.category === "Aktive").length)}
+        ${stat("🧒", "Jugend & Nachwuchs", s.departments.filter((d) => d.category === "Jugend" || d.category === "Nachwuchs").length)}
+      </div>
+      ${Object.keys(byCat).map((cat) => `
+        <h3 style="margin:18px 0 10px">${esc(cat)}</h3>
+        <div class="grid grid-3 mb">
+          ${byCat[cat].map((d) => {
+            const members = s.players.filter((p) => p.departmentId === d.id).length;
+            return `<div class="card">
+              <div class="flex mb"><strong style="font-size:1.05rem">${esc(d.name)}</strong><span class="spacer"></span>
+                <span class="badge ${catBadge[d.category] || ""}">${esc(d.category)}</span></div>
+              <dl class="kv">
+                <dt>Liga/Spielklasse</dt><dd>${esc(d.league)}</dd>
+                <dt>Altersklasse</dt><dd>${esc(d.ageGroup)} · ${genderLabel[d.gender] || d.gender}</dd>
+                <dt>Training</dt><dd>${esc(d.times)}</dd>
+                <dt>Halle</dt><dd>${esc(d.venue)}</dd>
+                <dt>Ansprechpartner</dt><dd>${esc(d.trainer)}${d.email ? `<br><a href="mailto:${esc(d.email)}" class="soft">${esc(d.email)}</a>` : ""}</dd>
+                <dt>Mitglieder</dt><dd><strong>${members}</strong></dd>
+              </dl>
+              <div class="flex mt">
+                <a class="btn sm outline" href="#/verbandsmeldung" data-meld="${d.id}">📋 Verbandsmeldung</a>
+                <span class="spacer"></span>
+                <button class="btn sm ghost" data-dedit="${d.id}">✏️</button>
+                <button class="btn sm ghost" data-ddel="${d.id}">🗑️</button>
+              </div></div>`;
+          }).join("")}
+        </div>`).join("")}`;
+
+    $("[data-add]", el).onclick = () => departmentForm();
+    $$("[data-dedit]", el).forEach((b) => b.onclick = () => departmentForm(Store.byId("departments", b.dataset.dedit)));
+    $$("[data-ddel]", el).forEach((b) => b.onclick = () => {
+      const d = Store.byId("departments", b.dataset.ddel);
+      const members = S().players.filter((p) => p.departmentId === d.id).length;
+      confirmDialog(`Abteilung „${d.name}" löschen?${members ? ` ${members} Spielerin(nen) verlieren die Zuordnung.` : ""}`, () => {
+        S().players.forEach((p) => { if (p.departmentId === d.id) Store.update("players", p.id, { departmentId: null }); });
+        Store.remove("departments", d.id); toast("Abteilung gelöscht"); reload();
+      });
+    });
+    $$("[data-meld]", el).forEach((a) => a.onclick = () => { verbandsmeldung._preselect = a.dataset.meld; });
+  }
+
+  function departmentForm(d) {
+    const isEdit = !!d;
+    d = d || { code: "", name: "", category: "Jugend", gender: "w", league: "", ageGroup: "", trainer: "", email: "", times: "", venue: "Sporthalle SKV, Halle 1", active: true };
+    modal({
+      title: isEdit ? "Abteilung bearbeiten" : "Neue Abteilung",
+      body: `<form id="def"><div class="form-grid">
+        <div class="field"><label>Name</label><input name="name" value="${esc(d.name)}" required></div>
+        <div class="field"><label>Kurzcode</label><input name="code" value="${esc(d.code)}" placeholder="z. B. WU18"></div>
+        <div class="field"><label>Kategorie</label><select name="category">
+          ${["Aktive", "Jugend", "Nachwuchs", "Breitensport"].map((x) => `<option ${x === d.category ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+        <div class="field"><label>Geschlecht</label><select name="gender">
+          ${Object.entries(genderLabel).map(([k, v]) => `<option value="${k}" ${k === d.gender ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        <div class="field"><label>Liga / Spielklasse</label><input name="league" value="${esc(d.league)}"></div>
+        <div class="field"><label>Altersklasse</label><input name="ageGroup" value="${esc(d.ageGroup)}" placeholder="U18, Damen …"></div>
+        <div class="field"><label>Ansprechpartner:in</label><input name="trainer" value="${esc(d.trainer)}"></div>
+        <div class="field"><label>E-Mail</label><input name="email" value="${esc(d.email)}"></div>
+        <div class="field"><label>Trainingszeiten</label><input name="times" value="${esc(d.times)}"></div>
+        <div class="field"><label>Halle</label><input name="venue" value="${esc(d.venue)}"></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#def"); if (!f.reportValidity()) return;
+          const data = formData(f); data.active = true;
+          if (isEdit) Store.update("departments", d.id, data); else Store.add("departments", data);
+          closeModal(); toast("Gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
+
+  /* ======================================================================
+     VERBANDSMELDUNG (Mannschaftsmeldung an den Verband)
+     ====================================================================== */
+  const meldStatus = { Entwurf: "warn", gemeldet: "good", eingereicht: "info" };
+  const meldRoles = ["Spieler", "Kapitän", "Libero", "Ersatz", "Betreuer", "Trainer"];
+
+  function verbandsmeldung(el) {
+    const s = S();
+    if (verbandsmeldung._open && Store.byId("meldungen", verbandsmeldung._open)) {
+      return renderMeldungDetail(el, Store.byId("meldungen", verbandsmeldung._open));
+    }
+    el.innerHTML = `
+      ${head("Verbandsmeldung", "Mannschaftsmeldungen mit Jahrgang und Passnummer für den VVMV erstellen",
+        `<button class="btn" data-add>＋ Neue Meldung</button>`)}
+      <div class="grid grid-3 mb">
+        ${stat("📋", "Meldungen", s.meldungen.length)}
+        ${stat("✅", "Gemeldet", s.meldungen.filter((m) => m.status !== "Entwurf").length)}
+        ${stat("👥", "Gemeldete Spieler:innen", s.meldungen.reduce((a, m) => a + m.entries.length, 0))}
+      </div>
+      <a class="link-card mb" href="https://mv.sams-ticket.de/public/" target="_blank" rel="noopener">
+        <span class="ic">🌐</span><div class="grow"><div class="title">VVMV Meldeportal (SAMS)</div>
+        <div class="sub">Offizielle Online-Meldung des Volleyball-Verbands MV</div></div><span class="arr">↗</span></a>
+      <div class="grid grid-2">
+        ${s.meldungen.length ? s.meldungen.map((m) => `
+          <div class="card">
+            <div class="flex mb"><strong style="font-size:1.05rem">${esc(m.teamName)}</strong><span class="spacer"></span>
+              <span class="badge ${meldStatus[m.status] || ""}">${esc(m.status)}</span></div>
+            <dl class="kv mb">
+              <dt>Saison</dt><dd>${esc(m.season)}</dd>
+              <dt>Spielklasse</dt><dd>${esc(m.league)}</dd>
+              <dt>Staffel</dt><dd>${esc(m.staffel || "—")}</dd>
+              <dt>Verantwortlich</dt><dd>${esc(m.responsible || "—")}</dd>
+              <dt>Spieler:innen</dt><dd><strong>${m.entries.length}</strong></dd>
+            </dl>
+            <div class="flex"><button class="btn sm" data-open="${m.id}">Öffnen & bearbeiten</button>
+              <span class="spacer"></span>
+              <button class="btn sm ghost" data-mdel="${m.id}">🗑️</button></div>
+          </div>`).join("") : empty("📋", "Noch keine Meldungen – jetzt erstellen")}
+      </div>`;
+
+    $("[data-add]", el).onclick = () => meldungForm();
+    $$("[data-open]", el).forEach((b) => b.onclick = () => { verbandsmeldung._open = b.dataset.open; reload(); });
+    $$("[data-mdel]", el).forEach((b) => b.onclick = () => confirmDialog("Meldung löschen?", () => { Store.remove("meldungen", b.dataset.mdel); toast("Gelöscht"); reload(); }));
+  }
+
+  function meldungForm() {
+    const s = S();
+    const preset = verbandsmeldung._preselect;
+    verbandsmeldung._preselect = null;
+    const seasonLabel = `${s.season.year}/${String(s.season.year + 1).slice(2)}`;
+    modal({
+      title: "Neue Verbandsmeldung",
+      body: `<form id="mf"><div class="form-grid">
+        <div class="field"><label>Abteilung / Mannschaft</label><select name="departmentId" id="mdept">
+          ${s.departments.map((d) => `<option value="${d.id}" ${d.id === preset ? "selected" : ""}>${esc(d.name)}</option>`).join("")}</select></div>
+        <div class="field"><label>Saison</label><input name="season" value="${esc(seasonLabel)}"></div>
+        <div class="field"><label>Spielklasse / Liga</label><input name="league" id="mleague"></div>
+        <div class="field"><label>Staffel</label><input name="staffel" placeholder="z. B. Staffel Nord"></div>
+        <div class="field"><label>Mannschaftsname (Meldung)</label><input name="teamName" id="mteam"></div>
+        <div class="field"><label>Verantwortlich</label><input name="responsible" id="mresp"></div>
+      </div>
+      <p class="muted" style="font-size:.82rem">Alle aktiven Spieler:innen der gewählten Abteilung werden automatisch mit Jahrgang und Passnummer übernommen. Danach kannst du die Liste anpassen.</p></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Meldung anlegen</button>`,
+      onOpen(m) {
+        const sync = () => {
+          const d = Store.byId("departments", m.querySelector("#mdept").value);
+          if (!d) return;
+          m.querySelector("#mleague").value = d.league || "";
+          m.querySelector("#mteam").value = `${Store.CLUB} ${d.name}`;
+          m.querySelector("#mresp").value = d.trainer || "";
+        };
+        sync();
+        m.querySelector("#mdept").onchange = sync;
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const data = formData(m.querySelector("#mf"));
+          const roster = S().players.filter((p) => p.departmentId === data.departmentId && p.membershipStatus !== "inaktiv");
+          const entries = roster.map((p) => ({
+            playerId: p.id, passNumber: p.passNumber || "",
+            jahrgang: jahrgang(p.birthDate), role: p.position === "Libero" ? "Libero" : "Spieler",
+          }));
+          const created = Store.add("meldungen", Object.assign({ entries, status: "Entwurf", createdAt: new Date().toISOString() }, data));
+          closeModal(); verbandsmeldung._open = created.id; toast("Meldung angelegt", "good"); reload();
+        };
+      },
+    });
+  }
+
+  function renderMeldungDetail(el, m) {
+    const dep = Store.byId("departments", m.departmentId);
+    el.innerHTML = `
+      <div class="section-head">
+        <div><h2>${esc(m.teamName)}</h2><p>Verbandsmeldung · Saison ${esc(m.season)}</p></div>
+        <div class="spacer"></div>
+        <button class="btn outline" data-back>‹ Zurück</button>
+        <button class="btn secondary" data-print>🖨️ Drucken / PDF</button>
+      </div>
+      <div class="card mb"><div class="form-grid">
+        <div class="field"><label>Spielklasse / Liga</label><input id="f-league" value="${esc(m.league)}"></div>
+        <div class="field"><label>Staffel</label><input id="f-staffel" value="${esc(m.staffel || "")}"></div>
+        <div class="field"><label>Verantwortlich</label><input id="f-resp" value="${esc(m.responsible || "")}"></div>
+        <div class="field"><label>Status</label><select id="f-status">
+          ${Object.keys(meldStatus).map((k) => `<option ${k === m.status ? "selected" : ""}>${k}</option>`).join("")}</select></div>
+      </div></div>
+
+      <div class="card" style="padding:0">
+        <div class="card-head" style="padding:16px 16px 0"><h3>Gemeldete Spieler:innen (${m.entries.length})</h3>
+          <span class="spacer"></span><button class="btn sm" data-addpl>＋ Spieler:in</button></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>#</th><th>Name</th><th>Jahrgang</th><th>Passnummer</th><th>Position</th><th>Rolle</th><th></th></tr></thead>
+          <tbody>${m.entries.map((e, i) => {
+            const p = Store.byId("players", e.playerId);
+            return `<tr>
+              <td>${i + 1}</td>
+              <td><strong>${esc(p ? p.firstName + " " + p.lastName : "unbekannt")}</strong></td>
+              <td>${esc(e.jahrgang || (p ? jahrgang(p.birthDate) : "—"))}</td>
+              <td><input class="e-pass" data-i="${i}" value="${esc(e.passNumber || "")}" style="min-width:150px"></td>
+              <td class="soft">${esc(p ? p.position : "—")}</td>
+              <td><select class="e-role" data-i="${i}">${meldRoles.map((r) => `<option ${r === e.role ? "selected" : ""}>${r}</option>`).join("")}</select></td>
+              <td class="right"><button class="btn sm ghost" data-rm="${i}">🗑️</button></td></tr>`;
+          }).join("") || `<tr><td colspan="7">${empty("👥", "Noch keine Spieler:innen in der Meldung")}</td></tr>`}</tbody>
+        </table></div>
+      </div>
+      <p class="muted mt" style="font-size:.82rem">Änderungen an Passnummer und Rolle werden sofort gespeichert. Für die offizielle Einreichung nutze das VVMV-Meldeportal (SAMS).</p>`;
+
+    const saveField = (k, v) => { Store.update("meldungen", m.id, { [k]: v }); };
+    $("#f-league", el).onchange = (e) => saveField("league", e.target.value);
+    $("#f-staffel", el).onchange = (e) => saveField("staffel", e.target.value);
+    $("#f-resp", el).onchange = (e) => saveField("responsible", e.target.value);
+    $("#f-status", el).onchange = (e) => { saveField("status", e.target.value); toast("Status gespeichert", "good"); };
+
+    $$(".e-pass", el).forEach((inp) => inp.onchange = () => {
+      const entries = m.entries.slice(); entries[+inp.dataset.i].passNumber = inp.value;
+      Store.update("meldungen", m.id, { entries });
+      const pl = Store.byId("players", entries[+inp.dataset.i].playerId);
+      if (pl) Store.update("players", pl.id, { passNumber: inp.value });
+    });
+    $$(".e-role", el).forEach((sel) => sel.onchange = () => {
+      const entries = m.entries.slice(); entries[+sel.dataset.i].role = sel.value;
+      Store.update("meldungen", m.id, { entries });
+    });
+    $$("[data-rm]", el).forEach((b) => b.onclick = () => {
+      const entries = m.entries.filter((_, i) => i !== +b.dataset.rm);
+      Store.update("meldungen", m.id, { entries }); reload();
+    });
+    $("[data-addpl]", el).onclick = () => addMeldungPlayer(m);
+    $("[data-back]", el).onclick = () => { verbandsmeldung._open = null; reload(); };
+    $("[data-print]", el).onclick = () => printMeldung(Store.byId("meldungen", m.id), dep);
+  }
+
+  function addMeldungPlayer(m) {
+    const inList = new Set(m.entries.map((e) => e.playerId));
+    const avail = S().players.filter((p) => !inList.has(p.id))
+      .sort((a, b) => (a.departmentId === m.departmentId ? -1 : 1) - (b.departmentId === m.departmentId ? -1 : 1) || a.lastName.localeCompare(b.lastName));
+    if (!avail.length) { toast("Alle Spieler:innen sind bereits gemeldet"); return; }
+    modal({
+      title: "Spieler:in zur Meldung hinzufügen",
+      body: `<div class="list">${avail.map((p) => `
+        <label class="list-item" style="cursor:pointer">${avatar(p.firstName, p.lastName)}
+          <div class="grow"><div class="title">${esc(p.firstName)} ${esc(p.lastName)}</div>
+          <div class="sub">Jg. ${jahrgang(p.birthDate)} · ${esc(deptName(p.departmentId))} · ${esc(p.passNumber || "ohne Pass-Nr.")}</div></div>
+          <input type="checkbox" data-pl="${p.id}" style="width:auto"></label>`).join("")}</div>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Hinzufügen</button>`,
+      onOpen(mm) {
+        mm.querySelector("[data-x]").onclick = closeModal;
+        mm.querySelector("[data-s]").onclick = () => {
+          const picks = $$("[data-pl]:checked", mm).map((c) => c.dataset.pl);
+          const entries = m.entries.slice();
+          picks.forEach((pid) => {
+            const p = Store.byId("players", pid);
+            entries.push({ playerId: pid, passNumber: p.passNumber || "", jahrgang: jahrgang(p.birthDate), role: p.position === "Libero" ? "Libero" : "Spieler" });
+          });
+          Store.update("meldungen", m.id, { entries });
+          closeModal(); toast(`${picks.length} hinzugefügt`, "good"); reload();
+        };
+      },
+    });
+  }
+
+  function printMeldung(m, dep) {
+    const rows = m.entries.map((e, i) => {
+      const p = Store.byId("players", e.playerId);
+      return `<tr><td>${i + 1}</td><td>${esc(p ? p.lastName + ", " + p.firstName : "—")}</td>
+        <td>${esc(e.jahrgang || "")}</td><td>${esc(e.passNumber || "")}</td>
+        <td>${esc(p ? p.position : "")}</td><td>${esc(e.role || "")}</td></tr>`;
+    }).join("");
+    const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Verbandsmeldung ${esc(m.teamName)}</title>
+      <style>body{font-family:Arial,sans-serif;color:#111;margin:32px}h1{font-size:20px;margin:0 0 2px}
+      .sub{color:#555;margin:0 0 16px}table{width:100%;border-collapse:collapse;font-size:13px}
+      th,td{border:1px solid #999;padding:6px 8px;text-align:left}th{background:#eee}
+      .kv{font-size:13px;margin-bottom:14px}.kv b{display:inline-block;width:150px}
+      .sign{margin-top:40px;display:flex;gap:60px}.sign div{border-top:1px solid #333;padding-top:4px;font-size:12px;flex:1}
+      </style></head><body>
+      <h1>Mannschaftsmeldung – ${esc(Store.CLUB)}</h1>
+      <p class="sub">${esc(Store.WEBSITE)} · Volleyball-Verband Mecklenburg-Vorpommern (VVMV)</p>
+      <div class="kv">
+        <div><b>Mannschaft:</b> ${esc(m.teamName)}</div>
+        <div><b>Saison:</b> ${esc(m.season)}</div>
+        <div><b>Spielklasse:</b> ${esc(m.league)}${m.staffel ? " · " + esc(m.staffel) : ""}</div>
+        <div><b>Altersklasse:</b> ${esc(dep ? dep.ageGroup + " (" + (genderLabel[dep.gender] || dep.gender) + ")" : "—")}</div>
+        <div><b>Verantwortlich:</b> ${esc(m.responsible || "")}</div>
+        <div><b>Status:</b> ${esc(m.status)}</div>
+      </div>
+      <table><thead><tr><th>Nr.</th><th>Name, Vorname</th><th>Jahrgang</th><th>Passnummer</th><th>Position</th><th>Rolle</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="6">keine Spieler:innen</td></tr>'}</tbody></table>
+      <div class="sign"><div>Ort, Datum</div><div>Unterschrift Abteilungsleitung</div></div>
+      </body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) { toast("Bitte Pop-ups erlauben, um zu drucken", "bad"); return; }
+    w.document.write(html); w.document.close(); w.focus();
+    setTimeout(() => w.print(), 300);
+  }
+
+  // ---- Export ----
+  window.Views = {
+    dashboard, players, departments, calendar, training, drivers, jobs, consents,
+    birthdays, finances, clothing, sponsors, standings, wiki,
+    announcements, tasks, inventory, verbandsmeldung,
+  };
+})();
+
+</script>
+  <script>
+/* assets/js/app.js */
+/* ==========================================================================
+   SKV Volleyball – App-Router & Initialisierung
+   ========================================================================== */
+(function () {
+  "use strict";
+  const { $, $$ } = U;
+
+  // Navigationsstruktur (Reihenfolge = Menü)
+  const NAV = [
+    { group: "Team" },
+    { id: "dashboard", label: "Übersicht", icon: "🏠" },
+    { id: "departments", label: "Abteilungen", icon: "🏟️" },
+    { id: "players", label: "Spielerverwaltung", icon: "🧑‍🤝‍🧑" },
+    { id: "announcements", label: "Ankündigungen", icon: "📣" },
+    { id: "birthdays", label: "Geburtstage", icon: "🎂" },
+    { id: "consents", label: "Einverständnis", icon: "📝" },
+
+    { group: "Termine & Einsatz" },
+    { id: "calendar", label: "Kalender", icon: "📅" },
+    { id: "training", label: "Trainingsrückmeldung", icon: "🏐" },
+    { id: "drivers", label: "Fahrerplanung", icon: "🚗" },
+    { id: "jobs", label: "Heimspiel-Jobs", icon: "🙌" },
+    { id: "tasks", label: "Aufgaben", icon: "✅" },
+
+    { group: "Verein" },
+    { id: "finances", label: "Finanzen", icon: "💶" },
+    { id: "clothing", label: "Vereinskleidung", icon: "👕" },
+    { id: "sponsors", label: "Sponsoren", icon: "🤝" },
+    { id: "inventory", label: "Material", icon: "📦" },
+
+    { group: "Wissen & Verband" },
+    { id: "verbandsmeldung", label: "Verbandsmeldung", icon: "📋" },
+    { id: "standings", label: "Verbandsliga MV", icon: "🏆" },
+    { id: "wiki", label: "Volleyball-Wiki", icon: "📖" },
+  ];
+
+  const titles = {};
+  NAV.forEach((n) => { if (n.id) titles[n.id] = n.label; });
+
+  function buildNav() {
+    const nav = $("#nav");
+    nav.innerHTML = NAV.map((n) => {
+      if (n.group) return `<div class="nav-group-title">${n.group}</div>`;
+      return `<a href="#/${n.id}" data-route="${n.id}"><span class="ic">${n.icon}</span>${n.label}</a>`;
+    }).join("");
+  }
+
+  let current = "dashboard";
+
+  function route() {
+    const hash = (location.hash || "#/dashboard").replace(/^#\//, "");
+    current = Views[hash] ? hash : "dashboard";
+    render(current);
+  }
+
+  function render(id) {
+    const view = $("#view");
+    $("#pageTitle").textContent = titles[id] || "Übersicht";
+    $$("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.route === id));
+    view.scrollTop = 0;
+    window.scrollTo(0, 0);
+    try {
+      Views[id](view);
+    } catch (err) {
+      view.innerHTML = `<div class="card"><h3>Fehler beim Laden</h3><pre style="white-space:pre-wrap">${U.esc(err && err.stack || err)}</pre></div>`;
+      console.error(err);
+    }
+    // Menü auf Mobile schließen
+    $("#sidebar").classList.remove("open");
+    $("#overlay").classList.remove("show");
+  }
+
+  // Öffentliche App-API (von Views genutzt)
+  window.App = {
+    reload() { render(current); },
+    go(id) { location.hash = `#/${id}`; },
+  };
+
+  // ---- Theme ----
+  const THEME_KEY = "skv_theme";
+  function applyTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
+  }
+  function initTheme() {
+    let t = "light";
+    try { t = localStorage.getItem(THEME_KEY) || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"); } catch (e) {}
+    applyTheme(t);
+  }
+
+  // ---- Init ----
+  function init() {
+    buildNav();
+    initTheme();
+    window.addEventListener("hashchange", route);
+    if (!location.hash) location.hash = "#/dashboard";
+    route();
+
+    $("#themeToggle").onclick = () => applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
+    $("#resetData").onclick = () => U.confirmDialog("Alle Daten auf die Demo-Beispiele zurücksetzen? Eigene Eingaben gehen verloren.", () => {
+      Store.resetDemo(); U.toast("Demo-Daten wiederhergestellt", "good"); App.reload();
+    }, "Zurücksetzen");
+
+    $("#hamburger").onclick = () => {
+      $("#sidebar").classList.toggle("open");
+      $("#overlay").classList.toggle("show");
+    };
+    $("#overlay").addEventListener("click", () => { $("#sidebar").classList.remove("open"); });
+  }
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
+})();
+
+</script>
+</body>
+</html>

@@ -10,13 +10,32 @@ Die Anwendung läuft **komplett im Browser** – ohne Server, ohne Installation,
 ohne Build-Schritt. Alle Daten werden lokal im Browser (`localStorage`)
 gespeichert. Beim ersten Start werden realistische Beispieldaten geladen.
 
-## ▶️ Starten
+## ▶️ Starten / Offline testen
 
-Einfach die Datei **`index.html`** im Browser öffnen (Doppelklick genügt).
+Die Plattform ist **vollständig offline-fähig** – kein Server, kein Internet,
+keine externen Ressourcen. Es gibt zwei Wege:
 
-> Tipp: Für einen sauberen lokalen Server kann optional
-> `python3 -m http.server` im Projektordner gestartet und
-> `http://localhost:8000` aufgerufen werden.
+**1. Direkt (empfohlen zum schnellen Testen)**
+Die einzelne Datei **`dist/skv-mueritz-offline.html`** enthält alles (HTML, CSS,
+JavaScript) in einer Datei. Einfach herunterladen und per **Doppelklick** im
+Browser öffnen – funktioniert komplett ohne Internet und lässt sich bequem auf
+jedes Gerät kopieren (USB-Stick, E-Mail, Tablet …).
+
+**2. Projektordner**
+Das gesamte Repository herunterladen/klonen und **`index.html`** im Browser
+öffnen (Doppelklick). Alternativ ein lokaler Server:
+`python3 -m http.server` im Projektordner, dann `http://localhost:8000` aufrufen.
+
+> Die Daten werden im `localStorage` des jeweiligen Browsers gespeichert und
+> bleiben auch offline zwischen Sitzungen erhalten. Über den Button
+> **„Demo-Daten"** lässt sich der Beispielstand zurücksetzen.
+
+### Einzeldatei neu bauen
+Nach Änderungen an `assets/…` die Offline-Datei neu erzeugen mit:
+
+```bash
+node build.js
+```
 
 ## ✨ Funktionen
 
