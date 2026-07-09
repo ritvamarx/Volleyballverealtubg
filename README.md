@@ -42,23 +42,23 @@ node build.js
 | Bereich | Beschreibung |
 |---|---|
 | **Übersicht** | Trainer-Cockpit mit Kennzahlen, nächsten Terminen, offenen Aufgaben, Geburtstagen und Warnhinweisen. |
-| **Abteilungen** | Verschiedene Mannschaften/Abteilungen (Damen I/II, Herren I, weibl. U18/U16/U14, Mini-Volleyball, Hobby) mit Liga, Altersklasse, Trainingszeiten, Halle und Ansprechpartner. |
+| **Abteilungen** | Verschiedene Mannschaften/Abteilungen (Herren I, männl. U20/U18/U16/U14, Mini-Volleyball, Hobby) mit Liga, Altersklasse, Trainingszeiten, Halle und Ansprechpartner. |
 | **Spielerverwaltung** | Kader mit Position, Trikotnummer, **Abteilung**, **Jahrgang**, **Passnummer**, Geschlecht sowie Elternkontakt (E-Mail/Telefon) und Status. Direkter „Eltern kontaktieren"-Button (öffnet vorbereitete E-Mail). |
 | **Verbandsmeldung** | Mannschaftsmeldung an den VVMV: Abteilung wählen → Kader wird mit **Jahrgang** und **Passnummer** automatisch übernommen; Rolle (Kapitän/Libero/…), Staffel und Status pflegbar; **Druck-/PDF-Ausgabe** und Link zum SAMS-Meldeportal. |
 | **Ankündigungen** | Nachrichten an Team und Eltern zentral veröffentlichen (Zielgruppen-Auswahl). |
 | **Geburtstage** | Automatisch sortierte Geburtstagsliste inkl. „nächste 30 Tage" und Countdown. |
 | **Einverständniserklärungen** | Von den Eltern unterschriebene Formulare hochladen und ablegen (Datei-Upload, lokal gespeichert). Offene Formulare werden angemahnt. |
 | **Kalender** | Monatsansicht aller Trainings und Spieltage, farblich nach Terminart, plus Terminverwaltung. |
-| **Trainingsrückmeldung** | Spielerinnen melden sich **verbindlich** zu, ab oder unsicher – mit Live-Zählung pro Training. |
+| **Trainingsrückmeldung** | Spieler melden sich **verbindlich** zu, ab oder unsicher – mit Live-Zählung pro Training. |
 | **Fahrerplanung** | Fahrer für Auswärtsspiele eintragen, Plätze zuordnen und offene Mitfahrgelegenheiten erkennen. |
 | **Heimspiel-Jobs** | Catering, Helfer und sonstige Aufgaben für Heimspiele/Events vergeben und abhaken. |
 | **Aufgaben** | Persönliche To-Do-Liste des Trainers mit Priorität und Fälligkeit. |
 | **Finanzen** | Mitgliedsbeiträge, Spenden und Ausgaben verwalten, Saldo, offene Beiträge, „als bezahlt"-Buchung. |
-| **Vereinskleidung** | Kollektion mit Bild (SVG), Preis und Größen – von Spielerinnen direkt anforderbar; Bestellstatus-Verwaltung. |
+| **Vereinskleidung** | Kollektion mit Bild (SVG), Preis und Größen – von Spieler direkt anforderbar; Bestellstatus-Verwaltung. |
 | **Sponsoren** | Sponsoren mit Logo, Kategorie und Fördersumme präsentieren – **Platz für weitere Sponsoren** ist eingeplant. |
 | **Material** | Inventar (Bälle, Netze, Ausrüstung) mit Soll/Ist und Nachbestell-Hinweis. |
 | **Verbandsliga MV** | Tabelle/Punktestand der Verbandsliga sowie Direktlinks zum Volleyball-Verband Mecklenburg-Vorpommern (VVMV). |
-| **Volleyball-Wiki** | Regeln, Positionen, Techniken, Trainingsaufbau und Glossar – ideal für neue Spielerinnen und Eltern. |
+| **Volleyball-Wiki** | Regeln, Positionen, Techniken, Trainingsaufbau und Glossar – ideal für neue Spieler und Eltern. |
 
 ### Zusätzliche, den Trainer entlastende Funktionen
 Über die ausdrücklich gewünschten Punkte hinaus wurden ergänzt: **Ankündigungs-/

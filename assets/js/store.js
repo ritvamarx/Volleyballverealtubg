@@ -7,7 +7,7 @@
 (function () {
   "use strict";
 
-  const KEY = "skv_vb_data_v2";
+  const KEY = "skv_vb_data_v3";
   const CLUB = "SKV Müritz";
   const WEBSITE = "https://www.skv-mueritz.de";
 
@@ -19,48 +19,47 @@
   const SEASON = { year: 2025 };
 
   function seed() {
-    // Abteilungen / Mannschaften des Vereins
+    // Abteilungen / Mannschaften des Vereins – Jungen-/Herrenbereich
     const departments = [
-      dept("DAM1", "Damen I", "Aktive", "w", "Verbandsliga MV", "Damen", "Katrin Sommer", "damen1@skv-mueritz.de", "Di & Do 19:30–21:30", "Sporthalle SKV, Halle 1"),
-      dept("DAM2", "Damen II", "Aktive", "w", "Bezirksliga Ost", "Damen", "Katrin Sommer", "damen2@skv-mueritz.de", "Mo 19:00–21:00", "Sporthalle SKV, Halle 1"),
       dept("HER1", "Herren I", "Aktive", "m", "Landesliga MV", "Herren", "Michael Voß", "herren1@skv-mueritz.de", "Mi & Fr 19:30–21:30", "Sporthalle SKV, Halle 2"),
-      dept("WU18", "weibliche U18", "Jugend", "w", "Verbandsliga MV weibl. U18", "U18", "Andrea Berg", "wu18@skv-mueritz.de", "Mo & Fr 18:00–20:00", "Sporthalle SKV, Halle 1"),
-      dept("WU16", "weibliche U16", "Jugend", "w", "Verbandsliga MV weibl. U16", "U16", "Andrea Berg", "wu16@skv-mueritz.de", "Di & Do 17:00–18:30", "Sporthalle SKV, Halle 1"),
-      dept("WU14", "weibliche U14", "Jugend", "w", "Bezirksklasse weibl. U14", "U14", "Sven Lorenz", "wu14@skv-mueritz.de", "Mi 16:30–18:00", "Sporthalle SKV, Halle 2"),
-      dept("MINI", "Mini-Volleyball (U12)", "Nachwuchs", "mix", "Mini-Spielfeste MV", "U12", "Sven Lorenz", "mini@skv-mueritz.de", "Fr 16:00–17:30", "Grundschule am See"),
+      dept("MU20", "männliche U20", "Jugend", "m", "Verbandsliga MV männl. U20", "U20", "Thomas Krüger", "mu20@skv-mueritz.de", "Mo & Mi 18:30–20:30", "Sporthalle SKV, Halle 1"),
+      dept("MU18", "männliche U18", "Jugend", "m", "Verbandsliga MV männl. U18", "U18", "Andreas Berg", "mu18@skv-mueritz.de", "Mo & Fr 18:00–20:00", "Sporthalle SKV, Halle 1"),
+      dept("MU16", "männliche U16", "Jugend", "m", "Verbandsliga MV männl. U16", "U16", "Andreas Berg", "mu16@skv-mueritz.de", "Di & Do 17:00–18:30", "Sporthalle SKV, Halle 1"),
+      dept("MU14", "männliche U14", "Jugend", "m", "Bezirksklasse männl. U14", "U14", "Sven Lorenz", "mu14@skv-mueritz.de", "Mi 16:30–18:00", "Sporthalle SKV, Halle 2"),
+      dept("MINI", "Mini-Volleyball (U12)", "Nachwuchs", "m", "Mini-Spielfeste MV", "U12", "Sven Lorenz", "mini@skv-mueritz.de", "Fr 16:00–17:30", "Grundschule am See"),
       dept("HOBBY", "Hobby & Freizeit", "Breitensport", "mix", "Freizeitrunde Müritz", "Erwachsene", "Team Hobby", "hobby@skv-mueritz.de", "So 18:00–20:00", "Sporthalle SKV, Halle 1"),
     ];
     const deptId = (code) => (departments.find((x) => x.code === code) || {}).id || null;
 
     const players = [
-      p("Lena", "Bauer", "2009-03-14", "Zuspiel", 3, "U18", "Sabine Bauer", "sabine.bauer@example.de", "0170 1234501", true, "aktiv"),
-      p("Mia", "Schulz", "2008-07-02", "Außenangriff", 7, "U18", "Ralf Schulz", "ralf.schulz@example.de", "0170 1234502", true, "aktiv"),
-      p("Emma", "Wagner", "2009-11-28", "Mitte", 5, "U18", "Petra Wagner", "petra.wagner@example.de", "0170 1234503", false, "aktiv"),
-      p("Hannah", "Krüger", "2010-01-09", "Libero", 11, "U16", "Uwe Krüger", "uwe.krueger@example.de", "0170 1234504", true, "aktiv"),
-      p("Sophie", "Fischer", "2008-05-21", "Diagonal", 9, "U18", "Anke Fischer", "anke.fischer@example.de", "0170 1234505", true, "aktiv"),
-      p("Marie", "Hoffmann", "2010-09-03", "Außenangriff", 4, "U16", "Jens Hoffmann", "jens.hoffmann@example.de", "0170 1234506", false, "aktiv"),
-      p("Leonie", "Weber", "2009-07-08", "Mitte", 8, "U18", "Karin Weber", "karin.weber@example.de", "0170 1234507", true, "aktiv"),
-      p("Clara", "Schneider", "2011-02-17", "Zuspiel", 6, "U16", "Tim Schneider", "tim.schneider@example.de", "0170 1234508", true, "aktiv"),
-      p("Amelie", "Meyer", "2010-12-01", "Libero", 12, "U16", "Nadja Meyer", "nadja.meyer@example.de", "0170 1234509", false, "aktiv"),
-      p("Johanna", "Richter", "2008-08-25", "Diagonal", 10, "U18", "Frank Richter", "frank.richter@example.de", "0170 1234510", true, "aktiv"),
-      p("Paula", "Klein", "2011-04-30", "Außenangriff", 2, "U16", "Bea Klein", "bea.klein@example.de", "0170 1234511", true, "aktiv"),
-      p("Ida", "Wolf", "2009-07-08", "Mitte", 14, "U18", "Olaf Wolf", "olaf.wolf@example.de", "0170 1234512", false, "beitragsrückstand"),
+      p("Ben", "Bauer", "2009-03-14", "Zuspiel", 3, "U18", "Sabine Bauer", "sabine.bauer@example.de", "0170 1234501", true, "aktiv"),
+      p("Luca", "Schulz", "2008-07-02", "Außenangriff", 7, "U18", "Ralf Schulz", "ralf.schulz@example.de", "0170 1234502", true, "aktiv"),
+      p("Finn", "Wagner", "2009-11-28", "Mitte", 5, "U18", "Petra Wagner", "petra.wagner@example.de", "0170 1234503", false, "aktiv"),
+      p("Jonas", "Krüger", "2010-01-09", "Libero", 11, "U16", "Uwe Krüger", "uwe.krueger@example.de", "0170 1234504", true, "aktiv"),
+      p("Paul", "Fischer", "2008-05-21", "Diagonal", 9, "U18", "Anke Fischer", "anke.fischer@example.de", "0170 1234505", true, "aktiv"),
+      p("Noah", "Hoffmann", "2010-09-03", "Außenangriff", 4, "U16", "Jens Hoffmann", "jens.hoffmann@example.de", "0170 1234506", false, "aktiv"),
+      p("Elias", "Weber", "2009-07-08", "Mitte", 8, "U18", "Karin Weber", "karin.weber@example.de", "0170 1234507", true, "aktiv"),
+      p("Emil", "Schneider", "2011-02-17", "Zuspiel", 6, "U16", "Tim Schneider", "tim.schneider@example.de", "0170 1234508", true, "aktiv"),
+      p("Leon", "Meyer", "2010-12-01", "Libero", 12, "U16", "Nadja Meyer", "nadja.meyer@example.de", "0170 1234509", false, "aktiv"),
+      p("Max", "Richter", "2008-08-25", "Diagonal", 10, "U18", "Frank Richter", "frank.richter@example.de", "0170 1234510", true, "aktiv"),
+      p("Anton", "Klein", "2011-04-30", "Außenangriff", 2, "U16", "Bea Klein", "bea.klein@example.de", "0170 1234511", true, "aktiv"),
+      p("Tom", "Wolf", "2009-07-08", "Mitte", 14, "U18", "Olaf Wolf", "olaf.wolf@example.de", "0170 1234512", false, "beitragsrückstand"),
     ];
 
-    // Spielerinnen den Abteilungen zuordnen und Passnummern vergeben
-    const teamToDept = { U18: "WU18", U16: "WU16", U14: "WU14", Damen: "DAM1", Herren: "HER1" };
+    // Spieler den Abteilungen zuordnen und Passnummern vergeben
+    const teamToDept = { U20: "MU20", U18: "MU18", U16: "MU16", U14: "MU14", Herren: "HER1" };
     players.forEach((pl, i) => {
       pl.departmentId = deptId(teamToDept[pl.team] || null);
       pl.passNumber = `MV${SEASON.year}${String(10001 + i)}`;
     });
 
     const events = [
-      ev("training", "Training U18", d(0, 18, 0), d(0, 20, 0), "Sporthalle SKV, Halle 1", ""),
-      ev("training", "Training U16", d(1, 17, 0), d(1, 18, 30), "Sporthalle SKV, Halle 1", ""),
+      ev("training", "Training mU18", d(0, 18, 0), d(0, 20, 0), "Sporthalle SKV, Halle 1", ""),
+      ev("training", "Training mU16", d(1, 17, 0), d(1, 18, 30), "Sporthalle SKV, Halle 1", ""),
       ev("home", "Heimspiel vs. SV Rostock", d(3, 11, 0), d(3, 14, 0), "Sporthalle SKV, Halle 1", "SV Rostock"),
-      ev("training", "Training U18", d(5, 18, 0), d(5, 20, 0), "Sporthalle SKV, Halle 1", ""),
+      ev("training", "Training mU18", d(5, 18, 0), d(5, 20, 0), "Sporthalle SKV, Halle 1", ""),
       ev("away", "Auswärtsspiel @ VC Schwerin", d(7, 14, 0), d(7, 17, 0), "Sport- und Kongresshalle Schwerin", "VC Schwerin"),
-      ev("training", "Training U16", d(8, 17, 0), d(8, 18, 30), "Sporthalle SKV, Halle 1", ""),
+      ev("training", "Training mU16", d(8, 17, 0), d(8, 18, 30), "Sporthalle SKV, Halle 1", ""),
       ev("home", "Heimspiel vs. Stralsunder VV", d(10, 11, 0), d(10, 14, 0), "Sporthalle SKV, Halle 1", "Stralsunder VV"),
       ev("away", "Auswärtsspiel @ Neubrandenburg", d(14, 13, 0), d(14, 16, 0), "Halle am Datzeberg, Neubrandenburg", "Neubrandenburger SV"),
       ev("other", "Vereinsfest & Saisonabschluss", d(21, 15, 0), d(21, 20, 0), "Vereinsheim SKV", ""),
@@ -170,7 +169,7 @@
     // Verbandsliga-Tabelle MV (Beispieldaten)
     const standings = [
       st("VC Schwerin", 12, 10, 2, 30, 5, 29),
-      st("SKV Volleyball", 12, 9, 3, 28, 8, 27),
+      st("SKV Müritz", 12, 9, 3, 28, 8, 27),
       st("Stralsunder VV", 12, 8, 4, 26, 12, 24),
       st("Neubrandenburger SV", 12, 6, 6, 20, 18, 18),
       st("SV Rostock", 12, 5, 7, 17, 22, 15),
@@ -179,13 +178,13 @@
       st("Waren Volleys", 12, 2, 10, 8, 31, 5),
     ];
 
-    // Beispiel-Verbandsmeldung für die weibliche U18
-    const wu18Id = deptId("WU18");
-    const wu18Players = players.filter((pl) => pl.departmentId === wu18Id);
+    // Beispiel-Verbandsmeldung für die männliche U18
+    const mu18Id = deptId("MU18");
+    const mu18Players = players.filter((pl) => pl.departmentId === mu18Id);
     const seasonLabel = `${SEASON.year}/${String(SEASON.year + 1).slice(2)}`;
     const meldungen = [
-      meldung(seasonLabel, wu18Id, "Verbandsliga MV weibl. U18", "Staffel Nord", "SKV Müritz weibl. U18", "Andrea Berg",
-        wu18Players.map((pl) => ({
+      meldung(seasonLabel, mu18Id, "Verbandsliga MV männl. U18", "Staffel Nord", "SKV Müritz männl. U18", "Andreas Berg",
+        mu18Players.map((pl) => ({
           playerId: pl.id,
           passNumber: pl.passNumber,
           jahrgang: new Date(pl.birthDate).getFullYear(),
@@ -202,7 +201,7 @@
 
   // ---- Entity-Factories ----
   function p(firstName, lastName, birthDate, position, jerseyNumber, team, parentName, parentEmail, parentPhone, consentOnFile, membershipStatus) {
-    return { id: uid("pl"), firstName, lastName, birthDate, position, jerseyNumber, team, parentName, parentEmail, parentPhone, consentOnFile, membershipStatus, notes: "", gender: "w", passNumber: "", departmentId: null };
+    return { id: uid("pl"), firstName, lastName, birthDate, position, jerseyNumber, team, parentName, parentEmail, parentPhone, consentOnFile, membershipStatus, notes: "", gender: "m", passNumber: "", departmentId: null };
   }
   function dept(code, name, category, gender, league, ageGroup, trainer, email, times, venue) {
     return { id: uid("de"), code, name, category, gender, league, ageGroup, trainer, email, times, venue, active: true };

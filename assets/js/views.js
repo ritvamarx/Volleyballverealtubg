@@ -63,7 +63,7 @@
     el.innerHTML = `
       ${head("Übersicht", `Willkommen zurück im Trainer-Cockpit des ${esc(s.club)}`)}
       <div class="grid grid-4 mb">
-        ${stat("🏐", "Aktive Spielerinnen", s.players.filter((p) => p.membershipStatus !== "inaktiv").length, `${s.players.length} gesamt`)}
+        ${stat("🏐", "Aktive Spieler", s.players.filter((p) => p.membershipStatus !== "inaktiv").length, `${s.players.length} gesamt`)}
         ${stat("📅", "Nächste Termine", next.length, next[0] ? `${typeLabel[next[0].type]} ${relDays(next[0].start)}` : "—")}
         ${stat("📝", "Offene Einverständnis.", openConsents, openConsents ? "Bitte einholen" : "alles vollständig")}
         ${stat("💶", "Offene Beiträge", fmtMoney(openFees.reduce((a, f) => a + f.amount, 0)), `${openFees.length} Positionen`)}
@@ -151,7 +151,7 @@
       }));
 
     el.innerHTML = `
-      ${head("Spielerverwaltung", "Kader, Kontaktdaten der Eltern und Status", `<button class="btn" data-add>＋ Spielerin</button>`)}
+      ${head("Spielerverwaltung", "Kader, Kontaktdaten der Eltern und Status", `<button class="btn" data-add>＋ Spieler</button>`)}
       <div class="chip-row mb">${chips.join("")}</div>
       <div class="card" style="padding:0">
         <div class="table-wrap"><table>
@@ -181,8 +181,8 @@
     $$("[data-edit]", el).forEach((b) => b.onclick = () => playerForm(Store.byId("players", b.dataset.edit)));
     $$("[data-del]", el).forEach((b) => b.onclick = () => {
       const p = Store.byId("players", b.dataset.del);
-      confirmDialog(`Spielerin „${p.firstName} ${p.lastName}“ wirklich löschen?`, () => {
-        Store.remove("players", p.id); toast("Spielerin gelöscht"); reload();
+      confirmDialog(`Spieler „${p.firstName} ${p.lastName}“ wirklich löschen?`, () => {
+        Store.remove("players", p.id); toast("Spieler gelöscht"); reload();
       });
     });
     $$("[data-mail]", el).forEach((b) => b.onclick = () => contactParent(Store.byId("players", b.dataset.mail)));
@@ -198,10 +198,10 @@
   function playerForm(p) {
     const isEdit = !!p;
     const deps = S().departments;
-    p = p || { firstName: "", lastName: "", birthDate: "", position: "Außenangriff", jerseyNumber: "", team: "U18", departmentId: (deps[0] || {}).id || null, gender: "w", passNumber: "", parentName: "", parentEmail: "", parentPhone: "", membershipStatus: "aktiv", consentOnFile: false, notes: "" };
+    p = p || { firstName: "", lastName: "", birthDate: "", position: "Außenangriff", jerseyNumber: "", team: "U18", departmentId: (deps[0] || {}).id || null, gender: "m", passNumber: "", parentName: "", parentEmail: "", parentPhone: "", membershipStatus: "aktiv", consentOnFile: false, notes: "" };
     const positions = ["Zuspiel", "Außenangriff", "Mitte", "Diagonal", "Libero"];
     modal({
-      title: isEdit ? "Spielerin bearbeiten" : "Neue Spielerin",
+      title: isEdit ? "Spieler bearbeiten" : "Neuer Spieler",
       body: `<form id="pf"><div class="form-grid">
         <div class="field"><label>Vorname</label><input name="firstName" value="${esc(p.firstName)}" required></div>
         <div class="field"><label>Nachname</label><input name="lastName" value="${esc(p.lastName)}" required></div>
@@ -231,7 +231,7 @@
           data.jerseyNumber = Number(data.jerseyNumber) || "";
           if (isEdit) Store.update("players", p.id, data);
           else Store.add("players", data);
-          closeModal(); toast(isEdit ? "Gespeichert" : "Spielerin angelegt", "good"); reload();
+          closeModal(); toast(isEdit ? "Gespeichert" : "Spieler angelegt", "good"); reload();
         };
       },
     });
@@ -401,7 +401,7 @@
     const evt = Store.byId("events", sel);
 
     el.innerHTML = `
-      ${head("Trainingsrückmeldung", "Spielerinnen melden sich verbindlich zu, ab oder unsicher")}
+      ${head("Trainingsrückmeldung", "Spieler melden sich verbindlich zu, ab oder unsicher")}
       <div class="field" style="max-width:520px">
         <label>Trainingstermin</label>
         <select id="tsel">${trainings.map((t) => `<option value="${t.id}" ${t.id === sel ? "selected" : ""}>${fmtDateShort(t.start)} · ${fmtTime(t.start)} · ${esc(t.title)}</option>`).join("")}</select>
@@ -429,7 +429,7 @@
         ${stat("⏳", "Keine Rückmeldung", count.open)}
       </div>
       <div class="card" style="padding:0"><div class="table-wrap"><table>
-        <thead><tr><th>Spielerin</th><th>Team</th><th>Rückmeldung</th><th class="right">Aktion</th></tr></thead>
+        <thead><tr><th>Spieler</th><th>Team</th><th>Rückmeldung</th><th class="right">Aktion</th></tr></thead>
         <tbody>${roster.map((p) => {
           const st = resp[p.id] || "open";
           return `<tr>
@@ -492,7 +492,7 @@
     box.innerHTML = `
       <div class="grid grid-3 mb">
         ${stat("🚗", "Fahrer", list.length, `${seats} Plätze`)}
-        ${stat("🧍", "Zugeordnet", assigned, `von ${roster.length} Spielerinnen`)}
+        ${stat("🧍", "Zugeordnet", assigned, `von ${roster.length} Spieler`)}
         ${stat("⚠️", "Ohne Fahrt", needRide.length, needRide.length ? "noch offen" : "alle versorgt")}
       </div>
       <div class="grid grid-2">
@@ -506,17 +506,17 @@
                 <div class="list-item" style="padding:8px 10px">${avatar(...pn(pid))}
                   <div class="grow title">${esc(playerName(pid))}</div>
                   <button class="btn sm ghost" data-unassign="${d.id}:${pid}">✕</button></div>`).join("")
-                : `<div class="muted" style="padding:6px">Noch keine Mitfahrerinnen</div>`}
+                : `<div class="muted" style="padding:6px">Noch keine Mitfahrer</div>`}
             </div>
             <div class="flex">
-              <button class="btn sm outline" data-assign="${d.id}" ${d.playerIds.length >= d.seats ? "disabled" : ""}>＋ Mitfahrerin</button>
+              <button class="btn sm outline" data-assign="${d.id}" ${d.playerIds.length >= d.seats ? "disabled" : ""}>＋ Mitfahrer</button>
               <span class="spacer"></span>
               <button class="btn sm ghost" data-dedit="${d.id}">✏️</button>
               <button class="btn sm ghost" data-ddel="${d.id}">🗑️</button>
             </div>
           </div>`).join("") : empty("🚙", "Noch keine Fahrer eingetragen")}
       </div>
-      ${needRide.length ? `<div class="card mt"><div class="card-head"><h3>⚠️ Spielerinnen ohne Fahrt (${needRide.length})</h3></div>
+      ${needRide.length ? `<div class="card mt"><div class="card-head"><h3>⚠️ Spieler ohne Fahrt (${needRide.length})</h3></div>
         <div class="chip-row">${needRide.map((p) => `<span class="chip">${esc(p.firstName)} ${esc(p.lastName)}</span>`).join("")}</div></div>` : ""}`;
 
     $$("[data-ddel]", box).forEach((b) => b.onclick = () => confirmDialog("Fahrer entfernen?", () => { Store.remove("drivers", b.dataset.ddel); toast("Fahrer entfernt"); reload(); }));
@@ -559,9 +559,9 @@
     const list = S().drivers.filter((x) => x.eventId === evt.id);
     const assigned = new Set(list.flatMap((x) => x.playerIds));
     const avail = S().players.filter((p) => p.membershipStatus !== "inaktiv" && !assigned.has(p.id));
-    if (!avail.length) { toast("Alle Spielerinnen sind bereits zugeordnet"); return; }
+    if (!avail.length) { toast("Alle Spieler sind bereits zugeordnet"); return; }
     modal({
-      title: `Mitfahrerin → ${esc(d.name)}`,
+      title: `Mitfahrer → ${esc(d.name)}`,
       body: `<div class="list">${avail.map((p) => `
         <label class="list-item" style="cursor:pointer">${avatar(p.firstName, p.lastName)}
           <div class="grow title">${esc(p.firstName)} ${esc(p.lastName)}</div>
@@ -681,7 +681,7 @@
       </div>
 
       ${missing.length ? `<div class="card mb"><div class="card-head"><h3>⚠️ Fehlende Einverständniserklärungen</h3></div>
-        <div class="table-wrap"><table><thead><tr><th>Spielerin</th><th>Eltern</th><th>Kontakt</th><th class="right">Aktion</th></tr></thead>
+        <div class="table-wrap"><table><thead><tr><th>Spieler</th><th>Eltern</th><th>Kontakt</th><th class="right">Aktion</th></tr></thead>
         <tbody>${missing.map((p) => `<tr>
           <td>${esc(p.firstName)} ${esc(p.lastName)}</td><td>${esc(p.parentName)}</td>
           <td class="soft">${esc(p.parentEmail)}</td>
@@ -690,7 +690,7 @@
 
       <div class="card" style="padding:0"><div class="card-head" style="padding:18px 18px 0"><h3>📁 Abgelegte Formulare</h3></div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Spielerin</th><th>Art</th><th>Datei</th><th>Unterschrift</th><th>Erfasst am</th><th class="right"></th></tr></thead>
+          <thead><tr><th>Spieler</th><th>Art</th><th>Datei</th><th>Unterschrift</th><th>Erfasst am</th><th class="right"></th></tr></thead>
           <tbody>${s.consents.map((c) => `<tr>
             <td><strong>${esc(playerName(c.playerId))}</strong></td>
             <td>${esc(c.type)}</td>
@@ -716,7 +716,7 @@
     modal({
       title: "Einverständniserklärung hochladen",
       body: `<form id="cf"><div class="form-grid">
-        <div class="field"><label>Spielerin</label><select name="playerId">
+        <div class="field"><label>Spieler</label><select name="playerId">
           ${s.players.map((p) => `<option value="${p.id}" ${p.id === preselectPlayer ? "selected" : ""}>${esc(p.firstName)} ${esc(p.lastName)}</option>`).join("")}</select></div>
         <div class="field"><label>Art der Erklärung</label><select name="type">
           ${["Datennutzung & Fotorechte", "Fahrten & Aufsicht", "Medizinische Notfallversorgung", "Teilnahme Trainingslager"].map((x) => `<option>${x}</option>`).join("")}</select></div>
@@ -780,7 +780,7 @@
             <div class="grow"><div class="title">${esc(p.firstName)} ${esc(p.lastName)}</div>
             <div class="sub">${p.inDays === 0 ? "🎂 heute!" : fmtDateShort(p.next)} · wird ${p.turns}</div></div></div>`).join("")}</div></div>` : ""}
       <div class="card" style="padding:0"><div class="table-wrap"><table>
-        <thead><tr><th>Spielerin</th><th>Geburtstag</th><th>Alter</th><th>Nächster</th><th>In Tagen</th></tr></thead>
+        <thead><tr><th>Spieler</th><th>Geburtstag</th><th>Alter</th><th>Nächster</th><th>In Tagen</th></tr></thead>
         <tbody>${all.map((p) => `<tr>
           <td><div class="flex">${avatar(p.firstName, p.lastName)}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong></div></td>
           <td>${fmtDateShort(p.birthDate)}</td>
@@ -855,7 +855,7 @@
         <div class="field"><label>Betrag (€)</label><input type="number" step="0.01" name="amount" required></div>
         <div class="field full"><label>Beschreibung</label><input name="description" required></div>
         <div class="field"><label>Datum</label><input type="date" name="date" value="${new Date().toISOString().slice(0, 10)}"></div>
-        <div class="field"><label>Spielerin (optional)</label><select name="playerId"><option value="">—</option>
+        <div class="field"><label>Spieler (optional)</label><select name="playerId"><option value="">—</option>
           ${s.players.map((p) => `<option value="${p.id}">${esc(p.firstName)} ${esc(p.lastName)}</option>`).join("")}</select></div>
         <div class="field full"><label><input type="checkbox" name="paid" style="width:auto"> bereits bezahlt / eingegangen</label></div>
       </div></form>`,
@@ -894,7 +894,7 @@
 
       <div class="card"><div class="card-head"><h3>📦 Bestellungen & Anforderungen</h3></div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Artikel</th><th>Spielerin</th><th>Größe</th><th>Menge</th><th>Status</th><th class="right"></th></tr></thead>
+          <thead><tr><th>Artikel</th><th>Spieler</th><th>Größe</th><th>Menge</th><th>Status</th><th class="right"></th></tr></thead>
           <tbody>${s.clothingRequests.length ? s.clothingRequests.map((r) => {
             const item = Store.byId("clothing", r.itemId);
             return `<tr><td>${esc(item ? item.name : "—")}</td><td>${esc(playerName(r.playerId))}</td>
@@ -922,7 +922,7 @@
       body: `<div class="flex mb"><div style="width:120px">${clothingSVG(item.kind, item.color)}</div>
         <div><strong>${esc(item.name)}</strong><div class="price">${fmtMoney(item.price)}</div><p class="soft" style="font-size:.85rem">${esc(item.description)}</p></div></div>
         <form id="rf"><div class="form-grid">
-        <div class="field"><label>Spielerin</label><select name="playerId">${s.players.map((p) => `<option value="${p.id}">${esc(p.firstName)} ${esc(p.lastName)}</option>`).join("")}</select></div>
+        <div class="field"><label>Spieler</label><select name="playerId">${s.players.map((p) => `<option value="${p.id}">${esc(p.firstName)} ${esc(p.lastName)}</option>`).join("")}</select></div>
         <div class="field"><label>Größe</label><select name="size">${item.sizes.map((sz) => `<option>${esc(sz)}</option>`).join("")}</select></div>
         <div class="field"><label>Menge</label><input type="number" name="qty" min="1" value="1"></div>
       </div></form>`,
@@ -1084,7 +1084,7 @@
   function wiki(el) {
     const articles = [
       { id: "grundlagen", h: "🏐 Grundlagen & Ziel des Spiels", html: `
-        <p>Volleyball wird von zwei Teams zu je sechs Spielerinnen über ein Netz gespielt. Ziel ist es, den Ball so über das Netz ins gegnerische Feld zu spielen, dass ihn die Gegnerinnen nicht regelkonform zurückspielen können. Ein Team darf den Ball maximal <strong>dreimal</strong> berühren (plus möglicher Block), bevor er über das Netz muss.</p>
+        <p>Volleyball wird von zwei Teams zu je sechs Spieler über ein Netz gespielt. Ziel ist es, den Ball so über das Netz ins gegnerische Feld zu spielen, dass ihn die Gegnerinnen nicht regelkonform zurückspielen können. Ein Team darf den Ball maximal <strong>dreimal</strong> berühren (plus möglicher Block), bevor er über das Netz muss.</p>
         <ul><li>Feldgröße: 18 × 9 Meter, geteilt durch das Netz.</li>
         <li>Netzhöhe: 2,24 m (Damen) bzw. 2,43 m (Herren).</li>
         <li>Ein Satz wird bis <strong>25 Punkte</strong> gespielt (mind. 2 Punkte Vorsprung).</li>
@@ -1109,7 +1109,7 @@
       { id: "regeln", h: "⚖️ Wichtige Regeln & typische Fehler", html: `
         <ul>
         <li><strong>Vierschlag:</strong> Ball mehr als dreimal berührt (Block zählt nicht mit).</li>
-        <li><strong>Doppelberührung:</strong> zweimal hintereinander durch dieselbe Spielerin (außer beim Block).</li>
+        <li><strong>Doppelberührung:</strong> zweimal hintereinander durch dieselbe Spieler (außer beim Block).</li>
         <li><strong>Netzberührung</strong> im Spielgeschehen ist ein Fehler.</li>
         <li><strong>Übertreten der Mittellinie</strong> mit dem ganzen Fuß.</li>
         <li><strong>Rotationsfehler:</strong> falsche Position beim Aufschlag.</li>
@@ -1133,7 +1133,7 @@
     ];
 
     el.innerHTML = `
-      ${head("Volleyball-Wiki", "Regeln, Techniken und Begriffe – ideal für neue Spielerinnen und Eltern")}
+      ${head("Volleyball-Wiki", "Regeln, Techniken und Begriffe – ideal für neue Spieler und Eltern")}
       <div class="grid" style="grid-template-columns: 240px 1fr; gap:16px; align-items:start">
         <div class="card wiki-toc" style="position:sticky;top:80px">
           <h3 style="font-size:.9rem">Inhalt</h3>
@@ -1350,7 +1350,7 @@
     $$("[data-ddel]", el).forEach((b) => b.onclick = () => {
       const d = Store.byId("departments", b.dataset.ddel);
       const members = S().players.filter((p) => p.departmentId === d.id).length;
-      confirmDialog(`Abteilung „${d.name}" löschen?${members ? ` ${members} Spielerin(nen) verlieren die Zuordnung.` : ""}`, () => {
+      confirmDialog(`Abteilung „${d.name}" löschen?${members ? ` ${members} Spieler(nen) verlieren die Zuordnung.` : ""}`, () => {
         S().players.forEach((p) => { if (p.departmentId === d.id) Store.update("players", p.id, { departmentId: null }); });
         Store.remove("departments", d.id); toast("Abteilung gelöscht"); reload();
       });
@@ -1360,7 +1360,7 @@
 
   function departmentForm(d) {
     const isEdit = !!d;
-    d = d || { code: "", name: "", category: "Jugend", gender: "w", league: "", ageGroup: "", trainer: "", email: "", times: "", venue: "Sporthalle SKV, Halle 1", active: true };
+    d = d || { code: "", name: "", category: "Jugend", gender: "m", league: "", ageGroup: "", trainer: "", email: "", times: "", venue: "Sporthalle SKV, Halle 1", active: true };
     modal({
       title: isEdit ? "Abteilung bearbeiten" : "Neue Abteilung",
       body: `<form id="def"><div class="form-grid">
@@ -1407,7 +1407,7 @@
       <div class="grid grid-3 mb">
         ${stat("📋", "Meldungen", s.meldungen.length)}
         ${stat("✅", "Gemeldet", s.meldungen.filter((m) => m.status !== "Entwurf").length)}
-        ${stat("👥", "Gemeldete Spieler:innen", s.meldungen.reduce((a, m) => a + m.entries.length, 0))}
+        ${stat("👥", "Gemeldete Spieler", s.meldungen.reduce((a, m) => a + m.entries.length, 0))}
       </div>
       <a class="link-card mb" href="https://mv.sams-ticket.de/public/" target="_blank" rel="noopener">
         <span class="ic">🌐</span><div class="grow"><div class="title">VVMV Meldeportal (SAMS)</div>
@@ -1422,7 +1422,7 @@
               <dt>Spielklasse</dt><dd>${esc(m.league)}</dd>
               <dt>Staffel</dt><dd>${esc(m.staffel || "—")}</dd>
               <dt>Verantwortlich</dt><dd>${esc(m.responsible || "—")}</dd>
-              <dt>Spieler:innen</dt><dd><strong>${m.entries.length}</strong></dd>
+              <dt>Spieler</dt><dd><strong>${m.entries.length}</strong></dd>
             </dl>
             <div class="flex"><button class="btn sm" data-open="${m.id}">Öffnen & bearbeiten</button>
               <span class="spacer"></span>
@@ -1451,7 +1451,7 @@
         <div class="field"><label>Mannschaftsname (Meldung)</label><input name="teamName" id="mteam"></div>
         <div class="field"><label>Verantwortlich</label><input name="responsible" id="mresp"></div>
       </div>
-      <p class="muted" style="font-size:.82rem">Alle aktiven Spieler:innen der gewählten Abteilung werden automatisch mit Jahrgang und Passnummer übernommen. Danach kannst du die Liste anpassen.</p></form>`,
+      <p class="muted" style="font-size:.82rem">Alle aktiven Spieler der gewählten Abteilung werden automatisch mit Jahrgang und Passnummer übernommen. Danach kannst du die Liste anpassen.</p></form>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Meldung anlegen</button>`,
       onOpen(m) {
         const sync = () => {
@@ -1496,8 +1496,8 @@
       </div></div>
 
       <div class="card" style="padding:0">
-        <div class="card-head" style="padding:16px 16px 0"><h3>Gemeldete Spieler:innen (${m.entries.length})</h3>
-          <span class="spacer"></span><button class="btn sm" data-addpl>＋ Spieler:in</button></div>
+        <div class="card-head" style="padding:16px 16px 0"><h3>Gemeldete Spieler (${m.entries.length})</h3>
+          <span class="spacer"></span><button class="btn sm" data-addpl>＋ Spieler</button></div>
         <div class="table-wrap"><table>
           <thead><tr><th>#</th><th>Name</th><th>Jahrgang</th><th>Passnummer</th><th>Position</th><th>Rolle</th><th></th></tr></thead>
           <tbody>${m.entries.map((e, i) => {
@@ -1510,7 +1510,7 @@
               <td class="soft">${esc(p ? p.position : "—")}</td>
               <td><select class="e-role" data-i="${i}">${meldRoles.map((r) => `<option ${r === e.role ? "selected" : ""}>${r}</option>`).join("")}</select></td>
               <td class="right"><button class="btn sm ghost" data-rm="${i}">🗑️</button></td></tr>`;
-          }).join("") || `<tr><td colspan="7">${empty("👥", "Noch keine Spieler:innen in der Meldung")}</td></tr>`}</tbody>
+          }).join("") || `<tr><td colspan="7">${empty("👥", "Noch keine Spieler in der Meldung")}</td></tr>`}</tbody>
         </table></div>
       </div>
       <p class="muted mt" style="font-size:.82rem">Änderungen an Passnummer und Rolle werden sofort gespeichert. Für die offizielle Einreichung nutze das VVMV-Meldeportal (SAMS).</p>`;
@@ -1544,9 +1544,9 @@
     const inList = new Set(m.entries.map((e) => e.playerId));
     const avail = S().players.filter((p) => !inList.has(p.id))
       .sort((a, b) => (a.departmentId === m.departmentId ? -1 : 1) - (b.departmentId === m.departmentId ? -1 : 1) || a.lastName.localeCompare(b.lastName));
-    if (!avail.length) { toast("Alle Spieler:innen sind bereits gemeldet"); return; }
+    if (!avail.length) { toast("Alle Spieler sind bereits gemeldet"); return; }
     modal({
-      title: "Spieler:in zur Meldung hinzufügen",
+      title: "Spieler zur Meldung hinzufügen",
       body: `<div class="list">${avail.map((p) => `
         <label class="list-item" style="cursor:pointer">${avatar(p.firstName, p.lastName)}
           <div class="grow"><div class="title">${esc(p.firstName)} ${esc(p.lastName)}</div>
@@ -1594,7 +1594,7 @@
         <div><b>Status:</b> ${esc(m.status)}</div>
       </div>
       <table><thead><tr><th>Nr.</th><th>Name, Vorname</th><th>Jahrgang</th><th>Passnummer</th><th>Position</th><th>Rolle</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="6">keine Spieler:innen</td></tr>'}</tbody></table>
+      <tbody>${rows || '<tr><td colspan="6">keine Spieler</td></tr>'}</tbody></table>
       <div class="sign"><div>Ort, Datum</div><div>Unterschrift Abteilungsleitung</div></div>
       </body></html>`;
     const w = window.open("", "_blank");
