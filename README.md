@@ -52,7 +52,7 @@ node build.js
 | **Trainingsrückmeldung** | Spieler melden sich **verbindlich** zu, ab oder unsicher – mit Live-Zählung pro Training. |
 | **Fahrerplanung** | Fahrer für Auswärtsspiele eintragen, Plätze zuordnen und offene Mitfahrgelegenheiten erkennen. |
 | **Heimspiel-Jobs** | Catering, Helfer und sonstige Aufgaben für Heimspiele/Events vergeben und abhaken. |
-| **Aufgaben** | Persönliche To-Do-Liste des Trainers mit Priorität und Fälligkeit. |
+| **Aufgaben** | Vereins-Aufgabenverwaltung: neue Aufgaben starten (auch direkt aus der Übersicht), mit Kategorie (Training, Spieltag, Verein, Finanzen, Material), Zuständigkeit, Notizen, Priorität und Fälligkeit; Filter nach Kategorie, Bearbeiten, Überfällig-Warnung und Statistik. |
 | **Finanzen** | Mitgliedsbeiträge, Spenden und Ausgaben verwalten, Saldo, offene Beiträge, „als bezahlt"-Buchung. |
 | **Vereinskleidung** | Kollektion mit Bild (SVG), Preis und Größen – von Spieler direkt anforderbar; Bestellstatus-Verwaltung. |
 | **Sponsoren** | Sponsoren mit Logo, Kategorie und Fördersumme präsentieren – **Platz für weitere Sponsoren** ist eingeplant. |

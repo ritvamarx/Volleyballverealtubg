@@ -149,11 +149,11 @@
 
     // Aufgaben Trainer
     const tasks = [
-      task("Aufstellung für Heimspiel Rostock festlegen", d(2), "hoch", false),
-      task("Fehlende Einverständniserklärungen anmahnen", d(1), "hoch", false),
-      task("Bälle für Auswärtsspiel einpacken", d(6), "mittel", false),
-      task("Beitragsrückstand Ida Wolf klären", d(3), "mittel", false),
-      task("Hallenschlüssel-Übergabe organisieren", d(-1), "niedrig", true),
+      task("Aufstellung für Heimspiel Rostock festlegen", d(2), "hoch", false, "Spieltag", "Trainer"),
+      task("Fehlende Einverständniserklärungen anmahnen", d(1), "hoch", false, "Verein", "Trainer"),
+      task("Bälle für Auswärtsspiel einpacken", d(6), "mittel", false, "Material", "Betreuer"),
+      task("Beitragsrückstand Ida Wolf klären", d(3), "mittel", false, "Finanzen", "Trainer"),
+      task("Hallenschlüssel-Übergabe organisieren", d(-1), "niedrig", true, "Verein", "Trainer"),
     ];
 
     // Material / Inventar
@@ -239,8 +239,8 @@
   function ann(title, body, audience) {
     return { id: uid("an"), title, body, audience, date: new Date().toISOString() };
   }
-  function task(title, due, priority, done) {
-    return { id: uid("ta"), title, due, priority, done: !!done };
+  function task(title, due, priority, done, category, assignee, notes) {
+    return { id: uid("ta"), title, due, priority, done: !!done, category: category || "Verein", assignee: assignee || "", notes: notes || "" };
   }
   function inv(name, count, target, location) {
     return { id: uid("in"), name, count, target, location };
