@@ -84,13 +84,14 @@
 
         <div class="card">
           <div class="card-head"><h3>✅ Meine Aufgaben</h3><span class="spacer"></span>
+            <button class="btn sm" data-newtask>＋ Neue Aufgabe</button>
             <a class="btn sm outline" href="#/tasks">Alle</a></div>
           <div class="list">
             ${openTasks.length ? openTasks.slice(0, 5).map((t) => `
               <label class="list-item" style="cursor:pointer">
                 <input type="checkbox" data-task="${t.id}" style="width:auto">
                 <div class="grow"><div class="title">${esc(t.title)}</div>
-                <div class="sub">fällig ${relDays(t.due)} · ${prioBadge(t.priority)}</div></div>
+                <div class="sub">fällig ${relDays(t.due)} · ${prioBadge(t.priority)} <span class="badge info">${esc(taskCategory(t))}</span>${t.assignee ? ` · 👤 ${esc(t.assignee)}` : ""}</div></div>
               </label>`).join("") : empty("🎉", "Keine offenen Aufgaben")}
           </div>
         </div>
@@ -130,6 +131,7 @@
       Store.update("tasks", cb.dataset.task, { done: true });
       toast("Aufgabe erledigt", "good"); reload();
     }));
+    $("[data-newtask]", el).onclick = () => taskForm();
   }
   function prioBadge(p) {
     const m = { hoch: "bad", mittel: "warn", niedrig: "" };
@@ -1196,14 +1198,33 @@
   }
 
   /* ======================================================================
-     AUFGABEN (Trainer To-Do)
+     AUFGABEN (Vereins-Aufgaben)
      ====================================================================== */
+  const TASK_CATEGORIES = ["Training", "Spieltag", "Verein", "Finanzen", "Material"];
+  function taskCategory(t) { return (t && t.category) || "Verein"; }
+
   function tasks(el) {
     const s = S();
-    const open = s.tasks.filter((t) => !t.done).sort((a, b) => new Date(a.due) - new Date(b.due));
-    const done = s.tasks.filter((t) => t.done);
+    const filter = tasks._cat || "alle";
+    const all = s.tasks.slice();
+    const list = filter === "alle" ? all : all.filter((t) => taskCategory(t) === filter);
+    const open = list.filter((t) => !t.done).sort((a, b) => new Date(a.due) - new Date(b.due));
+    const done = list.filter((t) => t.done);
+    const overdue = all.filter((t) => !t.done && daysUntil(t.due) < 0).length;
+    const chips = [`<button class="chip ${filter === "alle" ? "active" : ""}" data-cat="alle">alle (${all.length})</button>`]
+      .concat(TASK_CATEGORIES.map((c) => {
+        const n = all.filter((t) => taskCategory(t) === c).length;
+        return `<button class="chip ${filter === c ? "active" : ""}" data-cat="${c}">${c} (${n})</button>`;
+      }));
+
     el.innerHTML = `
-      ${head("Aufgaben", "Deine To-Do-Liste rund um das Team", `<button class="btn" data-add>＋ Aufgabe</button>`)}
+      ${head("Aufgaben", "Aufgaben im Verein starten, zuweisen und nachhalten", `<button class="btn" data-add>＋ Neue Aufgabe</button>`)}
+      <div class="grid grid-3 mb">
+        ${stat("📋", "Offen", all.filter((t) => !t.done).length, "über alle Kategorien")}
+        ${stat("⏰", "Überfällig", overdue, overdue ? "bitte kümmern" : "nichts überfällig")}
+        ${stat("✅", "Erledigt", all.filter((t) => t.done).length, "insgesamt")}
+      </div>
+      <div class="chip-row mb">${chips.join("")}</div>
       <div class="grid grid-2">
         <div class="card">
           <div class="card-head"><h3>Offen (${open.length})</h3></div>
@@ -1215,33 +1236,49 @@
         </div>
       </div>`;
 
+    $$("[data-cat]", el).forEach((c) => c.onclick = () => { tasks._cat = c.dataset.cat; reload(); });
     $("[data-add]", el).onclick = () => taskForm();
+    $$("[data-tedit]", el).forEach((b) => b.onclick = () => taskForm(Store.byId("tasks", b.dataset.tedit)));
     $$("[data-tdone]", el).forEach((cb) => cb.onchange = () => { Store.update("tasks", cb.dataset.tdone, { done: cb.checked }); reload(); });
-    $$("[data-tdel]", el).forEach((b) => b.onclick = () => { Store.remove("tasks", b.dataset.tdel); toast("Gelöscht"); reload(); });
+    $$("[data-tdel]", el).forEach((b) => b.onclick = () => {
+      const t = Store.byId("tasks", b.dataset.tdel);
+      confirmDialog(`Aufgabe „${t.title}“ wirklich löschen?`, () => {
+        Store.remove("tasks", t.id); toast("Aufgabe gelöscht"); reload();
+      });
+    });
   }
   function taskRow(t) {
     const overdue = !t.done && daysUntil(t.due) < 0;
-    return `<label class="list-item" style="cursor:pointer">
+    return `<div class="list-item">
       <input type="checkbox" data-tdone="${t.id}" ${t.done ? "checked" : ""} style="width:auto">
       <div class="grow"><div class="title" style="${t.done ? "text-decoration:line-through;opacity:.6" : ""}">${esc(t.title)}</div>
-        <div class="sub">${t.done ? "erledigt" : `fällig ${relDays(t.due)}`} · ${prioBadge(t.priority)} ${overdue ? '<span class="badge bad">überfällig</span>' : ""}</div></div>
-      <button class="btn sm ghost" data-tdel="${t.id}">🗑️</button></label>`;
+        <div class="sub">${t.done ? "erledigt" : `fällig ${relDays(t.due)}`} · ${prioBadge(t.priority)} <span class="badge info">${esc(taskCategory(t))}</span>${t.assignee ? ` · 👤 ${esc(t.assignee)}` : ""} ${overdue ? '<span class="badge bad">überfällig</span>' : ""}</div>
+        ${t.notes ? `<div class="sub soft">${esc(t.notes)}</div>` : ""}</div>
+      <button class="btn sm ghost" data-tedit="${t.id}">✏️</button>
+      <button class="btn sm ghost" data-tdel="${t.id}">🗑️</button></div>`;
   }
-  function taskForm() {
+  function taskForm(t) {
+    const isEdit = !!t;
+    const dueVal = (isEdit && t.due ? new Date(t.due) : new Date()).toISOString().slice(0, 10);
     modal({
-      title: "Neue Aufgabe",
+      title: isEdit ? "Aufgabe bearbeiten" : "Neue Aufgabe starten",
       body: `<form id="tf"><div class="form-grid">
-        <div class="field full"><label>Aufgabe</label><input name="title" required></div>
-        <div class="field"><label>Fällig am</label><input type="date" name="due" value="${new Date().toISOString().slice(0, 10)}"></div>
-        <div class="field"><label>Priorität</label><select name="priority"><option>hoch</option><option selected>mittel</option><option>niedrig</option></select></div>
+        <div class="field full"><label>Aufgabe</label><input name="title" value="${esc(isEdit ? t.title : "")}" required></div>
+        <div class="field"><label>Fällig am</label><input type="date" name="due" value="${dueVal}"></div>
+        <div class="field"><label>Priorität</label><select name="priority">${["hoch", "mittel", "niedrig"].map((p) => `<option ${p === ((isEdit && t.priority) || "mittel") ? "selected" : ""}>${p}</option>`).join("")}</select></div>
+        <div class="field"><label>Kategorie</label><select name="category">${TASK_CATEGORIES.map((c) => `<option ${c === taskCategory(t) ? "selected" : ""}>${c}</option>`).join("")}</select></div>
+        <div class="field"><label>Zuständig</label><input name="assignee" value="${esc((isEdit && t.assignee) || "")}" placeholder="z. B. Trainer, Betreuer, Elternteil"></div>
+        <div class="field full"><label>Notizen</label><textarea name="notes" rows="2" placeholder="optional">${esc((isEdit && t.notes) || "")}</textarea></div>
       </div></form>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
       onOpen(m) {
         m.querySelector("[data-x]").onclick = closeModal;
         m.querySelector("[data-s]").onclick = () => {
           const f = m.querySelector("#tf"); if (!f.reportValidity()) return;
-          const d = formData(f); d.due = new Date(d.due).toISOString(); d.done = false;
-          Store.add("tasks", d); closeModal(); toast("Aufgabe angelegt", "good"); reload();
+          const d = formData(f); d.due = new Date(d.due).toISOString();
+          if (isEdit) { Store.update("tasks", t.id, d); toast("Aufgabe aktualisiert", "good"); }
+          else { d.done = false; Store.add("tasks", d); toast("Aufgabe gestartet", "good"); }
+          closeModal(); reload();
         };
       },
     });
