@@ -17,6 +17,10 @@ Für einen echten Server braucht man eine **dauerhaft laufende, aus dem Internet
 erreichbare Maschine**. Das muss aber kein teurer Mietserver sein — es gibt
 Optionen ab **0 €**.
 
+Details zum Minimalbetrieb — inklusive eines tatsächlich durchgeführten
+Testlaufs in dieser Umgebung — stehen unter
+[Minimalbetrieb](#minimalbetrieb-wie-wenig-reicht).
+
 ## Die Optionen im Vergleich
 
 | # | Option | Kosten/Monat | Leistung | Aufwand | Haken |
@@ -49,6 +53,67 @@ Optionen ab **0 €**.
 - **Betrieb:** Am einfachsten per Docker mit dem Image `itzg/minecraft-server`
   (automatische Updates, Neustart, EULA, Backups). Fertige Konfiguration liegt
   in [`minecraft-server/docker-compose.yml`](minecraft-server/docker-compose.yml).
+
+## Minimalbetrieb — wie wenig reicht?
+
+### Was in dieser Umgebung tatsächlich getestet wurde
+
+Um die Frage nicht theoretisch zu beantworten, wurde hier ein echter
+Minecraft-Server gestartet und ein echter Client damit verbunden. Ergebnis:
+
+| Messwert | Wert |
+|---|---|
+| Server im Leerlauf | **95 MB RAM** |
+| Server mit 1 verbundenen Spieler | **146 MB RAM**, ~5 % einer CPU |
+| Weltordner nach erstem Spawn | 116 KB |
+| Verbindungsaufbau eines Clients | erfolgreich, Spieler spawnte auf x=13, y=45, z=11 |
+
+Verwendet wurde `flying-squid` (ein Minecraft-Server in JavaScript, per npm
+installierbar), Protokollversion 1.21.4.
+
+**Fazit daraus: Rechenleistung ist nicht das Problem.** Ein Minecraft-Server
+für eine kleine Runde ist genügsam — er läuft auf praktisch jeder Hardware,
+die man herumliegen hat.
+
+### Warum es hier trotzdem nicht als echter Server taugt
+
+Drei Hürden, in aufsteigender Schwere:
+
+1. **Die Server-Downloads sind blockiert.** Die Netzwerk-Policy dieser Umgebung
+   verweigert `api.papermc.io` und `piston-data.mojang.com` (HTTP 403 am Proxy).
+   Das offizielle Paper/Vanilla-Serverpaket lässt sich hier also gar nicht
+   beschaffen — nur der Umweg über npm hat funktioniert. Diese Hürde ließe sich
+   beheben, indem man die Hosts in der Netzwerkkonfiguration der Umgebung
+   freigibt.
+2. **Es gibt keine eingehenden Verbindungen aus dem Internet.** Der Test lief
+   ausschließlich über `127.0.0.1`. Freunde könnten nicht beitreten, und
+   Tunnel-Dienste wie playit.gg würden an derselben Policy scheitern.
+3. **Der Container ist flüchtig.** Nach Sitzungsende wird er samt Weltordner
+   gelöscht. Das ist die Hürde, die sich prinzipiell nicht umgehen lässt.
+
+Hinzu kommt: `flying-squid` ist ein Entwicklungs- und Testserver, kein
+vollwertiger. Redstone, viele Mobs und große Teile der Spielmechanik fehlen.
+Zum Spielen ist er nicht gedacht.
+
+### Minimalkonfiguration für echtes Hosting
+
+Für Optionen 2–4 (Oracle, VPS, Zuhause) gilt: Ein Paper-Server für 2–5 Spieler
+kommt mit **1 GB RAM** aus, wenn man ihn passend einstellt. Die fertige
+Sparkonfiguration liegt in
+[`minecraft-server/docker-compose.minimal.yml`](minecraft-server/docker-compose.minimal.yml).
+
+Die wirksamsten Stellschrauben, nach Wirkung sortiert:
+
+| Einstellung | Sparsam | Standard | Wirkung |
+|---|---|---|---|
+| `view-distance` | 6 | 10 | mit Abstand der größte Hebel — halbiert grob den RAM-Bedarf |
+| `simulation-distance` | 4 | 10 | spart CPU (weniger aktive Mobs/Redstone) |
+| `MEMORY` | 1G | 2–3G | Heap-Größe der JVM |
+| `max-players` | 5 | 10–20 | jeder Spieler lädt eigene Chunks |
+
+Damit läuft ein Server bequem auf einem **Raspberry Pi 4 mit 2 GB RAM** oder der
+kleinsten Stufe jedes VPS-Anbieters. Unter 1 GB wird es unangenehm: Der Server
+startet zwar, ruckelt aber beim Erkunden neuer Gebiete.
 
 ## Schritt-für-Schritt-Plan
 

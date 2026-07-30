@@ -23,6 +23,16 @@ docker compose up -d
 docker compose logs -f mc          # beim ersten Start dauert es 1–2 Minuten
 ```
 
+### Sparvariante für kleine Maschinen
+
+Auf einem Raspberry Pi oder der kleinsten VPS-Stufe stattdessen
+`docker-compose.minimal.yml` verwenden — 1 GB RAM, `view-distance 6`, bis zu
+5 Spieler:
+
+```bash
+docker compose -f docker-compose.minimal.yml up -d
+```
+
 Verbinden im Spiel über `<IP-des-Servers>:25565`.
 
 ## Firewall
