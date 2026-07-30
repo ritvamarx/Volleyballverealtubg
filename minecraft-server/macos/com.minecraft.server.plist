@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Minecraft-Server als LaunchDaemon: startet beim Systemstart, ohne dass sich
+  jemand anmelden muss.
+
+  Vor dem Kopieren nach /Library/LaunchDaemons/ alle Vorkommen von
+  DEIN_BENUTZERNAME durch den eigenen Kurznamen ersetzen (whoami zeigt ihn an).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.minecraft.server</string>
+
+    <key>UserName</key>
+    <string>DEIN_BENUTZERNAME</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/DEIN_BENUTZERNAME/minecraft-server</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/DEIN_BENUTZERNAME/minecraft-server/start.sh</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!--
+      Neustart nur nach einem Absturz. Wird der Server sauber per "stop" oder
+      RCON beendet, bleibt er aus - noetig fuer Updates und Wartung.
+    -->
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <!-- Nach einem Absturz 30 s warten, statt in einer Schleife neu zu starten. -->
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/DEIN_BENUTZERNAME/minecraft-server/logs/launchd.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/DEIN_BENUTZERNAME/minecraft-server/logs/launchd.err.log</string>
+</dict>
+</plist>
