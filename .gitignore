@@ -2,3 +2,7 @@
 Thumbs.db
 node_modules/
 *.log
+
+# Minecraft-Server: Weltdaten und Backups gehören nicht ins Repo
+minecraft-server/data/
+minecraft-server/backups/
