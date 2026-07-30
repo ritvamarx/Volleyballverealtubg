@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Taegliche Weltsicherung um 4:00 Uhr.
+
+  Vor dem Kopieren nach /Library/LaunchDaemons/ alle Vorkommen von
+  DEIN_BENUTZERNAME durch den eigenen Kurznamen ersetzen.
+
+  Hinweis: Schlaeft der Mac zum geplanten Zeitpunkt, holt launchd den Lauf
+  beim naechsten Aufwachen nach. Mit den Energieeinstellungen aus Phase 4a
+  schlaeft er ohnehin nicht.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.minecraft.backup</string>
+
+    <key>UserName</key>
+    <string>DEIN_BENUTZERNAME</string>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/DEIN_BENUTZERNAME/minecraft-server</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/DEIN_BENUTZERNAME/minecraft-server/backup.sh</string>
+    </array>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>4</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <!-- mcrcon liegt je nach Architektur in einem anderen Homebrew-Pfad. -->
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/DEIN_BENUTZERNAME/minecraft-server/logs/backup.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/DEIN_BENUTZERNAME/minecraft-server/logs/backup.err.log</string>
+</dict>
+</plist>

@@ -152,6 +152,13 @@ startet zwar, ruckelt aber beim Erkunden neuer Gebiete.
 
 ### Phase 3c — Alternativ: Zuhause hosten (nur Stromkosten)
 
+> **Mac mini?** Dafür gibt es eine vollständige, eigene Anleitung:
+> [`minecraft-server/macos/README.md`](minecraft-server/macos/README.md) —
+> von der Java-Installation über launchd-Autostart und Energieeinstellungen
+> bis zu automatischen Backups. **Dort ausdrücklich ohne Docker:** Auf macOS
+> läuft Docker in einer Linux-VM und kostet Arbeitsspeicher und
+> Festplattentempo, während der Server nativ als Java-Prozess laufen kann.
+
 1. Alten Laptop/PC mit Linux (oder Windows) 24/7 laufen lassen; Deckel-zu-
    Standby im Energiemanagement deaktivieren.
 2. Docker + die Compose-Datei aus diesem Repo verwenden.

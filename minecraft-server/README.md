@@ -4,6 +4,11 @@ Die Kosten- und Entscheidungsübersicht steht in
 [`../MINECRAFT-SERVER-PLAN.md`](../MINECRAFT-SERVER-PLAN.md).
 Hier steht nur, wie man den Server konkret startet.
 
+> **Auf einem Mac (z. B. Mac mini)?** Diese Docker-Anleitung ist für
+> Linux-Hosts gedacht. Nimm stattdessen [`macos/README.md`](macos/README.md) —
+> dort läuft der Server nativ, weil Docker unter macOS eine Linux-VM startet
+> und dadurch RAM und Festplattentempo kostet.
+
 ## Voraussetzungen
 
 Eine Linux-Maschine, die dauerhaft läuft und aus dem Internet erreichbar ist
