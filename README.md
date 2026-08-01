@@ -1,3 +1,8 @@
+> **🇸🇪 Neu:** Im Ordner [`reisekasse/`](reisekasse/) liegt die **Reisekasse
+> Schweden** – ein EUR-⇄-SEK-Umrechner mit gemeinsamem Ausgabenprotokoll für die
+> Familie (installierbare Web-App). Details im
+> [Reisekasse-README](reisekasse/README.md).
+
 # 🏐 SKV Müritz – Trainer- & Vereinsplattform
 
 Eine komplette Verwaltungs- und Kommunikationsplattform für den Volleyballverein
