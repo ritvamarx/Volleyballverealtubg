@@ -373,11 +373,25 @@ textarea { resize: vertical; min-height: 72px; }
   }
   .sidebar.open { transform: none; }
   .hamburger { display: block; }
-  .grid-2, .grid-3, .grid-4, .form-grid { grid-template-columns: 1fr; }
-  .content { padding: 16px; }
+  .grid-2, .grid-3, .form-grid { grid-template-columns: 1fr; }
+  /* Kennzahl-Kacheln kompakt zweispaltig statt riesiger Einspalter */
+  .grid-4 { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .card { padding: 14px; }
+  .stat .value { font-size: 1.4rem; }
+  .stat .label { font-size: .68rem; }
+  .icon { width: 34px; height: 34px; flex: 0 0 34px; font-size: 1rem; border-radius: 9px; }
+  .content { padding: 14px; }
   /* Touch-freundlichere Bedienelemente */
-  .btn { padding: 11px 16px; }
-  .btn.sm { padding: 9px 13px; }
+  .btn { padding: 11px 14px; }
+  .btn.sm { padding: 9px 12px; }
+  .section-head .btn { padding: 10px 12px; font-size: .84rem; }
+  .section-head h2 { font-size: 1.2rem; }
+  .card-head { flex-wrap: wrap; row-gap: 8px; }
+  /* Listenzeilen: Text bekommt Platz, Aktions-Knöpfe brechen sauber in eine
+     eigene Zeile um (statt den Text auf eine Schmalspalte zu quetschen) */
+  .list-item { flex-wrap: wrap; row-gap: 8px; padding: 11px 12px; }
+  .list-item .grow { flex: 1 1 60%; min-width: 0; }
+  .list-item .btn.sm { padding: 8px 10px; }
   input, select, textarea { font-size: 16px; /* verhindert iOS-Auto-Zoom */ }
   th, td { padding: 9px 10px; }
   .section-head { gap: 8px; }
