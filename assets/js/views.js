@@ -1993,8 +1993,8 @@
       ${head("Verbandsliga MV – Tabelle & Links", "Punktestand der Verbandsliga Mecklenburg-Vorpommern und Direktlinks zum Verband")}
       <div class="grid grid-4 mb">
         ${stat("🏆", "Tabellenplatz SKV", ourPos ? ourPos + "." : "—", `${rows.length} Teams`)}
-        ${stat("⭐", "Punkte SKV", (rows.find((r) => /skv/i.test(r.team)) || {}).points ?? "—")}
-        ${stat("🎽", "Spiele", (rows.find((r) => /skv/i.test(r.team)) || {}).games ?? "—")}
+        ${stat("⭐", "Punkte SKV", (() => { const t = rows.find((r) => /skv/i.test(r.team)); return t && t.points != null ? t.points : "—"; })())}
+        ${stat("🎽", "Spiele", (() => { const t = rows.find((r) => /skv/i.test(r.team)); return t && t.games != null ? t.games : "—"; })())}
         ${stat("📈", "Satzverhältnis", (() => { const t = rows.find((r) => /skv/i.test(r.team)); return t ? `${t.setsW}:${t.setsL}` : "—"; })())}
       </div>
 

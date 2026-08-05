@@ -96,6 +96,7 @@ p { line-height: 1.55; }
 .topbar {
   position: sticky; top: 0; z-index: 30;
   display: flex; align-items: center; gap: 14px;
+  background: rgba(255,255,255,.92);
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
@@ -105,6 +106,7 @@ p { line-height: 1.55; }
 .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 .season-badge {
   font-size: .76rem; font-weight: 600; color: var(--primary);
+  background: rgba(30,58,138,.12);
   background: color-mix(in srgb, var(--primary) 12%, transparent);
   padding: 6px 12px; border-radius: 999px;
 }
@@ -141,6 +143,7 @@ p { line-height: 1.55; }
 .icon {
   width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center;
   font-size: 1.25rem; flex: 0 0 42px;
+  background: rgba(249,115,22,.15);
   background: color-mix(in srgb, var(--accent) 15%, transparent);
 }
 
@@ -177,11 +180,11 @@ td.wrap, th.wrap { white-space: normal; }
   font-size: .74rem; font-weight: 700; padding: 3px 9px; border-radius: 999px;
   background: var(--surface-2); color: var(--text-soft); border: 1px solid var(--border);
 }
-.badge.good { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); border-color: transparent; }
-.badge.warn { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); border-color: transparent; }
-.badge.bad  { background: color-mix(in srgb, var(--bad) 13%, transparent); color: var(--bad); border-color: transparent; }
-.badge.info { background: color-mix(in srgb, var(--primary-2) 14%, transparent); color: var(--primary-2); border-color: transparent; }
-.badge.accent { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-dark); border-color: transparent; }
+.badge.good { background: rgba(22,163,74,.14); background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); border-color: transparent; }
+.badge.warn { background: rgba(217,119,6,.16); background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); border-color: transparent; }
+.badge.bad  { background: rgba(220,38,38,.13); background: color-mix(in srgb, var(--bad) 13%, transparent); color: var(--bad); border-color: transparent; }
+.badge.info { background: rgba(37,99,235,.14); background: color-mix(in srgb, var(--primary-2) 14%, transparent); color: var(--primary-2); border-color: transparent; }
+.badge.accent { background: rgba(249,115,22,.16); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-dark); border-color: transparent; }
 
 .chip {
   display: inline-flex; align-items: center; gap: 6px; font-size: .82rem;
@@ -191,9 +194,9 @@ td.wrap, th.wrap { white-space: normal; }
 .chip.active { background: var(--primary); color: #fff; border-color: transparent; }
 .chip-row { display: flex; flex-wrap: wrap; gap: 8px; }
 
-.pill-type-training { background: color-mix(in srgb, var(--primary-2) 14%, transparent); color: var(--primary-2); }
-.pill-type-home { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
-.pill-type-away { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-dark); }
+.pill-type-training { background: rgba(37,99,235,.14); background: color-mix(in srgb, var(--primary-2) 14%, transparent); color: var(--primary-2); }
+.pill-type-home { background: rgba(22,163,74,.14); background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+.pill-type-away { background: rgba(249,115,22,.16); background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-dark); }
 .pill-type-other { background: var(--surface-2); color: var(--text-soft); }
 
 /* ---------- Forms ---------- */
@@ -210,7 +213,7 @@ textarea { resize: vertical; min-height: 72px; }
 
 /* ---------- Modal ---------- */
 .overlay {
-  position: fixed; inset: 0; background: rgba(6,12,28,.55);
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0; inset: 0; background: rgba(6,12,28,.55);
   opacity: 0; visibility: hidden; transition: opacity .2s; z-index: 60;
 }
 .overlay.show { opacity: 1; visibility: visible; }
@@ -282,13 +285,13 @@ textarea { resize: vertical; min-height: 72px; }
 
 /* clothing / product cards */
 .product { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
-.product .img { aspect-ratio: 4/3; background: var(--surface-2); display: grid; place-items: center; }
+.product .img { min-height: 180px; aspect-ratio: 4/3; background: var(--surface-2); display: grid; place-items: center; }
 .product .img svg { width: 100%; height: 100%; }
 .product .body { padding: 14px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .product .price { font-weight: 800; color: var(--accent-dark); }
 
 .sponsor-card { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
-.sponsor-logo { width: 100%; aspect-ratio: 16/7; background: var(--surface-2); border-radius: 10px; display: grid; place-items: center; overflow: hidden; }
+.sponsor-logo { width: 100%; min-height: 110px; aspect-ratio: 16/7; background: var(--surface-2); border-radius: 10px; display: grid; place-items: center; overflow: hidden; }
 .sponsor-logo svg { width: 80%; height: 80%; }
 
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 18px; flex-wrap: wrap; }
@@ -312,7 +315,7 @@ textarea { resize: vertical; min-height: 72px; }
 .cal-ev { font-size: .7rem; padding: 2px 5px; border-radius: 5px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Ferien / schulfreie Tage */
-.cal-cell.holiday { background: color-mix(in srgb, #f59e0b 10%, var(--surface)); border-color: color-mix(in srgb, #f59e0b 35%, var(--border)); }
+.cal-cell.holiday { background: rgba(245,158,11,.12); background: color-mix(in srgb, #f59e0b 10%, var(--surface)); border-color: rgba(245,158,11,.4); border-color: color-mix(in srgb, #f59e0b 35%, var(--border)); }
 .hol-dot { font-size: .62rem; }
 
 /* Jahresansicht */
@@ -323,7 +326,7 @@ textarea { resize: vertical; min-height: 72px; }
 .mini-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; font-size: .62rem; text-align: center; }
 .mini-grid b { color: var(--muted); font-weight: 700; }
 .mini-grid span { position: relative; padding: 2px 0; border-radius: 4px; color: var(--text-soft); min-height: 15px; }
-.mini-grid span.mini-hol { background: color-mix(in srgb, #f59e0b 25%, transparent); }
+.mini-grid span.mini-hol { background: rgba(245,158,11,.25); background: color-mix(in srgb, #f59e0b 25%, transparent); }
 .mini-grid span.mini-today { outline: 1.5px solid var(--accent); font-weight: 800; color: var(--text); }
 .mini-dot { position: absolute; left: 50%; transform: translateX(-50%); bottom: -1px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
 
