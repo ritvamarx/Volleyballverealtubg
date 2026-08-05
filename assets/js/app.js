@@ -32,6 +32,9 @@
     { id: "verbandsmeldung", label: "Verbandsmeldung", icon: "📋" },
     { id: "standings", label: "Verbandsliga MV", icon: "🏆" },
     { id: "wiki", label: "Volleyball-Wiki", icon: "📖" },
+
+    { group: "System" },
+    { id: "backup", label: "Datensicherung", icon: "💾" },
   ];
 
   const titles = {};
@@ -97,9 +100,19 @@
     route();
 
     $("#themeToggle").onclick = () => applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
-    $("#resetData").onclick = () => U.confirmDialog("Alle Daten auf die Demo-Beispiele zurücksetzen? Eigene Eingaben gehen verloren.", () => {
-      Store.resetDemo(); U.toast("Demo-Daten wiederhergestellt", "good"); App.reload();
-    }, "Zurücksetzen");
+    $("#resetData").onclick = () => U.modal({
+      title: "Daten zurücksetzen",
+      body: `<p>Wie soll die Plattform zurückgesetzt werden? <strong>Eigene Eingaben gehen verloren</strong> –
+        vorher ggf. unter „Datensicherung" exportieren.</p>`,
+      footer: `<button class="btn ghost" data-c>Abbrechen</button>
+        <button class="btn outline" data-e>Leer (ohne Demodaten)</button>
+        <button class="btn" data-d>Mit Demo-Daten</button>`,
+      onOpen(m) {
+        m.querySelector("[data-c]").onclick = U.closeModal;
+        m.querySelector("[data-e]").onclick = () => { Store.resetEmpty(); U.closeModal(); U.toast("Leer zurückgesetzt", "good"); App.reload(); };
+        m.querySelector("[data-d]").onclick = () => { Store.resetDemo(); U.closeModal(); U.toast("Demo-Daten geladen", "good"); App.reload(); };
+      },
+    });
 
     $("#hamburger").onclick = () => {
       $("#sidebar").classList.toggle("open");

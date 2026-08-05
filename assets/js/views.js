@@ -427,55 +427,139 @@
   /* ======================================================================
      KALENDER
      ====================================================================== */
+  // Fällt ein Datum in schulfreie Tage? → Name oder null
+  function holidayFor(date) {
+    const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    const h = S().holidays.find((x) => x.start <= iso && iso <= x.end);
+    return h ? h.name : null;
+  }
+
   function calendar(el) {
+    const mode = calendar._mode || "month";
     const cur = calendar._month ? new Date(calendar._month) : new Date();
     cur.setDate(1);
     const y = cur.getFullYear(), mo = cur.getMonth();
-    const first = new Date(y, mo, 1);
-    const startDow = (first.getDay() + 6) % 7; // Montag=0
-    const daysInMonth = new Date(y, mo + 1, 0).getDate();
-    const evByDay = {};
-    S().events.forEach((e) => {
-      const d = new Date(e.start);
-      if (d.getFullYear() === y && d.getMonth() === mo) {
-        const k = d.getDate(); (evByDay[k] = evByDay[k] || []).push(e);
-      }
-    });
     const today = new Date();
-    const cells = [];
-    for (let i = 0; i < startDow; i++) cells.push(`<div class="cal-cell other"></div>`);
-    for (let day = 1; day <= daysInMonth; day++) {
-      const isToday = today.getFullYear() === y && today.getMonth() === mo && today.getDate() === day;
-      const evs = (evByDay[day] || []).sort((a, b) => new Date(a.start) - new Date(b.start));
-      cells.push(`<div class="cal-cell ${isToday ? "today" : ""}">
-        <span class="cal-daynum">${day}</span>
-        ${evs.map((e) => `<div class="cal-ev pill-type-${e.type}" data-ev="${e.id}" title="${esc(e.title)}">${fmtTime(e.start)} ${esc(e.title)}</div>`).join("")}
-      </div>`);
-    }
     const dows = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-    const upcoming = upcomingEvents(8);
+
+    // ---------- Monatsansicht ----------
+    function monthHTML() {
+      const startDow = (new Date(y, mo, 1).getDay() + 6) % 7; // Montag=0
+      const daysInMonth = new Date(y, mo + 1, 0).getDate();
+      const evByDay = {};
+      S().events.forEach((e) => {
+        const d = new Date(e.start);
+        if (d.getFullYear() === y && d.getMonth() === mo) {
+          const k = d.getDate(); (evByDay[k] = evByDay[k] || []).push(e);
+        }
+      });
+      const cells = [];
+      for (let i = 0; i < startDow; i++) cells.push(`<div class="cal-cell other"></div>`);
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dt = new Date(y, mo, day);
+        const isToday = today.getFullYear() === y && today.getMonth() === mo && today.getDate() === day;
+        const hol = holidayFor(dt);
+        const evs = (evByDay[day] || []).sort((a, b) => new Date(a.start) - new Date(b.start));
+        cells.push(`<div class="cal-cell ${isToday ? "today" : ""} ${hol ? "holiday" : ""}" ${hol ? `title="${esc(hol)}"` : ""}>
+          <span class="cal-daynum">${day}${hol ? ' <span class="hol-dot" title="' + esc(hol) + '">🏖</span>' : ""}</span>
+          ${evs.map((e) => `<div class="cal-ev pill-type-${e.type}" data-ev="${e.id}" title="${esc(e.title)}">${fmtTime(e.start)} ${esc(e.title)}</div>`).join("")}
+        </div>`);
+      }
+      return `
+        <div class="cal-head">
+          <button class="btn sm outline" data-prev>‹</button>
+          <strong style="font-size:1.05rem">${MON[mo]} ${y}</strong>
+          <button class="btn sm outline" data-next>›</button>
+          <span class="spacer"></span>
+          <button class="btn sm ghost" data-today>Heute</button>
+        </div>
+        <div class="cal-grid">${dows.map((d) => `<div class="cal-dow">${d}</div>`).join("")}${cells.join("")}</div>
+        <div class="chip-row mt">
+          <span class="chip pill-type-training">Training</span>
+          <span class="chip pill-type-home">Heimspiel</span>
+          <span class="chip pill-type-away">Auswärts</span>
+          <span class="chip pill-type-other">Sonstiges</span>
+          <span class="chip" style="background:color-mix(in srgb,#f59e0b 18%,transparent)">🏖 schulfrei (MV)</span>
+        </div>`;
+    }
+
+    // ---------- Jahresansicht ----------
+    function yearHTML() {
+      const evDays = new Set();
+      S().events.forEach((e) => {
+        const d = new Date(e.start);
+        if (d.getFullYear() === y) evDays.add(d.getMonth() * 100 + d.getDate());
+      });
+      const minis = Array.from({ length: 12 }, (_, m) => {
+        const startDow = (new Date(y, m, 1).getDay() + 6) % 7;
+        const dim = new Date(y, m + 1, 0).getDate();
+        let cells = "";
+        for (let i = 0; i < startDow; i++) cells += `<span></span>`;
+        for (let d = 1; d <= dim; d++) {
+          const isToday = today.getFullYear() === y && today.getMonth() === m && today.getDate() === d;
+          const hasEv = evDays.has(m * 100 + d);
+          const hol = holidayFor(new Date(y, m, d));
+          cells += `<span class="${isToday ? "mini-today" : ""} ${hol ? "mini-hol" : ""}">${d}${hasEv ? '<i class="mini-dot"></i>' : ""}</span>`;
+        }
+        return `<div class="mini-cal" data-month="${m}" title="Zur Monatsansicht">
+          <div class="mini-title">${MON[m]}</div>
+          <div class="mini-grid">${["M","D","M","D","F","S","S"].map((x) => `<b>${x}</b>`).join("")}${cells}</div>
+        </div>`;
+      }).join("");
+      return `
+        <div class="cal-head">
+          <button class="btn sm outline" data-prev>‹</button>
+          <strong style="font-size:1.05rem">Jahr ${y}</strong>
+          <button class="btn sm outline" data-next>›</button>
+          <span class="spacer"></span>
+          <button class="btn sm ghost" data-today>Heute</button>
+        </div>
+        <div class="year-grid">${minis}</div>
+        <p class="muted" style="font-size:.78rem;margin-bottom:0">● Termin · <span style="background:color-mix(in srgb,#f59e0b 25%,transparent);padding:0 4px;border-radius:4px">Tag</span> schulfrei · Monat antippen für Details</p>`;
+    }
+
+    // ---------- Listenansicht ----------
+    function listHTML() {
+      const showPast = !!calendar._showPast;
+      let evs = S().events.slice().sort((a, b) => new Date(a.start) - new Date(b.start));
+      if (!showPast) evs = evs.filter((e) => daysUntil(e.start) >= 0);
+      let lastKey = "";
+      const rows = evs.map((e) => {
+        const d = new Date(e.start);
+        const key = `${d.getFullYear()}-${d.getMonth()}`;
+        const headRow = key !== lastKey ? `<div class="list-month">${MON[d.getMonth()]} ${d.getFullYear()}</div>` : "";
+        lastKey = key;
+        const hol = holidayFor(d);
+        return `${headRow}
+          <div class="list-item" data-ev="${e.id}" style="cursor:pointer">
+            <div class="cal-list-date"><strong>${d.getDate()}.</strong><span>${DOW[d.getDay()]}</span></div>
+            <div class="grow"><div class="title">${esc(e.title)} ${eventPill(e.type)} ${e.seriesId ? '<span class="badge">🔁 Serie</span>' : ""}${hol ? ' <span class="badge warn">🏖 schulfrei</span>' : ""}</div>
+            <div class="sub">${fmtTime(e.start)} Uhr · ${esc(e.location || "—")}</div></div></div>`;
+      }).join("");
+      return `
+        <div class="cal-head">
+          <strong style="font-size:1.05rem">Terminliste</strong>
+          <span class="spacer"></span>
+          <label class="soft" style="font-size:.82rem;display:flex;align-items:center;gap:6px">
+            <input type="checkbox" data-past ${showPast ? "checked" : ""} style="width:auto"> Vergangene anzeigen</label>
+        </div>
+        <div class="list">${rows || empty("🗓️", "Keine Termine")}</div>`;
+    }
 
     const feeds = S().calendarFeeds;
+    const hols = S().holidays.slice().sort((a, b) => a.start.localeCompare(b.start));
+    const upcoming = upcomingEvents(8);
+    const bodyHTML = mode === "year" ? yearHTML() : mode === "list" ? listHTML() : monthHTML();
+
     el.innerHTML = `
       ${head("Kalender", "Alle Trainings und Spieltage auf einen Blick",
         `<button class="btn outline" data-import>⬇️ Termine importieren</button><button class="btn" data-add>＋ Termin</button>`)}
+      <div class="tabs">
+        ${[["month", "📅 Monat"], ["year", "🗓️ Jahr"], ["list", "📋 Liste"]].map(([k, l]) =>
+          `<button class="tab ${mode === k ? "active" : ""}" data-mode="${k}">${l}</button>`).join("")}
+      </div>
       <div class="grid cols-side">
-        <div class="card">
-          <div class="cal-head">
-            <button class="btn sm outline" data-prev>‹</button>
-            <strong style="font-size:1.05rem">${MON[mo]} ${y}</strong>
-            <button class="btn sm outline" data-next>›</button>
-            <span class="spacer"></span>
-            <button class="btn sm ghost" data-today>Heute</button>
-          </div>
-          <div class="cal-grid">${dows.map((d) => `<div class="cal-dow">${d}</div>`).join("")}${cells.join("")}</div>
-          <div class="chip-row mt">
-            <span class="chip pill-type-training">Training</span>
-            <span class="chip pill-type-home">Heimspiel</span>
-            <span class="chip pill-type-away">Auswärts</span>
-            <span class="chip pill-type-other">Sonstiges</span>
-          </div>
-        </div>
+        <div class="card">${bodyHTML}</div>
         <div>
           <div class="card mb">
             <div class="card-head"><h3>Nächste Termine</h3></div>
@@ -486,7 +570,7 @@
                   <div class="sub">${fmtDateShort(e.start)} · ${fmtTime(e.start)} Uhr · ${esc(e.location)}</div></div></div>`).join("")}
             </div>
           </div>
-          <div class="card">
+          <div class="card mb">
             <div class="card-head"><h3>🔄 Kalender-Abos</h3><span class="spacer"></span>
               <button class="btn sm outline" data-sync title="Alle Abos jetzt abrufen">↻</button></div>
             <div class="list">
@@ -499,12 +583,39 @@
                 </div>`).join("") : `<div class="muted" style="font-size:.85rem">Keine Abos – über „Termine importieren" anlegen.</div>`}
             </div>
           </div>
+          <div class="card">
+            <div class="card-head"><h3>🏖 Schulfrei (MV)</h3><span class="spacer"></span>
+              <button class="btn sm outline" data-hadd>＋</button></div>
+            <div class="list" style="max-height:280px;overflow-y:auto">
+              ${hols.length ? hols.map((h) => `
+                <div class="list-item" style="padding:8px 10px">
+                  <div class="grow"><div class="title" style="font-size:.84rem">${esc(h.name)}</div>
+                    <div class="sub">${fmtDateShort(h.start)}${h.end !== h.start ? " – " + fmtDateShort(h.end) : ""}</div></div>
+                  <button class="btn sm ghost" data-hedit="${h.id}">✏️</button>
+                  <button class="btn sm ghost" data-hdel="${h.id}">🗑️</button>
+                </div>`).join("") : `<div class="muted" style="font-size:.85rem">Keine Einträge</div>`}
+            </div>
+            <p class="muted" style="font-size:.74rem;margin:8px 0 0">Ferien & Feiertage Mecklenburg-Vorpommern – Angaben ohne Gewähr, bitte prüfen:
+            <a href="https://www.bildung-mv.de/schueler/ferien/" target="_blank" rel="noopener">Bildungsserver MV ↗</a></p>
+          </div>
         </div>
       </div>`;
 
-    $("[data-prev]", el).onclick = () => { calendar._month = new Date(y, mo - 1, 1).toISOString(); reload(); };
-    $("[data-next]", el).onclick = () => { calendar._month = new Date(y, mo + 1, 1).toISOString(); reload(); };
-    $("[data-today]", el).onclick = () => { calendar._month = null; reload(); };
+    const step = mode === "year" ? 12 : 1;
+    if ($("[data-prev]", el)) $("[data-prev]", el).onclick = () => { calendar._month = new Date(y, mo - step, 1).toISOString(); reload(); };
+    if ($("[data-next]", el)) $("[data-next]", el).onclick = () => { calendar._month = new Date(y, mo + step, 1).toISOString(); reload(); };
+    if ($("[data-today]", el)) $("[data-today]", el).onclick = () => { calendar._month = null; reload(); };
+    if ($("[data-past]", el)) $("[data-past]", el).onchange = (e2) => { calendar._showPast = e2.target.checked; reload(); };
+    $$("[data-mode]", el).forEach((b) => b.onclick = () => { calendar._mode = b.dataset.mode; reload(); });
+    $$(".mini-cal", el).forEach((mc) => mc.onclick = () => {
+      calendar._month = new Date(y, +mc.dataset.month, 1).toISOString();
+      calendar._mode = "month"; reload();
+    });
+    $("[data-hadd]", el).onclick = () => holidayForm();
+    $$("[data-hedit]", el).forEach((b) => b.onclick = () => holidayForm(Store.byId("holidays", b.dataset.hedit)));
+    $$("[data-hdel]", el).forEach((b) => b.onclick = () => confirmDialog("Eintrag löschen?", () => {
+      Store.remove("holidays", b.dataset.hdel); toast("Gelöscht"); reload();
+    }));
     $("[data-add]", el).onclick = () => eventForm();
     $("[data-import]", el).onclick = () => calendarImport();
     $("[data-sync]", el).onclick = async () => {
@@ -624,9 +735,29 @@
       onOpen(m) {
         m.querySelector("[data-x]").onclick = closeModal;
         m.querySelector("[data-edit]").onclick = () => { closeModal(); eventForm(e); };
-        m.querySelector("[data-del]").onclick = () => confirmDialog("Termin wirklich löschen?", () => {
-          Store.remove("events", id); closeModal(); toast("Termin gelöscht"); reload();
-        });
+        m.querySelector("[data-del]").onclick = () => {
+          if (e.seriesId) {
+            const count = S().events.filter((x) => x.seriesId === e.seriesId).length;
+            closeModal();
+            modal({
+              title: "Serientermin löschen",
+              body: `<p>Dieser Termin gehört zu einer Serie mit <strong>${count} Terminen</strong>. Was soll gelöscht werden?</p>`,
+              footer: `<button class="btn ghost" data-c>Abbrechen</button>
+                <button class="btn outline" data-one>Nur diesen Termin</button>
+                <button class="btn danger" data-all>Ganze Serie (${count})</button>`,
+              onOpen(m2) {
+                m2.querySelector("[data-c]").onclick = closeModal;
+                m2.querySelector("[data-one]").onclick = () => { Store.remove("events", id); closeModal(); toast("Termin gelöscht"); reload(); };
+                m2.querySelector("[data-all]").onclick = () => {
+                  S().events.filter((x) => x.seriesId === e.seriesId).forEach((x) => Store.remove("events", x.id));
+                  closeModal(); toast(`Serie gelöscht (${count} Termine)`); reload();
+                };
+              },
+            });
+          } else confirmDialog("Termin wirklich löschen?", () => {
+            Store.remove("events", id); closeModal(); toast("Termin gelöscht"); reload();
+          });
+        };
       },
     });
   }
@@ -646,6 +777,15 @@
         <div class="field full"><label>Ort</label><input name="location" value="${esc(e.location)}"></div>
         <div class="field full"><label>Gegner (bei Spielen)</label><input name="opponent" value="${esc(e.opponent)}"></div>
         <div class="field full"><label>Beschreibung</label><textarea name="description">${esc(e.description)}</textarea></div>
+        ${!isEdit ? `
+        <div class="field"><label>🔁 Wiederholung (z. B. Training)</label><select name="repeat">
+          <option value="">keine</option>
+          <option value="7">wöchentlich</option>
+          <option value="14">alle 2 Wochen</option>
+        </select></div>
+        <div class="field"><label>Wiederholen bis</label><input type="date" name="repeatUntil"></div>
+        <div class="field full"><label style="font-weight:400" class="soft">
+          <input type="checkbox" name="skipHolidays" checked style="width:auto"> Termine in den Schulferien/Feiertagen (MV) automatisch auslassen</label></div>` : ""}
       </div></form>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
       onOpen(m) {
@@ -654,10 +794,58 @@
           const f = m.querySelector("#ef");
           if (!f.reportValidity()) return;
           const d = formData(f);
+          const repeat = Number(d.repeat) || 0;
+          const repeatUntil = d.repeatUntil ? new Date(d.repeatUntil + "T23:59:59") : null;
+          const skipHol = !!d.skipHolidays;
+          delete d.repeat; delete d.repeatUntil; delete d.skipHolidays;
           d.start = new Date(d.start).toISOString();
           d.end = d.end ? new Date(d.end).toISOString() : d.start;
-          if (isEdit) Store.update("events", e.id, d); else Store.add("events", d);
+          if (isEdit) { Store.update("events", e.id, d); }
+          else if (repeat && repeatUntil) {
+            // Serie erzeugen: alle N Tage bis zum Enddatum (max. 80 Termine)
+            const seriesId = Store.uid("se");
+            const durMs = new Date(d.end) - new Date(d.start);
+            let cur2 = new Date(d.start), made = 0, skipped = 0;
+            while (cur2 <= repeatUntil && made < 80) {
+              if (skipHol && holidayFor(cur2)) { skipped++; }
+              else {
+                Store.add("events", Object.assign({}, d, {
+                  start: cur2.toISOString(),
+                  end: new Date(cur2.getTime() + durMs).toISOString(),
+                  seriesId,
+                }));
+                made++;
+              }
+              cur2 = new Date(cur2.getTime() + repeat * 86400000);
+            }
+            closeModal(); toast(`Serie angelegt: ${made} Termine${skipped ? `, ${skipped} in Ferien übersprungen` : ""}`, "good"); reload();
+            return;
+          } else { Store.add("events", d); }
           closeModal(); toast("Termin gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
+
+  function holidayForm(h) {
+    const isEdit = !!h;
+    h = h || { name: "", start: "", end: "" };
+    modal({
+      title: isEdit ? "Schulfreien Eintrag bearbeiten" : "Schulfreie Tage hinzufügen",
+      body: `<form id="hf"><div class="form-grid">
+        <div class="field full"><label>Bezeichnung</label><input name="name" value="${esc(h.name)}" required placeholder="z. B. Herbstferien MV"></div>
+        <div class="field"><label>Von</label><input type="date" name="start" value="${esc(h.start)}" required></div>
+        <div class="field"><label>Bis</label><input type="date" name="end" value="${esc(h.end)}"></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#hf"); if (!f.reportValidity()) return;
+          const d = formData(f);
+          if (!d.end || d.end < d.start) d.end = d.start;
+          if (isEdit) Store.update("holidays", h.id, d); else Store.add("holidays", d);
+          closeModal(); toast("Gespeichert", "good"); reload();
         };
       },
     });
@@ -992,6 +1180,15 @@
             </div>`;
           }).join("") || empty("🗂️", "Noch keine Vorlagen – jetzt anlegen")}
         </div>
+      </div>
+
+      <div class="card mt">
+        <div class="card-head"><h3>💌 Elternbrief des Trainers</h3><span class="spacer"></span>
+          <button class="btn sm" data-letter>🖨️ Brief drucken / PDF</button></div>
+        <p class="soft" style="font-size:.88rem;margin-top:0">Motivierender Brief an alle Eltern zum Saisonstart:
+        Erwartungen (Fahrten zu Auswärtsspielen, Heimspiel-Buffet mit 2 anwesenden Elternteilen),
+        die <strong>aktuellen Heimspieltermine aus dem Kalender</strong>, Zustimmung zur Kontaktaufnahme
+        (E-Mail & Mobilnummer) und zur WhatsApp-Gruppe – inklusive Rückmeldeabschnitt zum Abtrennen.</p>
       </div>`;
 
     $("[data-add]", el).onclick = () => consentForm();
@@ -1011,6 +1208,89 @@
       });
     });
     $$("[data-tprint]", el).forEach((b) => b.onclick = () => printConsentTemplate(Store.byId("consentTemplates", b.dataset.tprint)));
+    $("[data-letter]", el).onclick = () => printParentLetter();
+  }
+
+  // Motivierender Elternbrief mit Erwartungen, Heimspielterminen und Rückmeldeabschnitt
+  function printParentLetter() {
+    const homeGames = S().events.filter((e) => e.type === "home" && daysUntil(e.start) >= 0)
+      .sort((a, b) => new Date(a.start) - new Date(b.start));
+    const gamesHTML = homeGames.length
+      ? `<ul>${homeGames.map((g) => `<li><strong>${fmtDate(g.start)}, ${fmtTime(g.start)} Uhr</strong> – ${esc(g.title)}${g.opponent ? " gegen " + esc(g.opponent) : ""} (${esc(g.location)})</li>`).join("")}</ul>`
+      : `<p><em>Die Heimspieltermine werden rechtzeitig bekannt gegeben bzw. hier ergänzt:</em></p>
+         <ul><li>______________________________</li><li>______________________________</li><li>______________________________</li></ul>`;
+    const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Elternbrief SKV Müritz</title>
+      <style>
+        body{font-family:Georgia,'Times New Roman',serif;color:#111;margin:44px auto;max-width:720px;line-height:1.55;font-size:14.5px}
+        h1{font-size:21px;font-family:Arial,sans-serif;color:#1e3a8a;margin-bottom:0}
+        .sub{color:#666;font-family:Arial,sans-serif;font-size:12px;margin-top:2px}
+        h2{font-size:15px;font-family:Arial,sans-serif;color:#1e3a8a;margin:22px 0 6px}
+        ul{margin:6px 0;padding-left:22px}
+        .cut{border-top:2px dashed #666;margin:30px 0 14px;position:relative}
+        .cut::before{content:"✂";position:absolute;top:-11px;left:12px;background:#fff;padding:0 6px;color:#666}
+        .slip{font-family:Arial,sans-serif;font-size:13px;border:1px solid #999;border-radius:8px;padding:16px}
+        .slip .line{border-bottom:1px solid #333;margin:16px 0 4px;padding-bottom:2px}
+        .chk{margin:8px 0}
+        .sign{margin-top:34px;display:flex;gap:50px}.sign div{border-top:1px solid #333;padding-top:4px;font-size:11.5px;flex:1;font-family:Arial,sans-serif}
+        @media print { body{margin:12mm} }
+      </style></head><body>
+      <h1>🏐 SKV Müritz – Abteilung Volleyball</h1>
+      <div class="sub">www.skv-mueritz.de · Elternbrief zur Saison</div>
+
+      <p style="margin-top:26px">Liebe Eltern,</p>
+      <p>ein neues Volleyball-Jahr liegt vor uns – und ich freue mich riesig, Ihre Kinder dabei zu begleiten!
+      Unsere Mannschaft trainiert mit großem Einsatz, wächst als Team zusammen und wird in dieser Saison
+      auch in der <strong>Erwachsenenliga</strong> wertvolle Erfahrungen sammeln. Damit das gelingt, brauchen
+      wir Sie: Ohne die Unterstützung der Eltern ist Jugendsport im Verein nicht möglich. Vieles davon kostet
+      wenig Zeit, bewirkt aber sehr viel – und ganz nebenbei erleben Sie Ihr Kind dort, wo es über sich
+      hinauswächst.</p>
+
+      <h2>🚗 Fahrten zu Auswärtsspielen</h2>
+      <p>Zu Auswärtsspielen fahren wir wann immer möglich mit dem Vereinsbus – <strong>ich fahre als Trainer
+      immer selbst mit</strong>. Wenn die Plätze im Bus nicht ausreichen, bin ich auf einzelne Eltern
+      angewiesen, die mit dem eigenen PKW einige Spieler mitnehmen. Bitte geben Sie unten an, ob Sie
+      grundsätzlich als Fahrer/in zur Verfügung stehen – die konkrete Abstimmung erfolgt rechtzeitig vor
+      jedem Spiel.</p>
+
+      <h2>🥗 Heimspiele: kleines Buffet</h2>
+      <p>Bei Heimspielen ist es guter Brauch, dass die gastgebende Mannschaft für beide Teams ein kleines
+      Buffet organisiert: <strong>Salat, belegte Brötchen, Kuchen und Getränke</strong>. Das übernehmen die
+      Eltern der Heimmannschaft gemeinsam – wenn jede Familie einmal pro Saison etwas beisteuert, ist es für
+      alle leicht zu stemmen. Zusätzlich sollten pro Heimspiel <strong>zwei Elternteile anwesend</strong>
+      sein, die den Stand betreuen. Bitte tragen Sie sich dafür in die Listen ein, die ich vor jedem
+      Heimspiel herumgebe.</p>
+
+      <h2>📅 Unsere Heimspieltermine</h2>
+      ${gamesHTML}
+
+      <h2>📱 Kommunikation</h2>
+      <p>Damit Informationen zu Training, Spielen und Fahrten Sie schnell erreichen, möchte ich Sie gern
+      direkt kontaktieren können und organisiere die Eltern in einer <strong>WhatsApp-Gruppe</strong>.
+      Bitte geben Sie dazu unten Ihre E-Mail-Adresse und Mobilnummer an. Die Daten werden ausschließlich
+      für die Vereinskommunikation genutzt; die Teilnahme an der WhatsApp-Gruppe ist freiwillig – wichtige
+      Informationen erhalten Sie auf Wunsch auch per E-Mail.</p>
+
+      <p>Ich freue mich auf eine tolle Saison mit Ihren Kindern – und auf Sie am Spielfeldrand!</p>
+      <p>Mit sportlichen Grüßen<br><br>_______________________________<br>Trainer, SKV Müritz Volleyball</p>
+
+      <div class="cut"></div>
+      <div class="slip">
+        <strong>Rückmeldung an den Trainer</strong> (bitte bis zum nächsten Training zurückgeben)
+        <div class="line">Name des Kindes:</div>
+        <div class="line">Name Erziehungsberechtigte/r:</div>
+        <div class="line">E-Mail-Adresse:</div>
+        <div class="line">Mobilnummer:</div>
+        <div class="chk">☐ Ich stimme zu, dass der Trainer mich über E-Mail/Telefon kontaktiert.</div>
+        <div class="chk">☐ Ich möchte in die WhatsApp-Elterngruppe aufgenommen werden.</div>
+        <div class="chk">☐ Ich stehe grundsätzlich als Fahrer/in für Auswärtsspiele zur Verfügung (Plätze: ____ )</div>
+        <div class="chk">☐ Ich helfe beim Heimspiel-Buffet (Salat / Brötchen / Kuchen / Getränke – Zutreffendes bitte einkreisen)</div>
+        <div class="sign"><div>Ort, Datum</div><div>Unterschrift Erziehungsberechtigte/r</div></div>
+      </div>
+      </body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) { toast("Bitte Pop-ups erlauben, um zu drucken", "bad"); return; }
+    w.document.write(html); w.document.close(); w.focus();
+    setTimeout(() => w.print(), 300);
   }
 
   function consentTemplateForm(t) {
@@ -1055,6 +1335,8 @@
         <div>Name des Spielers: &nbsp;</div>
         <div>Geburtsdatum: &nbsp;</div>
         <div>Name der/des Erziehungsberechtigten: &nbsp;</div>
+        <div>E-Mail-Adresse: &nbsp;</div>
+        <div>Mobilnummer: &nbsp;</div>
       </div>
       <div class="sign"><div>Ort, Datum</div><div>Unterschrift Erziehungsberechtigte/r</div></div>
       </body></html>`;
@@ -1957,10 +2239,71 @@
     setTimeout(() => w.print(), 300);
   }
 
+  /* ======================================================================
+     DATENSICHERUNG (Komplett-Export/-Import als CSV)
+     ====================================================================== */
+  function backup(el) {
+    const s = S();
+    const counts = IO.BACKUP_COLLECTIONS.map((c) => ({ name: c, n: (s[c] || []).length }));
+    const total = counts.reduce((a, x) => a + x.n, 0);
+    el.innerHTML = `
+      ${head("Datensicherung", "Alle Vereinsdaten als eine CSV-Datei exportieren und wieder importieren")}
+      <div class="grid grid-2">
+        <div class="card">
+          <div class="card-head"><h3>⬇️ Alles exportieren</h3></div>
+          <p class="soft" style="font-size:.88rem;margin-top:0">Erstellt <strong>eine CSV-Datei</strong> mit allen
+          Daten (${total} Einträge in ${counts.filter((c) => c.n).length} Tabellen) – als Sicherung, zum Umzug auf ein
+          anderes Gerät oder zur Bearbeitung in Excel. Die Datei enthält Abschnitte je Tabelle
+          (<code>#TABELLE;…</code>).</p>
+          <button class="btn" data-exall>💾 Komplett-Export (CSV)</button>
+          <div class="mt">
+            <div class="chip-row">${counts.filter((c) => c.n).map((c) => `<span class="badge">${esc(c.name)}: ${c.n}</span>`).join("") || '<span class="muted">Noch keine Daten vorhanden</span>'}</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>⬆️ Aus Datei wiederherstellen</h3></div>
+          <p class="soft" style="font-size:.88rem;margin-top:0">Liest eine zuvor exportierte CSV-Datei ein.
+          <strong>Achtung:</strong> Die enthaltenen Tabellen ersetzen den aktuellen Datenbestand vollständig.</p>
+          <button class="btn secondary" data-imall>📂 CSV-Datei wählen & importieren</button>
+          <div id="backupResult" class="mt"></div>
+        </div>
+      </div>
+      <div class="card mt">
+        <div class="card-head"><h3>🧹 Zurücksetzen</h3></div>
+        <div class="flex flex-wrap">
+          <button class="btn outline" data-empty>Leerer Verein (ohne Demodaten)</button>
+          <button class="btn outline" data-demo>Mit Demo-Beispieldaten</button>
+        </div>
+        <p class="muted" style="font-size:.8rem;margin-bottom:0">Struktur (Abteilungen, Formular-Vorlagen, Kleiderkatalog, Ferien MV) bleibt in beiden Fällen erhalten.</p>
+      </div>`;
+
+    $("[data-exall]", el).onclick = () => {
+      IO.download(`skv-mueritz-datensicherung-${new Date().toISOString().slice(0, 10)}.csv`, IO.exportAllCSV(), "text/csv");
+      toast("Datensicherung erstellt", "good");
+    };
+    $("[data-imall]", el).onclick = async () => {
+      const f = await IO.pickFile(".csv,text/csv");
+      if (!f) return;
+      let parsed;
+      try { parsed = IO.importAllCSV(f.text); }
+      catch (err) { $("#backupResult", el).innerHTML = `<span class="badge bad">Fehler: ${esc(err.message)}</span>`; return; }
+      confirmDialog(`Import aus „${f.name}": ${parsed.tables.length} Tabellen (${parsed.counts.join(", ")}). Aktuelle Daten dieser Tabellen werden ERSETZT. Fortfahren?`, () => {
+        Store.replaceAll(parsed.data);
+        toast("Datensicherung wiederhergestellt", "good"); reload();
+      }, "Importieren");
+    };
+    $("[data-empty]", el).onclick = () => confirmDialog("Alle Daten löschen und leer starten (Struktur bleibt)?", () => {
+      Store.resetEmpty(); toast("Leer zurückgesetzt", "good"); reload();
+    }, "Zurücksetzen");
+    $("[data-demo]", el).onclick = () => confirmDialog("Alle Daten durch Demo-Beispieldaten ersetzen?", () => {
+      Store.resetDemo(); toast("Demo-Daten geladen", "good"); reload();
+    }, "Laden");
+  }
+
   // ---- Export ----
   window.Views = {
     dashboard, players, departments, calendar, training, drivers, jobs, consents,
     birthdays, finances, clothing, sponsors, standings, wiki,
-    announcements, tasks, inventory, verbandsmeldung,
+    announcements, tasks, inventory, verbandsmeldung, backup,
   };
 })();

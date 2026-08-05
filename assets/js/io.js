@@ -201,9 +201,75 @@
     return { added, errors };
   }
 
+  // ---------- Komplett-Backup: ALLE Daten als eine CSV-Datei ----------
+  // Format: Abschnitte, eingeleitet mit  #TABELLE;<name>  gefolgt von normaler CSV.
+  const BACKUP_COLLECTIONS = ["departments", "players", "events", "responses", "drivers", "jobs",
+    "consents", "consentTemplates", "calendarFeeds", "finances", "clothing", "clothingRequests",
+    "sponsors", "announcements", "tasks", "inventory", "standings", "meldungen", "holidays"];
+  const NUM_FIELDS = new Set(["amount", "seats", "qty", "price", "count", "target", "jerseyNumber",
+    "games", "win", "loss", "setsW", "setsL", "points", "contribution"]);
+  const BOOL_FIELDS = new Set(["paid", "done", "consentOnFile", "required", "autoSync", "active"]);
+
+  function cellOut(v) {
+    if (v == null) return "";
+    if (typeof v === "object") return JSON.stringify(v);  // Arrays/Objekte als JSON in der Zelle
+    return String(v);
+  }
+  function cellIn(key, v) {
+    if (v === "" || v == null) return "";
+    if (typeof v === "string" && (v.startsWith("[") || v.startsWith("{"))) {
+      try { return JSON.parse(v); } catch (e) { return v; }
+    }
+    if (BOOL_FIELDS.has(key)) return v === "true";
+    if (NUM_FIELDS.has(key)) { const n = Number(v); return isNaN(n) ? v : n; }
+    return v;
+  }
+
+  function exportAllCSV() {
+    const s = Store.get();
+    const parts = [`#SKV-BACKUP;1;${new Date().toISOString()};${s.club}`];
+    BACKUP_COLLECTIONS.forEach((coll) => {
+      const rows = s[coll] || [];
+      // Spaltenmenge = Vereinigung aller Schlüssel (stabil sortiert, id zuerst)
+      const keys = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+      keys.sort((a, b) => (a === "id" ? -1 : b === "id" ? 1 : a.localeCompare(b)));
+      parts.push(`#TABELLE;${coll}`);
+      parts.push(keys.join(";"));
+      rows.forEach((r) => parts.push(keys.map((k) => {
+        const v = cellOut(r[k]);
+        return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+      }).join(";")));
+    });
+    return parts.join("\n");
+  }
+
+  function importAllCSV(text) {
+    text = text.replace(/^﻿/, "").replace(/\r/g, "");
+    if (!text.includes("#TABELLE;")) throw new Error("Kein SKV-Backup: Abschnitt #TABELLE fehlt");
+    const result = {};
+    const sections = text.split(/\n(?=#TABELLE;)/);
+    sections.forEach((sec) => {
+      if (!sec.startsWith("#TABELLE;")) return;
+      const nl = sec.indexOf("\n");
+      const name = sec.slice(9, nl).trim();
+      if (!BACKUP_COLLECTIONS.includes(name)) return;
+      const body = sec.slice(nl + 1);
+      if (!body.trim()) { result[name] = []; return; }
+      const rows = parseCSV(body);
+      result[name] = rows.map((r) => {
+        const o = {};
+        Object.keys(r).forEach((k) => { if (k) o[k] = cellIn(k, r[k]); });
+        return o;
+      });
+    });
+    const found = Object.keys(result);
+    if (!found.length) throw new Error("Keine bekannten Tabellen in der Datei gefunden");
+    return { data: result, tables: found, counts: found.map((t) => `${t}: ${result[t].length}`) };
+  }
+
   window.IO = {
     download, pickFile, toCSV, parseCSV, toVCard,
     parseICS, parseFeed, fetchText, parseByType, mergeEvents, syncAllFeeds,
-    guessType,
+    guessType, exportAllCSV, importAllCSV, BACKUP_COLLECTIONS,
   };
 })();

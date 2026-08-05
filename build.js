@@ -29,7 +29,7 @@ fs.writeFileSync(outFile, html);
 
 const kb = (fs.statSync(outFile).size / 1024).toFixed(1);
 console.log(`✔ Erstellt: dist/skv-mueritz-offline.html (${kb} KB)`);
-if (/href="https?:|src="https?:/.test(html.replace(/https:\/\/www\.skv-mueritz\.de|https:\/\/[^"]*vvmv|https:\/\/mv\.sams-ticket|https:\/\/www\.volleyball-verband/g, ""))) {
+if (/href="https?:|src="https?:/.test(html.replace(/https:\/\/www\.skv-mueritz\.de|https:\/\/[^"]*vvmv|https:\/\/mv\.sams-ticket|https:\/\/www\.volleyball-verband|https:\/\/www\.bildung-mv\.de[^"]*|https:\/\/calendar\.google\.com[^"]*/g, ""))) {
   console.warn("⚠ Warnung: potenziell externe Ressource gefunden (bitte prüfen).");
 } else {
   console.log("✔ Keine externen Ressourcen – voll offline-tauglich (nur bewusste Verbands-/Vereinslinks).");

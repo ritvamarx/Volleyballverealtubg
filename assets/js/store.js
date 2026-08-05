@@ -7,7 +7,7 @@
 (function () {
   "use strict";
 
-  const KEY = "skv_vb_data_v4";
+  const KEY = "skv_vb_data_v5";
   const CLUB = "SKV Müritz";
   const WEBSITE = "https://www.skv-mueritz.de";
 
@@ -16,9 +16,9 @@
   const uid = (p) => `${p}_${Date.now().toString(36)}_${(_idc++).toString(36)}`;
 
   // Saison-Anker für die Seed-Daten
-  const SEASON = { year: 2025 };
+  const SEASON = { year: 2026 };
 
-  function seed() {
+  function seed(includeDemo) {
     // Abteilungen / Mannschaften des Vereins – Jungen-/Herrenbereich
     const departments = [
       dept("HER1", "Herren I", "Aktive", "m", "Landesliga MV", "Herren", "Michael Voß", "herren1@skv-mueritz.de", "Mi & Fr 19:30–21:30", "Sporthalle SKV, Halle 2"),
@@ -112,6 +112,19 @@
       ctpl("Fahrten & Aufsicht", "Einverständnis zur Mitfahrt in privaten PKW zu Auswärtsspielen und zur Aufsicht durch das Trainerteam während Fahrten und Spielen.", true),
       ctpl("Medizinische Notfallversorgung", "Einverständnis zur Veranlassung notwendiger ärztlicher Maßnahmen im Notfall, wenn die Eltern nicht erreichbar sind.", true),
       ctpl("Teilnahme Trainingslager", "Einverständnis zur Teilnahme am Trainingslager inkl. Übernachtung.", false),
+      ctpl("Teilnahme an der Erwachsenenliga",
+        "Hiermit erkläre ich mich damit einverstanden, dass mein Kind am Spiel- und Trainingsbetrieb der Erwachsenenmannschaften des SKV Müritz (z. B. Herren I, Landesliga/Verbandsliga Mecklenburg-Vorpommern) teilnimmt.\n\n" +
+        "Mir ist bekannt, dass:\n" +
+        "• mein Kind dabei gemeinsam mit erwachsenen Spielern trainiert und Wettkämpfe bestreitet,\n" +
+        "• die Teilnahme im Rahmen der Jugendschutzbestimmungen und der Spielordnung des Volleyball-Verbands Mecklenburg-Vorpommern (VVMV) erfolgt,\n" +
+        "• für den Einsatz in Erwachsenenmannschaften ggf. eine gesonderte Spielberechtigung/Doppelspielrecht beim Verband beantragt wird,\n" +
+        "• die Aufsicht während Training und Spielen durch das Trainerteam gewährleistet ist.\n\n" +
+        "Diese Zustimmung gilt für die laufende Saison und kann jederzeit schriftlich widerrufen werden.", false),
+      ctpl("Kontaktaufnahme & WhatsApp-Gruppe",
+        "Hiermit erkläre ich mich damit einverstanden, dass das Trainerteam des SKV Müritz mich in Angelegenheiten des Trainings- und Spielbetriebs kontaktiert (z. B. Terminänderungen, Fahrten, Rückmeldungen).\n\n" +
+        "Dazu gebe ich freiwillig meine E-Mail-Adresse und meine Mobilnummer an (Felder unten) und stimme zu, dass diese ausschließlich für die Vereinskommunikation gespeichert und genutzt werden.\n\n" +
+        "☐ Ich bin außerdem einverstanden, in die WhatsApp-Elterngruppe der Mannschaft aufgenommen zu werden. Mir ist bekannt, dass WhatsApp Daten außerhalb der EU verarbeiten kann und die Teilnahme freiwillig ist; alle wichtigen Informationen erhalte ich auf Wunsch alternativ per E-Mail.\n\n" +
+        "Diese Einwilligung kann jederzeit mit Wirkung für die Zukunft widerrufen werden.", true),
     ];
 
     // Kalender-Abos (iCal/RSS) für automatischen Termin-Import
@@ -198,6 +211,22 @@
       st("Waren Volleys", 12, 2, 10, 8, 31, 5),
     ];
 
+    // Schulfreie Tage in Mecklenburg-Vorpommern (editierbar; Angaben ohne Gewähr)
+    const holidays = [
+      hol("Sommerferien MV", "2026-07-13", "2026-08-21"),
+      hol("Herbstferien MV", "2026-10-05", "2026-10-14"),
+      hol("Tag der Deutschen Einheit", "2026-10-03", "2026-10-03"),
+      hol("Reformationstag", "2026-10-31", "2026-10-31"),
+      hol("Weihnachtsferien MV", "2026-12-21", "2027-01-02"),
+      hol("Winterferien MV", "2027-02-01", "2027-02-12"),
+      hol("Internationaler Frauentag", "2027-03-08", "2027-03-08"),
+      hol("Osterferien MV", "2027-03-22", "2027-03-31"),
+      hol("Tag der Arbeit", "2027-05-01", "2027-05-01"),
+      hol("Christi Himmelfahrt", "2027-05-06", "2027-05-06"),
+      hol("Pfingstferien MV", "2027-05-14", "2027-05-18"),
+      hol("Sommerferien MV", "2027-07-05", "2027-08-14"),
+    ];
+
     // Beispiel-Verbandsmeldung für die männliche U18
     const mu18Id = deptId("MU18");
     const mu18Players = players.filter((pl) => pl.departmentId === mu18Id);
@@ -212,11 +241,26 @@
         })), "gemeldet"),
     ];
 
+    // Struktur-Daten (Abteilungen, Vorlagen, Kleidung, Ferien) sind immer dabei –
+    // personen- und terminbezogene Beispieldaten nur im Demo-Modus.
     return {
       club: CLUB, website: "https://www.skv-mueritz.de", season: SEASON,
-      departments, players, events, responses, drivers, jobs, consents, consentTemplates,
-      calendarFeeds, finances, clothing, clothingRequests, sponsors, announcements,
-      tasks, inventory, standings, meldungen,
+      departments, consentTemplates, clothing, holidays,
+      players: includeDemo ? players : [],
+      events: includeDemo ? events : [],
+      responses: includeDemo ? responses : [],
+      drivers: includeDemo ? drivers : [],
+      jobs: includeDemo ? jobs : [],
+      consents: includeDemo ? consents : [],
+      calendarFeeds: includeDemo ? calendarFeeds : [],
+      finances: includeDemo ? finances : [],
+      clothingRequests: includeDemo ? clothingRequests : [],
+      sponsors: includeDemo ? sponsors : [],
+      announcements: includeDemo ? announcements : [],
+      tasks: includeDemo ? tasks : [],
+      inventory: includeDemo ? inventory : [],
+      standings: includeDemo ? standings : [],
+      meldungen: includeDemo ? meldungen : [],
     };
   }
 
@@ -260,6 +304,9 @@
   function feed(name, url, type, autoSync) {
     return { id: uid("cf"), name, url, type: type || "ical", autoSync: !!autoSync, lastSync: null, lastResult: "" };
   }
+  function hol(name, start, end) {
+    return { id: uid("ho"), name, start, end };
+  }
   function fin(type, description, amount, date, paid, playerId) {
     return { id: uid("fi"), type, description, amount, date, paid: !!paid, playerId: playerId || null };
   }
@@ -301,7 +348,8 @@
       const raw = localStorage.getItem(KEY);
       if (raw) return JSON.parse(raw);
     } catch (e) { /* ignore */ }
-    const s = seed();
+    // Erststart: OHNE Demodaten (leerer Verein mit Struktur)
+    const s = seed(false);
     persist(s);
     return s;
   }
@@ -312,7 +360,19 @@
 
   function resetDemo() {
     _idc = 1;
-    state = seed();
+    state = seed(true);
+    persist(state);
+    return state;
+  }
+  function resetEmpty() {
+    _idc = 1;
+    state = seed(false);
+    persist(state);
+    return state;
+  }
+  // Kompletten Datenbestand ersetzen (z. B. nach CSV-Import); unbekannte Felder bleiben erhalten
+  function replaceAll(obj) {
+    state = Object.assign({}, seed(false), obj);
     persist(state);
     return state;
   }
@@ -322,7 +382,7 @@
     CLUB, WEBSITE,
     get: () => state,
     save,
-    resetDemo,
+    resetDemo, resetEmpty, replaceAll,
     uid,
     // generische CRUD-Helfer für eine Collection
     add(coll, obj) { obj.id = obj.id || uid(coll.slice(0, 2)); state[coll].push(obj); save(); return obj; },

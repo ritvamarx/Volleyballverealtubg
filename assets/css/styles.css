@@ -311,6 +311,29 @@ textarea { resize: vertical; min-height: 72px; }
 .cal-daynum { font-size: .78rem; font-weight: 700; color: var(--text-soft); }
 .cal-ev { font-size: .7rem; padding: 2px 5px; border-radius: 5px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+/* Ferien / schulfreie Tage */
+.cal-cell.holiday { background: color-mix(in srgb, #f59e0b 10%, var(--surface)); border-color: color-mix(in srgb, #f59e0b 35%, var(--border)); }
+.hol-dot { font-size: .62rem; }
+
+/* Jahresansicht */
+.year-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+.mini-cal { border: 1px solid var(--border); border-radius: 10px; padding: 8px; cursor: pointer; background: var(--surface); }
+.mini-cal:hover { border-color: var(--accent); }
+.mini-title { font-size: .8rem; font-weight: 700; color: var(--primary-2); margin-bottom: 4px; }
+.mini-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; font-size: .62rem; text-align: center; }
+.mini-grid b { color: var(--muted); font-weight: 700; }
+.mini-grid span { position: relative; padding: 2px 0; border-radius: 4px; color: var(--text-soft); min-height: 15px; }
+.mini-grid span.mini-hol { background: color-mix(in srgb, #f59e0b 25%, transparent); }
+.mini-grid span.mini-today { outline: 1.5px solid var(--accent); font-weight: 800; color: var(--text); }
+.mini-dot { position: absolute; left: 50%; transform: translateX(-50%); bottom: -1px; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+
+/* Listenansicht Kalender */
+.list-month { font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .6px; color: var(--primary-2); margin: 14px 0 4px; }
+.list-month:first-child { margin-top: 0; }
+.cal-list-date { width: 44px; flex: 0 0 44px; text-align: center; display: flex; flex-direction: column; line-height: 1.1; }
+.cal-list-date strong { font-size: 1.05rem; }
+.cal-list-date span { font-size: .68rem; color: var(--muted); text-transform: uppercase; }
+
 .timeline { position: relative; padding-left: 18px; }
 .timeline::before { content: ""; position: absolute; left: 4px; top: 4px; bottom: 4px; width: 2px; background: var(--border); }
 .timeline .tl-item { position: relative; padding: 0 0 16px 10px; }
