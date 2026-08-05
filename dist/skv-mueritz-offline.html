@@ -1265,6 +1265,14 @@ textarea { resize: vertical; min-height: 72px; }
     if (/training|übung/.test(t)) return "training";
     if (/heim|home/.test(t)) return "home";
     if (/auswärts|auswaerts|away|@/.test(t)) return "away";
+    // Spielplan-Titel "Heim : Gast" (SAMS/Verband): Position des eigenen Vereins entscheidet
+    const OWN = /skv|müritz|mueritz/;
+    const sep = t.match(/\s+(?::|-|–|vs\.?|gegen)\s+/);
+    if (sep) {
+      const [left, right] = [t.slice(0, sep.index), t.slice(sep.index + sep[0].length)];
+      if (OWN.test(left) && !OWN.test(right)) return "home";
+      if (OWN.test(right) && !OWN.test(left)) return "away";
+    }
     return "other";
   }
   function normalizeImported(e) {
@@ -2035,10 +2043,13 @@ textarea { resize: vertical; min-height: 72px; }
         lastKey = key;
         const hol = holidayFor(d);
         return `${headRow}
-          <div class="list-item" data-ev="${e.id}" style="cursor:pointer">
-            <div class="cal-list-date"><strong>${d.getDate()}.</strong><span>${DOW[d.getDay()]}</span></div>
-            <div class="grow"><div class="title">${esc(e.title)} ${eventPill(e.type)} ${e.seriesId ? '<span class="badge">🔁 Serie</span>' : ""}${hol ? ' <span class="badge warn">🏖 schulfrei</span>' : ""}</div>
-            <div class="sub">${fmtTime(e.start)} Uhr · ${esc(e.location || "—")}</div></div></div>`;
+          <div class="list-item">
+            <div class="cal-list-date" data-ev="${e.id}" style="cursor:pointer"><strong>${d.getDate()}.</strong><span>${DOW[d.getDay()]}</span></div>
+            <div class="grow" data-ev="${e.id}" style="cursor:pointer"><div class="title">${esc(e.title)} ${e.seriesId ? '<span class="badge">🔁 Serie</span>' : ""}${hol ? ' <span class="badge warn">🏖 schulfrei</span>' : ""}</div>
+            <div class="sub">${fmtTime(e.start)} Uhr · ${esc(e.location || "—")}</div></div>
+            <select class="ev-type" data-evtype="${e.id}" title="Art des Termins ändern" style="width:auto;font-size:.78rem;padding:5px 6px">
+              ${Object.entries(typeLabel).map(([k, v]) => `<option value="${k}" ${k === e.type ? "selected" : ""}>${v}</option>`).join("")}
+            </select></div>`;
       }).join("");
       return `
         <div class="cal-head">
@@ -2148,6 +2159,10 @@ textarea { resize: vertical; min-height: 72px; }
       Store.remove("calendarFeeds", b.dataset.fdel); toast("Abo entfernt"); reload();
     }));
     $$("[data-ev]", el).forEach((n) => n.onclick = () => eventDetail(n.dataset.ev));
+    $$("[data-evtype]", el).forEach((sel) => sel.onchange = () => {
+      Store.update("events", sel.dataset.evtype, { type: sel.value, reGuessed: true });
+      toast("Termin-Art geändert", "good"); reload();
+    });
   }
 
   /* ---------- Termin-Import (iCal / Google Kalender / RSS) ---------- */
@@ -2710,13 +2725,22 @@ textarea { resize: vertical; min-height: 72px; }
         <div class="card-head"><h3>💌 Elternbriefe des Trainers</h3><span class="spacer"></span>
           <button class="btn sm" data-ladd>＋ Neuer Brief</button></div>
         <p class="soft" style="font-size:.88rem;margin-top:0">Briefe an die Eltern – frei bearbeitbar, mit
-        Rückmeldefrist, optional mit den aktuellen Heimspielterminen aus dem Kalender und Rückmeldeabschnitt.</p>
+        Rückmeldefrist, Terminen aus dem Kalender und Rückmeldeabschnitt.
+        📨 <strong>Serienbrief</strong>: ein personalisierter Brief pro Spieler (Daten werden automatisch eingesetzt).</p>
+        ${(() => {
+          const h = s.events.filter((e) => e.type === "home" && daysUntil(e.start) >= 0).length;
+          const a = s.events.filter((e) => e.type === "away" && daysUntil(e.start) >= 0).length;
+          return `<p class="soft" style="font-size:.82rem">📅 Aktuell werden <strong>${h} Heimspiele</strong> und <strong>${a} Auswärtsspiele</strong> aus dem
+            Kalender eingefügt.${(h + a) === 0 ? ` <span class="badge warn">Hinweis</span> Keine Spieltermine gefunden – importierte Termine ggf. in der
+            Kalender-<strong>Listenansicht</strong> per Auswahlfeld als Heim-/Auswärtsspiel einstufen.` : ""}</p>`;
+        })()}
         <div class="list">
           ${s.letters.map((l) => `
             <div class="list-item">
               <div class="grow"><div class="title">${esc(l.title)}</div>
                 <div class="sub">${l.deadline ? `⏰ Rückmeldung bis ${fmtDateShort(l.deadline)}` : "ohne Frist"} ·
-                  ${l.includeHomeGames ? "mit Heimspielterminen" : "ohne Termine"} · ${l.includeSlip ? "mit Rückmeldeabschnitt" : "ohne Abschnitt"}</div></div>
+                  ${l.includeHomeGames ? "mit Terminen" : "ohne Termine"} · ${l.includeSlip ? "mit Rückmeldeabschnitt" : "ohne Abschnitt"}</div></div>
+              <button class="btn sm outline" data-lserial="${l.id}" title="Serienbrief: ein Brief pro Spieler">📨 Serienbrief</button>
               <button class="btn sm ghost" data-lprint="${l.id}" title="Drucken">🖨️</button>
               <button class="btn sm ghost" data-ledit="${l.id}">✏️</button>
               <button class="btn sm ghost" data-ldel="${l.id}">🗑️</button>
@@ -2749,6 +2773,7 @@ textarea { resize: vertical; min-height: 72px; }
       confirmDialog(`Brief „${l.title}" löschen?`, () => { Store.remove("letters", l.id); toast("Brief gelöscht"); reload(); });
     });
     $$("[data-lprint]", el).forEach((b) => b.onclick = () => printParentLetter(Store.byId("letters", b.dataset.lprint)));
+    $$("[data-lserial]", el).forEach((b) => b.onclick = () => serialLetterModal(Store.byId("letters", b.dataset.lserial)));
   }
 
   function letterForm(l) {
@@ -2760,7 +2785,7 @@ textarea { resize: vertical; min-height: 72px; }
       body: `<form id="lf"><div class="form-grid">
         <div class="field"><label>Titel</label><input name="title" value="${esc(l.title)}" required placeholder="z. B. Elternbrief zum Saisonstart"></div>
         <div class="field"><label>⏰ Rückmeldefrist</label><input type="date" name="deadline" value="${esc(l.deadline)}"></div>
-        <div class="field full"><label>Brieftext <span class="soft" style="font-weight:400">(Absätze mit Leerzeile trennen; Zeilen mit „## " werden Überschriften)</span></label>
+        <div class="field full"><label>Brieftext <span class="soft" style="font-weight:400">(Absätze mit Leerzeile trennen; „## " = Überschrift; Platzhalter für Serienbrief: {vorname}, {nachname}, {eltern})</span></label>
           <textarea name="body" rows="14" required>${esc(l.body)}</textarea></div>
         <div class="field"><label><input type="checkbox" name="includeHomeGames" ${l.includeHomeGames ? "checked" : ""} style="width:auto"> Termine einfügen (Heim- & Auswärtsspiele je Datum zusammengefasst, Trainings-Hinweis donnerstags)</label></div>
         <div class="field"><label><input type="checkbox" name="includeSlip" ${l.includeSlip ? "checked" : ""} style="width:auto"> Rückmeldeabschnitt (E-Mail, Mobil, WhatsApp, Fahrer, Buffet) anhängen</label></div>
@@ -2842,8 +2867,9 @@ textarea { resize: vertical; min-height: 72px; }
     setTimeout(() => w.print(), 300);
   }
 
-  // Elternbrief drucken – nutzt den bearbeitbaren Brief (Titel, Text, Frist, Optionen)
-  function printParentLetter(l) {
+  // Elternbrief drucken – nutzt den bearbeitbaren Brief (Titel, Text, Frist, Optionen).
+  // playersList (optional): Serienbrief – ein personalisierter Brief pro Spieler
+  function printParentLetter(l, playersList) {
     l = l || S().letters[0];
     if (!l) { toast("Kein Brief vorhanden – bitte zuerst anlegen", "bad"); return; }
     // Termine je Datum zusammenfassen: ein Listeneintrag pro Datum
@@ -2868,19 +2894,56 @@ textarea { resize: vertical; min-height: 72px; }
       ${homeGames.length ? `<ul>${dateList(homeGames)}</ul>` : `<p><em>Die Heimspieltermine werden rechtzeitig bekannt gegeben bzw. hier ergänzt:</em></p>${blanks}`}
       <p style="margin-bottom:4px"><strong>Auswärtsspiele:</strong></p>
       ${awayGames.length ? `<ul>${dateList(awayGames)}</ul>` : `<p><em>Die Auswärtstermine werden rechtzeitig bekannt gegeben bzw. hier ergänzt:</em></p>${blanks}`}`;
+    // Platzhalter {vorname} {nachname} {eltern} ersetzen (Serienbrief: je Spieler)
+    const fill = (text, pl2) => String(text || "")
+      .replace(/\{vorname\}/gi, pl2 ? pl2.firstName : "…")
+      .replace(/\{nachname\}/gi, pl2 ? pl2.lastName : "…")
+      .replace(/\{eltern\}/gi, pl2 ? ([pl2.parentName, pl2.parent2Name].filter(Boolean).join(" und ") || "Eltern") : "Eltern");
     // Brieftext: Leerzeilen = Absätze, "## " am Zeilenanfang = Überschrift
-    const bodyHTML = String(l.body || "").split(/\n{2,}/).map((block) => {
+    const toBodyHTML = (pl2) => fill(l.body, pl2).split(/\n{2,}/).map((block) => {
       const lines = block.split("\n");
       return lines.map((line) =>
         line.startsWith("## ") ? `<h2>${esc(line.slice(3))}</h2>` : line.trim() === "" ? "" : `<span>${esc(line)} </span>`
       ).join("");
     }).map((b) => b.startsWith("<h2>") ? b : `<p>${b}</p>`).join("");
     const deadlineTxt = l.deadline ? `bitte bis zum <strong>${fmtDate(l.deadline)}</strong> zurückgeben` : "bitte bis zum nächsten Training zurückgeben";
+
+    // Ein Brief (ggf. personalisiert für einen Spieler)
+    const oneLetter = (pl2) => {
+      const parents = pl2 ? [pl2.parentName, pl2.parent2Name].filter(Boolean).join(" und ") : "";
+      const bestEmail = pl2 ? (pl2.parentEmail || pl2.playerEmail || "") : "";
+      const bestPhone = pl2 ? (pl2.parentPhone || pl2.playerPhone || "") : "";
+      const pref = (val, filled) => filled ? `<div class="line">${val} <strong>${esc(filled)}</strong></div>` : `<div class="line">${val}</div>`;
+      return `
+      <h1>🏐 SKV Müritz – Abteilung Volleyball</h1>
+      <div class="sub">www.skv-mueritz.de · ${esc(l.title || "Elternbrief zur Saison")}${l.deadline ? ` · Rückmeldung bis ${fmtDateShort(l.deadline)}` : ""}</div>
+      ${pl2 ? `<div class="addr">An die Eltern von <strong>${esc(pl2.firstName)} ${esc(pl2.lastName)}</strong>${parents ? ` – ${esc(parents)}` : ""}${pl2.departmentId ? ` · ${esc(deptName(pl2.departmentId))}` : ""}</div>` : ""}
+      <div style="margin-top:22px">${toBodyHTML(pl2)}</div>
+      ${gamesHTML}
+      <p>Mit sportlichen Grüßen<br><br>_______________________________<br>Trainer, SKV Müritz Volleyball</p>
+      ${l.includeSlip ? `
+      <div class="cut"></div>
+      <div class="slip">
+        <strong>Rückmeldung an den Trainer</strong> (${deadlineTxt})
+        ${pref("Name des Kindes:", pl2 ? `${pl2.firstName} ${pl2.lastName}` : "")}
+        ${pref("Name Erziehungsberechtigte/r:", parents)}
+        ${pref("E-Mail-Adresse:", bestEmail)}
+        ${pref("Mobilnummer:", bestPhone)}
+        <div class="chk">☐ Ich stimme zu, dass der Trainer mich über E-Mail/Telefon kontaktiert.</div>
+        <div class="chk">☐ Ich möchte in die WhatsApp-Elterngruppe aufgenommen werden.</div>
+        <div class="chk">☐ Ich stehe grundsätzlich als Fahrer/in für Auswärtsspiele zur Verfügung (Plätze: ____ )</div>
+        <div class="chk">☐ Ich helfe beim Heimspiel-Buffet (Salat / Brötchen / Kuchen / Getränke – Zutreffendes bitte einkreisen)</div>
+        <div class="sign"><div>Ort, Datum</div><div>Unterschrift Erziehungsberechtigte/r</div></div>
+      </div>` : ""}`;
+    };
+
+    const list = Array.isArray(playersList) && playersList.length ? playersList : [null];
     const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>${esc(l.title || "Elternbrief SKV Müritz")}</title>
       <style>
         body{font-family:Georgia,'Times New Roman',serif;color:#111;margin:44px auto;max-width:720px;line-height:1.55;font-size:14.5px}
         h1{font-size:21px;font-family:Arial,sans-serif;color:#1e3a8a;margin-bottom:0}
         .sub{color:#666;font-family:Arial,sans-serif;font-size:12px;margin-top:2px}
+        .addr{font-family:Arial,sans-serif;font-size:13px;margin-top:16px;padding:8px 12px;border:1px solid #ccc;border-radius:6px;background:#f8f8f8}
         h2{font-size:15px;font-family:Arial,sans-serif;color:#1e3a8a;margin:22px 0 6px}
         ul{margin:6px 0;padding-left:22px}
         .cut{border-top:2px dashed #666;margin:30px 0 14px;position:relative}
@@ -2889,34 +2952,62 @@ textarea { resize: vertical; min-height: 72px; }
         .slip .line{border-bottom:1px solid #333;margin:16px 0 4px;padding-bottom:2px}
         .chk{margin:8px 0}
         .sign{margin-top:34px;display:flex;gap:50px}.sign div{border-top:1px solid #333;padding-top:4px;font-size:11.5px;flex:1;font-family:Arial,sans-serif}
+        .pagebreak{page-break-after:always}
         @media print { body{margin:12mm} }
       </style></head><body>
-      <h1>🏐 SKV Müritz – Abteilung Volleyball</h1>
-      <div class="sub">www.skv-mueritz.de · ${esc(l.title || "Elternbrief zur Saison")}${l.deadline ? ` · Rückmeldung bis ${fmtDateShort(l.deadline)}` : ""}</div>
-
-      <div style="margin-top:22px">${bodyHTML}</div>
-      ${gamesHTML}
-      <p>Mit sportlichen Grüßen<br><br>_______________________________<br>Trainer, SKV Müritz Volleyball</p>
-
-      ${l.includeSlip ? `
-      <div class="cut"></div>
-      <div class="slip">
-        <strong>Rückmeldung an den Trainer</strong> (${deadlineTxt})
-        <div class="line">Name des Kindes:</div>
-        <div class="line">Name Erziehungsberechtigte/r:</div>
-        <div class="line">E-Mail-Adresse:</div>
-        <div class="line">Mobilnummer:</div>
-        <div class="chk">☐ Ich stimme zu, dass der Trainer mich über E-Mail/Telefon kontaktiert.</div>
-        <div class="chk">☐ Ich möchte in die WhatsApp-Elterngruppe aufgenommen werden.</div>
-        <div class="chk">☐ Ich stehe grundsätzlich als Fahrer/in für Auswärtsspiele zur Verfügung (Plätze: ____ )</div>
-        <div class="chk">☐ Ich helfe beim Heimspiel-Buffet (Salat / Brötchen / Kuchen / Getränke – Zutreffendes bitte einkreisen)</div>
-        <div class="sign"><div>Ort, Datum</div><div>Unterschrift Erziehungsberechtigte/r</div></div>
-      </div>` : ""}
+      ${list.map((pl2, i) => oneLetter(pl2) + (i < list.length - 1 ? '<div class="pagebreak"></div>' : "")).join("")}
       </body></html>`;
     const w = window.open("", "_blank");
     if (!w) { toast("Bitte Pop-ups erlauben, um zu drucken", "bad"); return; }
     w.document.write(html); w.document.close(); w.focus();
     setTimeout(() => w.print(), 300);
+  }
+
+  // Serienbrief: Spieler auswählen, ein personalisierter Brief pro Spieler
+  function serialLetterModal(l) {
+    const s = S();
+    const active = s.players.filter((p) => p.membershipStatus !== "inaktiv")
+      .sort((a, b) => a.lastName.localeCompare(b.lastName));
+    if (!active.length) { toast("Keine aktiven Spieler vorhanden", "bad"); return; }
+    modal({
+      title: `Serienbrief – ${esc(l.title)}`,
+      body: `
+        <p class="soft" style="margin-top:0;font-size:.85rem">Ein personalisierter Brief pro Spieler: Anschrift,
+        Rückmeldeabschnitt mit Name, Eltern, E-Mail und Mobilnummer werden automatisch ausgefüllt.
+        Im Brieftext funktionieren die Platzhalter <code>{vorname}</code>, <code>{nachname}</code>, <code>{eltern}</code>.</p>
+        <div class="field mb"><label>Abteilung</label><select id="slDept">
+          <option value="">alle Abteilungen</option>
+          ${s.departments.map((d) => `<option value="${d.id}">${esc(d.name)}</option>`).join("")}</select></div>
+        <div class="list" id="slList" style="max-height:300px;overflow-y:auto">
+          ${active.map((p) => `
+            <label class="list-item" data-dept="${esc(p.departmentId || "")}" style="cursor:pointer;padding:8px 10px">
+              <input type="checkbox" data-slp="${p.id}" checked style="width:auto">
+              <div class="grow"><div class="title" style="font-size:.88rem">${esc(p.firstName)} ${esc(p.lastName)}</div>
+              <div class="sub">${esc(deptName(p.departmentId))} · ${esc(p.parentName || "ohne Elternkontakt")}</div></div>
+            </label>`).join("")}
+        </div>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>🖨️ Serienbrief drucken</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("#slDept").onchange = (ev) => {
+          const dep = ev.target.value;
+          m.querySelectorAll("#slList label").forEach((row) => {
+            const match = !dep || row.dataset.dept === dep;
+            row.style.display = match ? "" : "none";
+            row.querySelector("input").checked = match;
+          });
+        };
+        m.querySelector("[data-s]").onclick = () => {
+          const ids = Array.from(m.querySelectorAll("[data-slp]:checked"))
+            .filter((c) => c.closest("label").style.display !== "none")
+            .map((c) => c.dataset.slp);
+          if (!ids.length) { toast("Keine Spieler ausgewählt", "bad"); return; }
+          closeModal();
+          printParentLetter(l, ids.map((id) => Store.byId("players", id)).filter(Boolean));
+          toast(`Serienbrief mit ${ids.length} Briefen erstellt`, "good");
+        };
+      },
+    });
   }
 
   function consentTemplateForm(t) {
@@ -4056,6 +4147,20 @@ textarea { resize: vertical; min-height: 72px; }
       $("#overlay").classList.toggle("show");
     };
     $("#overlay").addEventListener("click", () => { $("#sidebar").classList.remove("open"); });
+
+    // Bereits importierte Termine mit Art "Sonstiges" einmalig neu klassifizieren
+    // (verbesserte Erkennung von "Heim : Gast"-Spielplan-Titeln)
+    if (window.IO) {
+      let reclassified = 0;
+      Store.get().events.forEach((e) => {
+        if (e.sourceUid && e.type === "other" && !e.reGuessed) {
+          const t = IO.guessType(e.title);
+          Store.update("events", e.id, { type: t, reGuessed: true });
+          if (t !== "other") reclassified++;
+        }
+      });
+      if (reclassified) U.toast(`${reclassified} importierte Termine als Heim-/Auswärtsspiel erkannt`, "good");
+    }
 
     // Ferien-Abo MV: automatisch aktualisieren (still, höchstens einmal pro Tag)
     if (window.IO && navigator.onLine !== false) {

@@ -120,6 +120,20 @@
     };
     $("#overlay").addEventListener("click", () => { $("#sidebar").classList.remove("open"); });
 
+    // Bereits importierte Termine mit Art "Sonstiges" einmalig neu klassifizieren
+    // (verbesserte Erkennung von "Heim : Gast"-Spielplan-Titeln)
+    if (window.IO) {
+      let reclassified = 0;
+      Store.get().events.forEach((e) => {
+        if (e.sourceUid && e.type === "other" && !e.reGuessed) {
+          const t = IO.guessType(e.title);
+          Store.update("events", e.id, { type: t, reGuessed: true });
+          if (t !== "other") reclassified++;
+        }
+      });
+      if (reclassified) U.toast(`${reclassified} importierte Termine als Heim-/Auswärtsspiel erkannt`, "good");
+    }
+
     // Ferien-Abo MV: automatisch aktualisieren (still, höchstens einmal pro Tag)
     if (window.IO && navigator.onLine !== false) {
       const HK = "skv_holidays_synced";

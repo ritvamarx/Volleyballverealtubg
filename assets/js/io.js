@@ -155,6 +155,14 @@
     if (/training|übung/.test(t)) return "training";
     if (/heim|home/.test(t)) return "home";
     if (/auswärts|auswaerts|away|@/.test(t)) return "away";
+    // Spielplan-Titel "Heim : Gast" (SAMS/Verband): Position des eigenen Vereins entscheidet
+    const OWN = /skv|müritz|mueritz/;
+    const sep = t.match(/\s+(?::|-|–|vs\.?|gegen)\s+/);
+    if (sep) {
+      const [left, right] = [t.slice(0, sep.index), t.slice(sep.index + sep[0].length)];
+      if (OWN.test(left) && !OWN.test(right)) return "home";
+      if (OWN.test(right) && !OWN.test(left)) return "away";
+    }
     return "other";
   }
   function normalizeImported(e) {
