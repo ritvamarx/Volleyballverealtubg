@@ -120,6 +120,19 @@
     };
     $("#overlay").addEventListener("click", () => { $("#sidebar").classList.remove("open"); });
 
+    // Ferien-Abo MV: automatisch aktualisieren (still, höchstens einmal pro Tag)
+    if (window.IO && navigator.onLine !== false) {
+      const HK = "skv_holidays_synced";
+      const todayKey = new Date().toISOString().slice(0, 10);
+      let last = null; try { last = localStorage.getItem(HK); } catch (e) {}
+      if (last !== todayKey) {
+        IO.syncHolidaysMV().then(() => {
+          try { localStorage.setItem(HK, todayKey); } catch (e) {}
+          App.reload();
+        }).catch(() => { /* offline/CORS – Seed-Termine bleiben */ });
+      }
+    }
+
     // Kalender-Abos automatisch synchronisieren (still im Hintergrund)
     if (window.IO && navigator.onLine !== false) {
       IO.syncAllFeeds().then((r) => {

@@ -211,20 +211,61 @@
       st("Waren Volleys", 12, 2, 10, 8, 31, 5),
     ];
 
-    // Schulfreie Tage in Mecklenburg-Vorpommern (editierbar; Angaben ohne Gewähr)
+    // Schulfreie Tage in Mecklenburg-Vorpommern (Stand: offizielle Ferientermine
+    // Bildungsministerium MV; werden per Ferien-Abo automatisch aktualisiert)
     const holidays = [
-      hol("Sommerferien MV", "2026-07-13", "2026-08-21"),
-      hol("Herbstferien MV", "2026-10-05", "2026-10-14"),
+      hol("Sommerferien MV", "2026-07-13", "2026-08-22"),
       hol("Tag der Deutschen Einheit", "2026-10-03", "2026-10-03"),
+      hol("Herbstferien MV", "2026-10-15", "2026-10-24"),
       hol("Reformationstag", "2026-10-31", "2026-10-31"),
       hol("Weihnachtsferien MV", "2026-12-21", "2027-01-02"),
-      hol("Winterferien MV", "2027-02-01", "2027-02-12"),
+      hol("Winterferien MV", "2027-02-08", "2027-02-19"),
       hol("Internationaler Frauentag", "2027-03-08", "2027-03-08"),
       hol("Osterferien MV", "2027-03-22", "2027-03-31"),
       hol("Tag der Arbeit", "2027-05-01", "2027-05-01"),
       hol("Christi Himmelfahrt", "2027-05-06", "2027-05-06"),
+      hol("Pfingstferien MV", "2027-05-07", "2027-05-07"),
       hol("Pfingstferien MV", "2027-05-14", "2027-05-18"),
-      hol("Sommerferien MV", "2027-07-05", "2027-08-14"),
+      hol("Sommerferien MV", "2027-07-12", "2027-08-28"),
+      hol("Herbstferien MV", "2027-10-18", "2027-10-29"),
+      hol("Weihnachtsferien MV", "2027-12-20", "2028-01-03"),
+    ];
+
+    // Bearbeitbare Link-Sammlung (Übersicht & Verbandsseite)
+    const links = [
+      lnk("🏠", "Vereinswebsite SKV Müritz", "Offizielle Seite des Vereins", WEBSITE),
+      lnk("🏐", "Volleyball-Verband MV (VVMV)", "Startseite des Landesverbands", "https://www.vvmv.de/"),
+      lnk("📊", "Ligen & Tabellen", "Aktuelle Tabellen im SAMS-Spielbetrieb", "https://mv.sams-ticket.de/public/ranking.html"),
+      lnk("📅", "Spielplan & Termine", "Ansetzungen der Verbandsliga", "https://mv.sams-ticket.de/public/schedule.html"),
+      lnk("📋", "Spielbetrieb / Meldung", "Infos zum Spielbetrieb des VVMV", "https://www.vvmv.de/spielbetrieb/"),
+      lnk("⚖️", "Regeln & Ordnungen", "Spielordnung und Regelwerk", "https://www.volleyball-verband.de/regelwerk"),
+      lnk("🧑‍⚖️", "Schiedsrichterwesen", "Ansetzungen & Ausbildung", "https://www.vvmv.de/schiedsrichter/"),
+      lnk("🏖", "Ferientermine MV (offiziell)", "Bildungsserver Mecklenburg-Vorpommern", "https://www.bildung-mv.de/schueler/ferien/"),
+    ];
+
+    // Elternbriefe des Trainers (bearbeitbar, mehrere möglich)
+    const letters = [
+      letter("Elternbrief zum Saisonstart",
+        "Liebe Eltern,\n\n" +
+        "ein neues Volleyball-Jahr liegt vor uns – und ich freue mich riesig, Ihre Kinder dabei zu begleiten! " +
+        "Unsere Mannschaft trainiert mit großem Einsatz, wächst als Team zusammen und wird in dieser Saison auch in der Erwachsenenliga wertvolle Erfahrungen sammeln. " +
+        "Damit das gelingt, brauchen wir Sie: Ohne die Unterstützung der Eltern ist Jugendsport im Verein nicht möglich. " +
+        "Vieles davon kostet wenig Zeit, bewirkt aber sehr viel – und ganz nebenbei erleben Sie Ihr Kind dort, wo es über sich hinauswächst.\n\n" +
+        "## 🚗 Fahrten zu Auswärtsspielen\n" +
+        "Zu Auswärtsspielen fahren wir wann immer möglich mit dem Vereinsbus – ich fahre als Trainer immer selbst mit. " +
+        "Wenn die Plätze im Bus nicht ausreichen, bin ich auf einzelne Eltern angewiesen, die mit dem eigenen PKW einige Spieler mitnehmen. " +
+        "Bitte geben Sie unten an, ob Sie grundsätzlich als Fahrer/in zur Verfügung stehen – die konkrete Abstimmung erfolgt rechtzeitig vor jedem Spiel.\n\n" +
+        "## 🥗 Heimspiele: kleines Buffet\n" +
+        "Bei Heimspielen ist es guter Brauch, dass die gastgebende Mannschaft für beide Teams ein kleines Buffet organisiert: Salat, belegte Brötchen, Kuchen und Getränke. " +
+        "Das übernehmen die Eltern der Heimmannschaft gemeinsam – wenn jede Familie einmal pro Saison etwas beisteuert, ist es für alle leicht zu stemmen. " +
+        "Zusätzlich sollten pro Heimspiel zwei Elternteile anwesend sein, die den Stand betreuen. " +
+        "Bitte tragen Sie sich dafür in die Listen ein, die ich vor jedem Heimspiel herumgebe.\n\n" +
+        "## 📱 Kommunikation\n" +
+        "Damit Informationen zu Training, Spielen und Fahrten Sie schnell erreichen, möchte ich Sie gern direkt kontaktieren können und organisiere die Eltern in einer WhatsApp-Gruppe. " +
+        "Bitte geben Sie dazu unten Ihre E-Mail-Adresse und Mobilnummer an. Die Daten werden ausschließlich für die Vereinskommunikation genutzt; " +
+        "die Teilnahme an der WhatsApp-Gruppe ist freiwillig – wichtige Informationen erhalten Sie auf Wunsch auch per E-Mail.\n\n" +
+        "Ich freue mich auf eine tolle Saison mit Ihren Kindern – und auf Sie am Spielfeldrand!",
+        "", true, true),
     ];
 
     // Beispiel-Verbandsmeldung für die männliche U18
@@ -245,7 +286,7 @@
     // personen- und terminbezogene Beispieldaten nur im Demo-Modus.
     return {
       club: CLUB, website: "https://www.skv-mueritz.de", season: SEASON,
-      departments, consentTemplates, clothing, holidays,
+      departments, consentTemplates, clothing, holidays, letters, links,
       players: includeDemo ? players : [],
       events: includeDemo ? events : [],
       responses: includeDemo ? responses : [],
@@ -304,8 +345,16 @@
   function feed(name, url, type, autoSync) {
     return { id: uid("cf"), name, url, type: type || "ical", autoSync: !!autoSync, lastSync: null, lastResult: "" };
   }
+  function lnk(icon, title, sub, url) {
+    return { id: uid("lk"), icon, title, sub, url };
+  }
+  function letter(title, body, deadline, includeHomeGames, includeSlip) {
+    return { id: uid("le"), title, body, deadline: deadline || "", includeHomeGames: !!includeHomeGames, includeSlip: !!includeSlip, createdAt: new Date().toISOString() };
+  }
   function hol(name, start, end) {
-    return { id: uid("ho"), name, start, end };
+    // src "auto": stammt aus Seed/Ferien-Abo und wird beim Sync ersetzt;
+    // manuell angelegte Einträge haben kein src und bleiben erhalten
+    return { id: uid("ho"), name, start, end, src: "auto" };
   }
   function fin(type, description, amount, date, paid, playerId) {
     return { id: uid("fi"), type, description, amount, date, paid: !!paid, playerId: playerId || null };

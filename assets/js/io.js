@@ -190,6 +190,55 @@
     return added;
   }
 
+  // ---------- Ferien-Abo: Schulferien & Feiertage Mecklenburg-Vorpommern ----------
+  // Primärquelle: OpenHolidays API (offene Daten, CORS-freigegeben, speist sich aus
+  // den offiziellen Terminen). Fallback: ferien-api.de. Ersetzt nur automatisch
+  // verwaltete Einträge (src === "auto"); manuell angelegte bleiben erhalten.
+  async function syncHolidaysMV() {
+    const today = new Date();
+    const from = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+    const to = new Date(today.getFullYear() + 1, 11, 31);
+    const iso = (d) => d.toISOString().slice(0, 10);
+    let entries = [];
+    // 1) OpenHolidays API: Schulferien + gesetzliche Feiertage
+    try {
+      const base = "https://openholidaysapi.org";
+      const q = `countryIsoCode=DE&subdivisionCode=DE-MV&languageIsoCode=DE&validFrom=${iso(from)}&validTo=${iso(to)}`;
+      const [school, pub] = await Promise.all([
+        fetch(`${base}/SchoolHolidays?${q}`).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }),
+        fetch(`${base}/PublicHolidays?${q}`).then((r) => r.ok ? r.json() : []),
+      ]);
+      const nameOf = (h) => {
+        const n = Array.isArray(h.name) ? (h.name.find((x) => x.language === "DE") || h.name[0]) : null;
+        return (n && n.text) || "Schulfrei";
+      };
+      entries = [].concat(school || [], pub || []).map((h) => ({
+        name: nameOf(h), start: h.startDate, end: h.endDate || h.startDate, src: "auto",
+      }));
+    } catch (e1) {
+      // 2) Fallback: ferien-api.de (nur Schulferien)
+      const all = await fetch("https://ferien-api.de/api/v1/holidays/MV")
+        .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+      entries = (all || [])
+        .filter((h) => h.start && h.start.slice(0, 10) >= iso(from) && h.start.slice(0, 10) <= iso(to))
+        .map((h) => ({
+          name: (h.name || "ferien").replace(/^\w/, (c) => c.toUpperCase()) + " MV",
+          start: h.start.slice(0, 10), end: (h.end || h.start).slice(0, 10), src: "auto",
+        }));
+    }
+    if (!entries.length) throw new Error("Keine Ferientermine erhalten");
+    // src="auto"-Einträge ersetzen, manuelle behalten
+    const manual = Store.get().holidays.filter((h) => h.src !== "auto");
+    const seen = new Set();
+    const fresh = entries.filter((h) => {
+      const k = `${h.name}|${h.start}`;
+      if (seen.has(k)) return false; seen.add(k); return true;
+    }).map((h) => Object.assign({ id: Store.uid("ho") }, h));
+    Store.get().holidays = manual.concat(fresh).sort((a, b) => a.start.localeCompare(b.start));
+    Store.save();
+    return { count: fresh.length };
+  }
+
   // Alle Abos mit autoSync durchsynchronisieren (still). Gibt {added, errors}
   async function syncAllFeeds() {
     const feeds = Store.get().calendarFeeds.filter((f) => f.autoSync && f.url);
@@ -205,7 +254,7 @@
   // Format: Abschnitte, eingeleitet mit  #TABELLE;<name>  gefolgt von normaler CSV.
   const BACKUP_COLLECTIONS = ["departments", "players", "events", "responses", "drivers", "jobs",
     "consents", "consentTemplates", "calendarFeeds", "finances", "clothing", "clothingRequests",
-    "sponsors", "announcements", "tasks", "inventory", "standings", "meldungen", "holidays"];
+    "sponsors", "announcements", "tasks", "inventory", "standings", "meldungen", "holidays", "letters", "links"];
   const NUM_FIELDS = new Set(["amount", "seats", "qty", "price", "count", "target", "jerseyNumber",
     "games", "win", "loss", "setsW", "setsL", "points", "contribution"]);
   const BOOL_FIELDS = new Set(["paid", "done", "consentOnFile", "required", "autoSync", "active"]);
@@ -270,6 +319,6 @@
   window.IO = {
     download, pickFile, toCSV, parseCSV, toVCard,
     parseICS, parseFeed, fetchText, parseByType, mergeEvents, syncAllFeeds,
-    guessType, exportAllCSV, importAllCSV, BACKUP_COLLECTIONS,
+    guessType, exportAllCSV, importAllCSV, BACKUP_COLLECTIONS, syncHolidaysMV,
   };
 })();

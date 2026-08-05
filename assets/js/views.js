@@ -35,6 +35,52 @@
     const d = Store.byId("departments", id);
     return d ? d.name : "—";
   }
+
+  // ---- Bearbeitbare Link-Sammlung (Übersicht + Verbandsseite) ----
+  function linkListHTML() {
+    return S().links.map((lk) => `
+      <div class="flex" style="gap:0">
+        <a class="link-card grow" href="${esc(lk.url)}" target="_blank" rel="noopener" style="border-radius:12px 0 0 12px;border-right:none">
+          <span class="ic">${esc(lk.icon || "🔗")}</span>
+          <div class="grow"><div class="title">${esc(lk.title)}</div><div class="sub">${esc(lk.sub || "")}</div></div>
+          <span class="arr">↗</span></a>
+        <div style="display:flex;flex-direction:column;border:1px solid var(--border);border-left:none;border-radius:0 12px 12px 0;overflow:hidden">
+          <button class="btn sm ghost" data-lkedit="${lk.id}" style="border-radius:0">✏️</button>
+          <button class="btn sm ghost" data-lkdel="${lk.id}" style="border-radius:0">🗑️</button>
+        </div>
+      </div>`).join("") || empty("🔗", "Noch keine Links – jetzt anlegen");
+  }
+  function bindLinkActions(el) {
+    $$("[data-lkadd]", el).forEach((b) => b.onclick = () => linkForm());
+    $$("[data-lkedit]", el).forEach((b) => b.onclick = () => linkForm(Store.byId("links", b.dataset.lkedit)));
+    $$("[data-lkdel]", el).forEach((b) => b.onclick = () => {
+      const lk = Store.byId("links", b.dataset.lkdel);
+      confirmDialog(`Link „${lk.title}" löschen?`, () => { Store.remove("links", lk.id); toast("Link gelöscht"); reload(); });
+    });
+  }
+  function linkForm(lk) {
+    const isEdit = !!lk;
+    lk = lk || { icon: "🔗", title: "", sub: "", url: "https://" };
+    modal({
+      title: isEdit ? "Link bearbeiten" : "Neuer Link",
+      body: `<form id="lkf"><div class="form-grid">
+        <div class="field"><label>Symbol (Emoji)</label><input name="icon" value="${esc(lk.icon)}" maxlength="4"></div>
+        <div class="field"><label>Titel</label><input name="title" value="${esc(lk.title)}" required></div>
+        <div class="field full"><label>Beschreibung</label><input name="sub" value="${esc(lk.sub)}"></div>
+        <div class="field full"><label>URL</label><input type="url" name="url" value="${esc(lk.url)}" required placeholder="https://"></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#lkf"); if (!f.reportValidity()) return;
+          const d = formData(f);
+          if (isEdit) Store.update("links", lk.id, d); else Store.add("links", d);
+          closeModal(); toast("Link gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
   function jahrgang(birthDate) { return birthDate ? new Date(birthDate).getFullYear() : "—"; }
   const genderLabel = { w: "weiblich", m: "männlich", mix: "gemischt" };
   const typeLabel = { training: "Training", home: "Heimspiel", away: "Auswärtsspiel", other: "Termin" };
@@ -124,12 +170,19 @@
             <a class="list-item" href="#/finances"><div class="grow"><div class="title">${openFees.length} offene Beiträge</div><div class="sub">Zahlungen prüfen</div></div><span class="arr">›</span></a>
           </div>
         </div>
+      </div>
+
+      <div class="card mt">
+        <div class="card-head"><h3>🔗 Links</h3><span class="spacer"></span>
+          <button class="btn sm outline" data-lkadd>＋ Link</button></div>
+        <div class="grid grid-2">${linkListHTML()}</div>
       </div>`;
 
     $$("[data-task]", el).forEach((cb) => cb.addEventListener("change", () => {
       Store.update("tasks", cb.dataset.task, { done: true });
       toast("Aufgabe erledigt", "good"); reload();
     }));
+    bindLinkActions(el);
   }
   function prioBadge(p) {
     const m = { hoch: "bad", mittel: "warn", niedrig: "" };
@@ -585,6 +638,7 @@
           </div>
           <div class="card">
             <div class="card-head"><h3>🏖 Schulfrei (MV)</h3><span class="spacer"></span>
+              <button class="btn sm outline" data-hsync title="Ferien-Abo: jetzt aktualisieren">↻</button>
               <button class="btn sm outline" data-hadd>＋</button></div>
             <div class="list" style="max-height:280px;overflow-y:auto">
               ${hols.length ? hols.map((h) => `
@@ -595,8 +649,9 @@
                   <button class="btn sm ghost" data-hdel="${h.id}">🗑️</button>
                 </div>`).join("") : `<div class="muted" style="font-size:.85rem">Keine Einträge</div>`}
             </div>
-            <p class="muted" style="font-size:.74rem;margin:8px 0 0">Ferien & Feiertage Mecklenburg-Vorpommern – Angaben ohne Gewähr, bitte prüfen:
-            <a href="https://www.bildung-mv.de/schueler/ferien/" target="_blank" rel="noopener">Bildungsserver MV ↗</a></p>
+            <p class="muted" style="font-size:.74rem;margin:8px 0 0">📡 <strong>Ferien-Abo:</strong> aktualisiert sich automatisch beim App-Start
+            über die OpenHolidays-API (offizielle Ferientermine MV) – oder per ↻. Eigene Einträge bleiben erhalten.
+            Offizielle Quelle: <a href="https://www.bildung-mv.de/schueler/ferien/" target="_blank" rel="noopener">Bildungsserver MV ↗</a></p>
           </div>
         </div>
       </div>`;
@@ -611,6 +666,15 @@
       calendar._month = new Date(y, +mc.dataset.month, 1).toISOString();
       calendar._mode = "month"; reload();
     });
+    $("[data-hsync]", el).onclick = async () => {
+      toast("Ferientermine werden abgerufen …");
+      try {
+        const r = await IO.syncHolidaysMV();
+        toast(`✓ ${r.count} Ferien-/Feiertagseinträge aktualisiert`, "good"); reload();
+      } catch (err) {
+        toast("Abruf fehlgeschlagen (offline?) – vorhandene Termine bleiben", "bad");
+      }
+    };
     $("[data-hadd]", el).onclick = () => holidayForm();
     $$("[data-hedit]", el).forEach((b) => b.onclick = () => holidayForm(Store.byId("holidays", b.dataset.hedit)));
     $$("[data-hdel]", el).forEach((b) => b.onclick = () => confirmDialog("Eintrag löschen?", () => {
@@ -1183,12 +1247,30 @@
       </div>
 
       <div class="card mt">
-        <div class="card-head"><h3>💌 Elternbrief des Trainers</h3><span class="spacer"></span>
-          <button class="btn sm" data-letter>🖨️ Brief drucken / PDF</button></div>
-        <p class="soft" style="font-size:.88rem;margin-top:0">Motivierender Brief an alle Eltern zum Saisonstart:
-        Erwartungen (Fahrten zu Auswärtsspielen, Heimspiel-Buffet mit 2 anwesenden Elternteilen),
-        die <strong>aktuellen Heimspieltermine aus dem Kalender</strong>, Zustimmung zur Kontaktaufnahme
-        (E-Mail & Mobilnummer) und zur WhatsApp-Gruppe – inklusive Rückmeldeabschnitt zum Abtrennen.</p>
+        <div class="card-head"><h3>📑 Sammeldokument Pflicht-Erklärungen</h3><span class="spacer"></span>
+          <button class="btn sm" data-collective>🖨️ Drucken / PDF</button></div>
+        <p class="soft" style="font-size:.88rem;margin-top:0">Zum Saisonstart: <strong>alle Pflicht-Formulare in
+        einem Dokument</strong> (${s.consentTemplates.filter((t) => t.required).length} Erklärungen). Der Spieler trägt seine Daten
+        <strong>nur einmal</strong> ein, die Eltern unterschreiben <strong>nur einmal</strong> für alle Erklärungen –
+        jede Erklärung wird einzeln angekreuzt.</p>
+      </div>
+
+      <div class="card mt">
+        <div class="card-head"><h3>💌 Elternbriefe des Trainers</h3><span class="spacer"></span>
+          <button class="btn sm" data-ladd>＋ Neuer Brief</button></div>
+        <p class="soft" style="font-size:.88rem;margin-top:0">Briefe an die Eltern – frei bearbeitbar, mit
+        Rückmeldefrist, optional mit den aktuellen Heimspielterminen aus dem Kalender und Rückmeldeabschnitt.</p>
+        <div class="list">
+          ${s.letters.map((l) => `
+            <div class="list-item">
+              <div class="grow"><div class="title">${esc(l.title)}</div>
+                <div class="sub">${l.deadline ? `⏰ Rückmeldung bis ${fmtDateShort(l.deadline)}` : "ohne Frist"} ·
+                  ${l.includeHomeGames ? "mit Heimspielterminen" : "ohne Termine"} · ${l.includeSlip ? "mit Rückmeldeabschnitt" : "ohne Abschnitt"}</div></div>
+              <button class="btn sm ghost" data-lprint="${l.id}" title="Drucken">🖨️</button>
+              <button class="btn sm ghost" data-ledit="${l.id}">✏️</button>
+              <button class="btn sm ghost" data-ldel="${l.id}">🗑️</button>
+            </div>`).join("") || empty("💌", "Noch keine Briefe – jetzt anlegen")}
+        </div>
       </div>`;
 
     $("[data-add]", el).onclick = () => consentForm();
@@ -1208,18 +1290,142 @@
       });
     });
     $$("[data-tprint]", el).forEach((b) => b.onclick = () => printConsentTemplate(Store.byId("consentTemplates", b.dataset.tprint)));
-    $("[data-letter]", el).onclick = () => printParentLetter();
+    $("[data-collective]", el).onclick = () => printCollectiveConsent();
+    $("[data-ladd]", el).onclick = () => letterForm();
+    $$("[data-ledit]", el).forEach((b) => b.onclick = () => letterForm(Store.byId("letters", b.dataset.ledit)));
+    $$("[data-ldel]", el).forEach((b) => b.onclick = () => {
+      const l = Store.byId("letters", b.dataset.ldel);
+      confirmDialog(`Brief „${l.title}" löschen?`, () => { Store.remove("letters", l.id); toast("Brief gelöscht"); reload(); });
+    });
+    $$("[data-lprint]", el).forEach((b) => b.onclick = () => printParentLetter(Store.byId("letters", b.dataset.lprint)));
   }
 
-  // Motivierender Elternbrief mit Erwartungen, Heimspielterminen und Rückmeldeabschnitt
-  function printParentLetter() {
-    const homeGames = S().events.filter((e) => e.type === "home" && daysUntil(e.start) >= 0)
+  function letterForm(l) {
+    const isEdit = !!l;
+    l = l || { title: "", body: "Liebe Eltern,\n\n", deadline: "", includeHomeGames: true, includeSlip: true };
+    modal({
+      title: isEdit ? "Elternbrief bearbeiten" : "Neuer Elternbrief",
+      wide: true,
+      body: `<form id="lf"><div class="form-grid">
+        <div class="field"><label>Titel</label><input name="title" value="${esc(l.title)}" required placeholder="z. B. Elternbrief zum Saisonstart"></div>
+        <div class="field"><label>⏰ Rückmeldefrist</label><input type="date" name="deadline" value="${esc(l.deadline)}"></div>
+        <div class="field full"><label>Brieftext <span class="soft" style="font-weight:400">(Absätze mit Leerzeile trennen; Zeilen mit „## " werden Überschriften)</span></label>
+          <textarea name="body" rows="14" required>${esc(l.body)}</textarea></div>
+        <div class="field"><label><input type="checkbox" name="includeHomeGames" ${l.includeHomeGames ? "checked" : ""} style="width:auto"> Termine einfügen (Heim- & Auswärtsspiele je Datum zusammengefasst, Trainings-Hinweis donnerstags)</label></div>
+        <div class="field"><label><input type="checkbox" name="includeSlip" ${l.includeSlip ? "checked" : ""} style="width:auto"> Rückmeldeabschnitt (E-Mail, Mobil, WhatsApp, Fahrer, Buffet) anhängen</label></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button>
+        <button class="btn outline" data-p>🖨️ Vorschau/Druck</button>
+        <button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        const collect = () => {
+          const d = formData(m.querySelector("#lf"));
+          return { title: d.title, body: d.body, deadline: d.deadline, includeHomeGames: !!d.includeHomeGames, includeSlip: !!d.includeSlip };
+        };
+        m.querySelector("[data-p]").onclick = () => printParentLetter(collect());
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#lf"); if (!f.reportValidity()) return;
+          const d = collect();
+          if (isEdit) Store.update("letters", l.id, d);
+          else Store.add("letters", Object.assign({ createdAt: new Date().toISOString() }, d));
+          closeModal(); toast("Brief gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
+
+  // Sammeldokument: alle Pflicht-Erklärungen, Daten & Unterschrift nur einmal
+  function printCollectiveConsent() {
+    const req = S().consentTemplates.filter((t) => t.required);
+    if (!req.length) { toast("Keine Pflicht-Vorlagen vorhanden", "bad"); return; }
+    const secs = req.map((t, i) => `
+      <div class="sec">
+        <div class="sec-head"><span class="num">${i + 1}</span> ${esc(t.name)}</div>
+        <div class="sec-body">${esc(t.text).replace(/\n/g, "<br>")}</div>
+        <div class="agree">☐ <strong>Ich stimme zu</strong>&nbsp;&nbsp;&nbsp;☐ Ich stimme nicht zu</div>
+      </div>`).join("");
+    const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Sammel-Einverständniserklärung SKV Müritz</title>
+      <style>
+        body{font-family:Arial,sans-serif;color:#111;margin:34px auto;max-width:720px;font-size:13px;line-height:1.5}
+        h1{font-size:19px;color:#1e3a8a;margin-bottom:2px}
+        .sub{color:#666;font-size:11.5px;margin-bottom:16px}
+        .box{border:1px solid #999;border-radius:8px;padding:14px;margin-bottom:18px}
+        .box .line{border-bottom:1px solid #333;margin:14px 0 3px;padding-bottom:2px}
+        .box .cols{display:flex;gap:24px}.box .cols>div{flex:1}
+        .sec{border:1px solid #bbb;border-radius:8px;padding:12px 14px;margin:10px 0;page-break-inside:avoid}
+        .sec-head{font-weight:700;color:#1e3a8a;margin-bottom:6px}
+        .num{display:inline-block;background:#1e3a8a;color:#fff;border-radius:50%;width:20px;height:20px;text-align:center;line-height:20px;font-size:11px;margin-right:6px}
+        .sec-body{font-size:12px;color:#222}
+        .agree{margin-top:8px;font-size:12.5px}
+        .sign{margin-top:30px;display:flex;gap:50px;page-break-inside:avoid}.sign div{border-top:1px solid #333;padding-top:4px;font-size:11px;flex:1}
+        .note{font-size:11px;color:#555;margin-top:14px}
+        @media print{body{margin:10mm}}
+      </style></head><body>
+      <h1>🏐 SKV Müritz – Sammel-Einverständniserklärung zum Saisonstart</h1>
+      <div class="sub">www.skv-mueritz.de · Abteilung Volleyball · Saison ${esc(`${S().season.year}/${String(S().season.year + 1).slice(2)}`)}</div>
+
+      <div class="box">
+        <strong>Angaben zum Spieler und zu den Erziehungsberechtigten</strong> (bitte einmal ausfüllen – gilt für alle Erklärungen)
+        <div class="cols">
+          <div><div class="line">Name, Vorname des Spielers:</div></div>
+          <div><div class="line">Geburtsdatum:</div></div>
+        </div>
+        <div class="line">Name der/des Erziehungsberechtigten:</div>
+        <div class="cols">
+          <div><div class="line">E-Mail-Adresse:</div></div>
+          <div><div class="line">Mobilnummer:</div></div>
+        </div>
+      </div>
+
+      <p><strong>Hiermit erkläre ich mich mit den nachfolgend angekreuzten Punkten einverstanden:</strong></p>
+      ${secs}
+
+      <p class="note">Alle Einwilligungen sind freiwillig und können jederzeit mit Wirkung für die Zukunft schriftlich
+      widerrufen werden. Die Daten werden ausschließlich für die Vereinsarbeit des SKV Müritz genutzt.</p>
+      <div class="sign"><div>Ort, Datum</div><div>Unterschrift Erziehungsberechtigte/r</div></div>
+      </body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) { toast("Bitte Pop-ups erlauben, um zu drucken", "bad"); return; }
+    w.document.write(html); w.document.close(); w.focus();
+    setTimeout(() => w.print(), 300);
+  }
+
+  // Elternbrief drucken – nutzt den bearbeitbaren Brief (Titel, Text, Frist, Optionen)
+  function printParentLetter(l) {
+    l = l || S().letters[0];
+    if (!l) { toast("Kein Brief vorhanden – bitte zuerst anlegen", "bad"); return; }
+    // Termine je Datum zusammenfassen: ein Listeneintrag pro Datum
+    const futureOf = (type) => S().events.filter((e) => e.type === type && daysUntil(e.start) >= 0)
       .sort((a, b) => new Date(a.start) - new Date(b.start));
-    const gamesHTML = homeGames.length
-      ? `<ul>${homeGames.map((g) => `<li><strong>${fmtDate(g.start)}, ${fmtTime(g.start)} Uhr</strong> – ${esc(g.title)}${g.opponent ? " gegen " + esc(g.opponent) : ""} (${esc(g.location)})</li>`).join("")}</ul>`
-      : `<p><em>Die Heimspieltermine werden rechtzeitig bekannt gegeben bzw. hier ergänzt:</em></p>
-         <ul><li>______________________________</li><li>______________________________</li><li>______________________________</li></ul>`;
-    const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>Elternbrief SKV Müritz</title>
+    const groupByDate = (evs) => {
+      const map = new Map();
+      evs.forEach((e) => { const k = String(e.start).slice(0, 10); if (!map.has(k)) map.set(k, []); map.get(k).push(e); });
+      return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    };
+    const dateList = (evs) => groupByDate(evs).map(([day, items]) =>
+      `<li><strong>${fmtDate(items[0].start)}</strong> – ${items.map((g) =>
+        `${fmtTime(g.start)} Uhr ${esc(g.title)}${g.opponent ? " gegen " + esc(g.opponent) : ""}${g.location ? " (" + esc(g.location) + ")" : ""}`
+      ).join(" · ")}</li>`).join("");
+    const blanks = `<ul><li>______________________________</li><li>______________________________</li><li>______________________________</li></ul>`;
+    const homeGames = futureOf("home");
+    const awayGames = futureOf("away");
+    const gamesHTML = !l.includeHomeGames ? "" : `
+      <h2>📅 Unsere Termine</h2>
+      <p><strong>🏐 Training:</strong> Unser regelmäßiges Training findet <strong>immer donnerstags</strong> statt.</p>
+      <p style="margin-bottom:4px"><strong>Heimspiele:</strong></p>
+      ${homeGames.length ? `<ul>${dateList(homeGames)}</ul>` : `<p><em>Die Heimspieltermine werden rechtzeitig bekannt gegeben bzw. hier ergänzt:</em></p>${blanks}`}
+      <p style="margin-bottom:4px"><strong>Auswärtsspiele:</strong></p>
+      ${awayGames.length ? `<ul>${dateList(awayGames)}</ul>` : `<p><em>Die Auswärtstermine werden rechtzeitig bekannt gegeben bzw. hier ergänzt:</em></p>${blanks}`}`;
+    // Brieftext: Leerzeilen = Absätze, "## " am Zeilenanfang = Überschrift
+    const bodyHTML = String(l.body || "").split(/\n{2,}/).map((block) => {
+      const lines = block.split("\n");
+      return lines.map((line) =>
+        line.startsWith("## ") ? `<h2>${esc(line.slice(3))}</h2>` : line.trim() === "" ? "" : `<span>${esc(line)} </span>`
+      ).join("");
+    }).map((b) => b.startsWith("<h2>") ? b : `<p>${b}</p>`).join("");
+    const deadlineTxt = l.deadline ? `bitte bis zum <strong>${fmtDate(l.deadline)}</strong> zurückgeben` : "bitte bis zum nächsten Training zurückgeben";
+    const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>${esc(l.title || "Elternbrief SKV Müritz")}</title>
       <style>
         body{font-family:Georgia,'Times New Roman',serif;color:#111;margin:44px auto;max-width:720px;line-height:1.55;font-size:14.5px}
         h1{font-size:21px;font-family:Arial,sans-serif;color:#1e3a8a;margin-bottom:0}
@@ -1235,47 +1441,16 @@
         @media print { body{margin:12mm} }
       </style></head><body>
       <h1>🏐 SKV Müritz – Abteilung Volleyball</h1>
-      <div class="sub">www.skv-mueritz.de · Elternbrief zur Saison</div>
+      <div class="sub">www.skv-mueritz.de · ${esc(l.title || "Elternbrief zur Saison")}${l.deadline ? ` · Rückmeldung bis ${fmtDateShort(l.deadline)}` : ""}</div>
 
-      <p style="margin-top:26px">Liebe Eltern,</p>
-      <p>ein neues Volleyball-Jahr liegt vor uns – und ich freue mich riesig, Ihre Kinder dabei zu begleiten!
-      Unsere Mannschaft trainiert mit großem Einsatz, wächst als Team zusammen und wird in dieser Saison
-      auch in der <strong>Erwachsenenliga</strong> wertvolle Erfahrungen sammeln. Damit das gelingt, brauchen
-      wir Sie: Ohne die Unterstützung der Eltern ist Jugendsport im Verein nicht möglich. Vieles davon kostet
-      wenig Zeit, bewirkt aber sehr viel – und ganz nebenbei erleben Sie Ihr Kind dort, wo es über sich
-      hinauswächst.</p>
-
-      <h2>🚗 Fahrten zu Auswärtsspielen</h2>
-      <p>Zu Auswärtsspielen fahren wir wann immer möglich mit dem Vereinsbus – <strong>ich fahre als Trainer
-      immer selbst mit</strong>. Wenn die Plätze im Bus nicht ausreichen, bin ich auf einzelne Eltern
-      angewiesen, die mit dem eigenen PKW einige Spieler mitnehmen. Bitte geben Sie unten an, ob Sie
-      grundsätzlich als Fahrer/in zur Verfügung stehen – die konkrete Abstimmung erfolgt rechtzeitig vor
-      jedem Spiel.</p>
-
-      <h2>🥗 Heimspiele: kleines Buffet</h2>
-      <p>Bei Heimspielen ist es guter Brauch, dass die gastgebende Mannschaft für beide Teams ein kleines
-      Buffet organisiert: <strong>Salat, belegte Brötchen, Kuchen und Getränke</strong>. Das übernehmen die
-      Eltern der Heimmannschaft gemeinsam – wenn jede Familie einmal pro Saison etwas beisteuert, ist es für
-      alle leicht zu stemmen. Zusätzlich sollten pro Heimspiel <strong>zwei Elternteile anwesend</strong>
-      sein, die den Stand betreuen. Bitte tragen Sie sich dafür in die Listen ein, die ich vor jedem
-      Heimspiel herumgebe.</p>
-
-      <h2>📅 Unsere Heimspieltermine</h2>
+      <div style="margin-top:22px">${bodyHTML}</div>
       ${gamesHTML}
-
-      <h2>📱 Kommunikation</h2>
-      <p>Damit Informationen zu Training, Spielen und Fahrten Sie schnell erreichen, möchte ich Sie gern
-      direkt kontaktieren können und organisiere die Eltern in einer <strong>WhatsApp-Gruppe</strong>.
-      Bitte geben Sie dazu unten Ihre E-Mail-Adresse und Mobilnummer an. Die Daten werden ausschließlich
-      für die Vereinskommunikation genutzt; die Teilnahme an der WhatsApp-Gruppe ist freiwillig – wichtige
-      Informationen erhalten Sie auf Wunsch auch per E-Mail.</p>
-
-      <p>Ich freue mich auf eine tolle Saison mit Ihren Kindern – und auf Sie am Spielfeldrand!</p>
       <p>Mit sportlichen Grüßen<br><br>_______________________________<br>Trainer, SKV Müritz Volleyball</p>
 
+      ${l.includeSlip ? `
       <div class="cut"></div>
       <div class="slip">
-        <strong>Rückmeldung an den Trainer</strong> (bitte bis zum nächsten Training zurückgeben)
+        <strong>Rückmeldung an den Trainer</strong> (${deadlineTxt})
         <div class="line">Name des Kindes:</div>
         <div class="line">Name Erziehungsberechtigte/r:</div>
         <div class="line">E-Mail-Adresse:</div>
@@ -1285,7 +1460,7 @@
         <div class="chk">☐ Ich stehe grundsätzlich als Fahrer/in für Auswärtsspiele zur Verfügung (Plätze: ____ )</div>
         <div class="chk">☐ Ich helfe beim Heimspiel-Buffet (Salat / Brötchen / Kuchen / Getränke – Zutreffendes bitte einkreisen)</div>
         <div class="sign"><div>Ort, Datum</div><div>Unterschrift Erziehungsberechtigte/r</div></div>
-      </div>
+      </div>` : ""}
       </body></html>`;
     const w = window.open("", "_blank");
     if (!w) { toast("Bitte Pop-ups erlauben, um zu drucken", "bad"); return; }
@@ -1388,9 +1563,15 @@
   /* ======================================================================
      GEBURTSTAGE
      ====================================================================== */
+  // Spieler ohne (gültiges) Geburtsdatum werden übersprungen – z. B. nach SAMS-Import
+  function validBirth(p) {
+    if (!p.birthDate) return false;
+    const b = new Date(p.birthDate);
+    return !isNaN(b.getTime());
+  }
   function birthdaysWithin(days) {
     const now = new Date(); now.setHours(0, 0, 0, 0);
-    return S().players.map((p) => {
+    return S().players.filter(validBirth).map((p) => {
       const b = new Date(p.birthDate);
       const next = new Date(now.getFullYear(), b.getMonth(), b.getDate());
       if (next < now) next.setFullYear(now.getFullYear() + 1);
@@ -1399,7 +1580,8 @@
     }).filter((p) => p.inDays <= days).sort((a, b) => a.inDays - b.inDays);
   }
   function birthdays(el) {
-    const all = S().players.map((p) => {
+    const missing = S().players.filter((p) => !validBirth(p));
+    const all = S().players.filter(validBirth).map((p) => {
       const b = new Date(p.birthDate);
       const now = new Date(); now.setHours(0, 0, 0, 0);
       const next = new Date(now.getFullYear(), b.getMonth(), b.getDate());
@@ -1422,8 +1604,10 @@
           <td>${fmtDateShort(p.birthDate)}</td>
           <td>${age(p.birthDate)} Jahre</td>
           <td>${DOW[new Date(p.next).getDay()]}, ${fmtDateShort(p.next)}</td>
-          <td>${p.inDays === 0 ? '<span class="badge accent">heute 🎂</span>' : `${p.inDays} Tage`}</td></tr>`).join("")}</tbody>
-      </table></div></div>`;
+          <td>${p.inDays === 0 ? '<span class="badge accent">heute 🎂</span>' : `${p.inDays} Tage`}</td></tr>`).join("")
+          || `<tr><td colspan="5">${empty("🎂", "Noch keine Spieler mit Geburtsdatum")}</td></tr>`}</tbody>
+      </table></div></div>
+      ${missing.length ? `<p class="muted mt" style="font-size:.82rem">⚠️ ${missing.length} Spieler ohne Geburtsdatum (z. B. aus SAMS-Import) – bitte in der Spielerverwaltung ergänzen: ${missing.slice(0, 8).map((p) => esc(p.firstName + " " + p.lastName)).join(", ")}${missing.length > 8 ? " …" : ""}</p>` : ""}`;
   }
 
   /* ======================================================================
@@ -1668,15 +1852,6 @@
   function standings(el) {
     const s = S();
     const rows = s.standings.slice().sort((a, b) => b.points - a.points || (b.setsW - b.setsL) - (a.setsW - a.setsL));
-    const links = [
-      ["🏠", "Vereinswebsite SKV Müritz", "Offizielle Seite des Vereins", Store.WEBSITE],
-      ["🏐", "Volleyball-Verband MV (VVMV)", "Startseite des Landesverbands", "https://www.vvmv.de/"],
-      ["📊", "Ligen & Tabellen", "Aktuelle Tabellen im SAMS-Spielbetrieb", "https://mv.sams-ticket.de/public/ranking.html"],
-      ["📅", "Spielplan & Termine", "Ansetzungen der Verbandsliga", "https://mv.sams-ticket.de/public/schedule.html"],
-      ["📋", "Spielbetrieb / Meldung", "Infos zum Spielbetrieb des VVMV", "https://www.vvmv.de/spielbetrieb/"],
-      ["⚖️", "Regeln & Ordnungen", "Spielordnung und Regelwerk", "https://www.volleyball-verband.de/regelwerk"],
-      ["🧑‍⚖️", "Schiedsrichterwesen", "Ansetzungen & Ausbildung", "https://www.vvmv.de/schiedsrichter/"],
-    ];
     const ourPos = rows.findIndex((r) => /skv/i.test(r.team)) + 1;
 
     el.innerHTML = `
@@ -1704,14 +1879,12 @@
         </div>
 
         <div class="card">
-          <div class="card-head"><h3>🔗 Verbands-Links</h3></div>
-          <div class="list">
-            ${links.map(([ic, t, sub, url]) => `
-              <a class="link-card" href="${esc(url)}" target="_blank" rel="noopener">
-                <span class="ic">${ic}</span><div class="grow"><div class="title">${esc(t)}</div><div class="sub">${esc(sub)}</div></div><span class="arr">↗</span></a>`).join("")}
-          </div>
+          <div class="card-head"><h3>🔗 Links</h3><span class="spacer"></span>
+            <button class="btn sm" data-lkadd>＋ Link</button></div>
+          <div class="list">${linkListHTML()}</div>
         </div>
       </div>`;
+    bindLinkActions(el);
   }
 
   /* ======================================================================
