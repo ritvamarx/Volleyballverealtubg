@@ -253,19 +253,19 @@
         "Damit das gelingt, brauchen wir Sie: Ohne die Unterstützung der Eltern ist Jugendsport im Verein nicht möglich. " +
         "Vieles davon kostet wenig Zeit, bewirkt aber sehr viel – und ganz nebenbei erleben Sie Ihr Kind dort, wo es über sich hinauswächst.\n\n" +
         "## 🚗 Fahrten zu Auswärtsspielen\n" +
-        "Zu Auswärtsspielen fahren wir wann immer möglich mit dem Vereinsbus – ich fahre als Trainer immer selbst mit. " +
-        "Wenn die Plätze im Bus nicht ausreichen, bin ich auf einzelne Eltern angewiesen, die mit dem eigenen PKW einige Spieler mitnehmen. " +
+        "Zu Auswärtsspielen fahren wir wann immer möglich mit dem Vereinsbus – es begleitet immer mindestens ein Mitglied des Trainerteams die Mannschaft. " +
+        "Wenn die Plätze im Bus nicht ausreichen, sind wir auf einzelne Eltern angewiesen, die mit dem eigenen PKW einige Spieler mitnehmen. " +
         "Bitte geben Sie unten an, ob Sie grundsätzlich als Fahrer/in zur Verfügung stehen – die konkrete Abstimmung erfolgt rechtzeitig vor jedem Spiel.\n\n" +
         "## 🥗 Heimspiele: kleines Buffet\n" +
-        "Bei Heimspielen ist es guter Brauch, dass die gastgebende Mannschaft für beide Teams ein kleines Buffet organisiert: Salat, belegte Brötchen, Kuchen und Getränke. " +
+        "An unseren Heimspieltagen sind immer drei Mannschaften in der Halle. Es ist guter Brauch, dass die gastgebende Mannschaft für alle drei Mannschaften ein kleines Buffet organisiert: Salat, belegte Brötchen, Kuchen und Getränke. " +
         "Das übernehmen die Eltern der Heimmannschaft gemeinsam – wenn jede Familie einmal pro Saison etwas beisteuert, ist es für alle leicht zu stemmen. " +
         "Zusätzlich sollten pro Heimspiel zwei Elternteile anwesend sein, die den Stand betreuen. " +
-        "Bitte tragen Sie sich dafür in die Listen ein, die ich vor jedem Heimspiel herumgebe.\n\n" +
+        "Bitte tragen Sie sich dafür in die Listen ein, die das Trainerteam vor jedem Heimspiel herumgibt.\n\n" +
         "## 📱 Kommunikation\n" +
-        "Damit Informationen zu Training, Spielen und Fahrten Sie schnell erreichen, möchte ich Sie gern direkt kontaktieren können und organisiere die Eltern in einer WhatsApp-Gruppe. " +
+        "Damit Informationen zu Training, Spielen und Fahrten Sie schnell erreichen, möchte das Trainerteam Sie gern direkt kontaktieren können und organisiert die Eltern in einer WhatsApp-Gruppe. " +
         "Bitte geben Sie dazu unten Ihre E-Mail-Adresse und Mobilnummer an. Die Daten werden ausschließlich für die Vereinskommunikation genutzt; " +
         "die Teilnahme an der WhatsApp-Gruppe ist freiwillig – wichtige Informationen erhalten Sie auf Wunsch auch per E-Mail.\n\n" +
-        "Ich freue mich auf eine tolle Saison mit Ihren Kindern – und auf Sie am Spielfeldrand!",
+        "Wir freuen uns auf eine tolle Saison mit Ihren Kindern – und auf Sie am Spielfeldrand!",
         "", true, true),
     ];
 

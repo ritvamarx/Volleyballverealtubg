@@ -1422,8 +1422,9 @@
   }
 
   // Elternbrief drucken – nutzt den bearbeitbaren Brief (Titel, Text, Frist, Optionen).
-  // playersList (optional): Serienbrief – ein personalisierter Brief pro Spieler
-  function printParentLetter(l, playersList) {
+  // playersList (optional): Serienbrief – ein personalisierter Brief pro Spieler.
+  // docTitle (optional): Fenster-/Dokumenttitel – wird beim "Als PDF sichern" zum Dateinamen.
+  function printParentLetter(l, playersList, docTitle) {
     l = l || S().letters[0];
     if (!l) { toast("Kein Brief vorhanden – bitte zuerst anlegen", "bad"); return; }
     // Termine je Datum zusammenfassen: ein Listeneintrag pro Datum
@@ -1434,16 +1435,45 @@
       evs.forEach((e) => { const k = String(e.start).slice(0, 10); if (!map.has(k)) map.set(k, []); map.get(k).push(e); });
       return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
     };
+    // Datum/Uhrzeit aus importierten Titeln entfernen (steht sonst doppelt in der Zeile)
+    const stripDateTime = (t) => String(t || "")
+      .replace(/\b(?:mo|di|mi|do|fr|sa|so)\.?,?\s+\d{1,2}\.\d{1,2}\.(?:\d{2,4})?\b/gi, "")
+      .replace(/\b\d{1,2}\.\s?(?:januar|februar|märz|april|mai|juni|juli|august|september|oktober|november|dezember)\s?(?:\d{2,4})?\b/gi, "")
+      .replace(/\b\d{1,2}\.\d{1,2}\.(?:\d{2,4})?\b/g, "")
+      .replace(/\b\d{4}-\d{2}-\d{2}\b/g, "")
+      .replace(/\b\d{1,2}:\d{2}(?:\s*Uhr)?\b/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/^[\s\-–:,·]+|[\s\-–:,·]+$/g, "").trim();
     const dateList = (evs) => groupByDate(evs).map(([day, items]) =>
       `<li><strong>${fmtDate(items[0].start)}</strong> – ${items.map((g) =>
-        `${fmtTime(g.start)} Uhr ${esc(g.title)}${g.opponent ? " gegen " + esc(g.opponent) : ""}${g.location ? " (" + esc(g.location) + ")" : ""}`
+        `${fmtTime(g.start)} Uhr ${esc(stripDateTime(g.title))}${g.opponent ? " gegen " + esc(g.opponent) : ""}${g.location ? " (" + esc(g.location) + ")" : ""}`
       ).join(" · ")}</li>`).join("");
     const blanks = `<ul><li>______________________________</li><li>______________________________</li><li>______________________________</li></ul>`;
     const homeGames = futureOf("home");
     const awayGames = futureOf("away");
-    const gamesHTML = !l.includeHomeGames ? "" : `
+    // Trainingszeiten mit Uhrzeit: aus den Kalender-Trainings abgeleitete Muster
+    // (Wochentag + Zeitfenster); Fallback: Trainingszeiten der Abteilung bzw. donnerstags
+    const DOW_ADV = ["sonntags", "montags", "dienstags", "mittwochs", "donnerstags", "freitags", "samstags"];
+    const trainingLine = (pl2) => {
+      const pats = new Map();
+      S().events.filter((e) => e.type === "training" && daysUntil(e.start) >= 0).forEach((e) => {
+        const d = new Date(e.start);
+        const k = `${d.getDay()}|${fmtTime(e.start)}|${fmtTime(e.end)}`;
+        if (!pats.has(k)) pats.set(k, { day: d.getDay(), from: fmtTime(e.start), to: fmtTime(e.end) });
+      });
+      if (pats.size) {
+        const list = Array.from(pats.values())
+          .sort((a, b) => ((a.day + 6) % 7) - ((b.day + 6) % 7) || a.from.localeCompare(b.from))
+          .map((p2) => `${DOW_ADV[p2.day]} ${p2.from}–${p2.to} Uhr`);
+        return `Unser regelmäßiges Training: <strong>${list.join(", ")}</strong>.`;
+      }
+      const dep = pl2 && pl2.departmentId ? Store.byId("departments", pl2.departmentId) : null;
+      if (dep && dep.times) return `Unser regelmäßiges Training: <strong>${esc(dep.times)}</strong>${dep.venue ? ` (${esc(dep.venue)})` : ""}.`;
+      return `Unser regelmäßiges Training findet <strong>immer donnerstags</strong> statt.`;
+    };
+    const gamesHTMLFor = (pl2) => !l.includeHomeGames ? "" : `
       <h2>📅 Unsere Termine</h2>
-      <p><strong>🏐 Training:</strong> Unser regelmäßiges Training findet <strong>immer donnerstags</strong> statt.</p>
+      <p><strong>🏐 Training:</strong> ${trainingLine(pl2)}</p>
       <p style="margin-bottom:4px"><strong>Heimspiele:</strong></p>
       ${homeGames.length ? `<ul>${dateList(homeGames)}</ul>` : `<p><em>Die Heimspieltermine werden rechtzeitig bekannt gegeben bzw. hier ergänzt:</em></p>${blanks}`}
       <p style="margin-bottom:4px"><strong>Auswärtsspiele:</strong></p>
@@ -1473,17 +1503,17 @@
       <div class="sub">www.skv-mueritz.de · ${esc(l.title || "Elternbrief zur Saison")}${l.deadline ? ` · Rückmeldung bis ${fmtDateShort(l.deadline)}` : ""}</div>
       ${pl2 ? `<div class="addr">An die Eltern von <strong>${esc(pl2.firstName)} ${esc(pl2.lastName)}</strong>${parents ? ` – ${esc(parents)}` : ""}${pl2.departmentId ? ` · ${esc(deptName(pl2.departmentId))}` : ""}</div>` : ""}
       <div style="margin-top:22px">${toBodyHTML(pl2)}</div>
-      ${gamesHTML}
-      <p>Mit sportlichen Grüßen<br><br>_______________________________<br>Trainer, SKV Müritz Volleyball</p>
+      ${gamesHTMLFor(pl2)}
+      <p>Mit sportlichen Grüßen<br><br>_______________________________<br>Das Trainerteam · SKV Müritz Volleyball</p>
       ${l.includeSlip ? `
       <div class="cut"></div>
       <div class="slip">
-        <strong>Rückmeldung an den Trainer</strong> (${deadlineTxt})
+        <strong>Rückmeldung an das Trainerteam</strong> (${deadlineTxt})
         ${pref("Name des Kindes:", pl2 ? `${pl2.firstName} ${pl2.lastName}` : "")}
         ${pref("Name Erziehungsberechtigte/r:", parents)}
         ${pref("E-Mail-Adresse:", bestEmail)}
         ${pref("Mobilnummer:", bestPhone)}
-        <div class="chk">☐ Ich stimme zu, dass der Trainer mich über E-Mail/Telefon kontaktiert.</div>
+        <div class="chk">☐ Ich stimme zu, dass das Trainerteam mich über E-Mail/Telefon kontaktiert.</div>
         <div class="chk">☐ Ich möchte in die WhatsApp-Elterngruppe aufgenommen werden.</div>
         <div class="chk">☐ Ich stehe grundsätzlich als Fahrer/in für Auswärtsspiele zur Verfügung (Plätze: ____ )</div>
         <div class="chk">☐ Ich helfe beim Heimspiel-Buffet (Salat / Brötchen / Kuchen / Getränke – Zutreffendes bitte einkreisen)</div>
@@ -1492,12 +1522,12 @@
     };
 
     const list = Array.isArray(playersList) && playersList.length ? playersList : [null];
-    const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>${esc(l.title || "Elternbrief SKV Müritz")}</title>
+    const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>${esc(docTitle || l.title || "Elternbrief SKV Müritz")}</title>
       <style>
         body{font-family:Georgia,'Times New Roman',serif;color:#111;margin:44px auto;max-width:720px;line-height:1.55;font-size:14.5px}
         h1{font-size:21px;font-family:Arial,sans-serif;color:#1e3a8a;margin-bottom:0}
         .sub{color:#666;font-family:Arial,sans-serif;font-size:12px;margin-top:2px}
-        .addr{font-family:Arial,sans-serif;font-size:13px;margin-top:16px;padding:8px 12px;border:1px solid #ccc;border-radius:6px;background:#f8f8f8}
+        .addr{font-family:Arial,sans-serif;font-size:11px;color:#888;margin-top:14px}
         h2{font-size:15px;font-family:Arial,sans-serif;color:#1e3a8a;margin:22px 0 6px}
         ul{margin:6px 0;padding-left:22px}
         .cut{border-top:2px dashed #666;margin:30px 0 14px;position:relative}
@@ -1529,6 +1559,9 @@
         <p class="soft" style="margin-top:0;font-size:.85rem">Ein personalisierter Brief pro Spieler: Anschrift,
         Rückmeldeabschnitt mit Name, Eltern, E-Mail und Mobilnummer werden automatisch ausgefüllt.
         Im Brieftext funktionieren die Platzhalter <code>{vorname}</code>, <code>{nachname}</code>, <code>{eltern}</code>.</p>
+        <p class="soft" style="font-size:.85rem">📄 <strong>Als PDF speichern:</strong> Der 📄-Knopf neben einem Spieler
+        öffnet dessen Einzelbrief – im Druckdialog „Als PDF sichern" wählen; der Dateiname ist dann automatisch
+        „Elternbrief – Name". Der große Knopf unten druckt alle ausgewählten Briefe in einem Dokument.</p>
         <div class="field mb"><label>Abteilung</label><select id="slDept">
           <option value="">alle Abteilungen</option>
           ${s.departments.map((d) => `<option value="${d.id}">${esc(d.name)}</option>`).join("")}</select></div>
@@ -1538,11 +1571,17 @@
               <input type="checkbox" data-slp="${p.id}" checked style="width:auto">
               <div class="grow"><div class="title" style="font-size:.88rem">${esc(p.firstName)} ${esc(p.lastName)}</div>
               <div class="sub">${esc(deptName(p.departmentId))} · ${esc(p.parentName || "ohne Elternkontakt")}</div></div>
+              <button type="button" class="btn sm ghost" data-slone="${p.id}" title="Einzelbrief drucken / als PDF sichern">📄</button>
             </label>`).join("")}
         </div>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>🖨️ Serienbrief drucken</button>`,
       onOpen(m) {
         m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelectorAll("[data-slone]").forEach((b) => b.onclick = (ev2) => {
+          ev2.preventDefault(); ev2.stopPropagation();
+          const p = Store.byId("players", b.dataset.slone);
+          printParentLetter(l, [p], `Elternbrief – ${p.firstName} ${p.lastName}`);
+        });
         m.querySelector("#slDept").onchange = (ev) => {
           const dep = ev.target.value;
           m.querySelectorAll("#slList label").forEach((row) => {

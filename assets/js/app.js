@@ -120,6 +120,25 @@
     };
     $("#overlay").addEventListener("click", () => { $("#sidebar").classList.remove("open"); });
 
+    // Formulierungs-Update in bestehenden Briefen: nur exakte alte Standardsätze
+    // werden ersetzt (individuell bearbeitete Texte bleiben unangetastet)
+    (function migrateLetterWording() {
+      const repl = [
+        ["ich fahre als Trainer immer selbst mit", "es begleitet immer mindestens ein Mitglied des Trainerteams die Mannschaft"],
+        ["Wenn die Plätze im Bus nicht ausreichen, bin ich auf einzelne Eltern angewiesen", "Wenn die Plätze im Bus nicht ausreichen, sind wir auf einzelne Eltern angewiesen"],
+        ["Bei Heimspielen ist es guter Brauch, dass die gastgebende Mannschaft für beide Teams ein kleines Buffet organisiert",
+          "An unseren Heimspieltagen sind immer drei Mannschaften in der Halle. Es ist guter Brauch, dass die gastgebende Mannschaft für alle drei Mannschaften ein kleines Buffet organisiert"],
+        ["die Listen ein, die ich vor jedem Heimspiel herumgebe", "die Listen ein, die das Trainerteam vor jedem Heimspiel herumgibt"],
+        ["möchte ich Sie gern direkt kontaktieren können und organisiere die Eltern", "möchte das Trainerteam Sie gern direkt kontaktieren können und organisiert die Eltern"],
+        ["Ich freue mich auf eine tolle Saison", "Wir freuen uns auf eine tolle Saison"],
+      ];
+      Store.get().letters.forEach((l) => {
+        let body = l.body || "", changed = false;
+        repl.forEach(([a, b]) => { if (body.includes(a)) { body = body.split(a).join(b); changed = true; } });
+        if (changed) Store.update("letters", l.id, { body });
+      });
+    })();
+
     // Bereits importierte Termine mit Art "Sonstiges" einmalig neu klassifizieren
     // (verbesserte Erkennung von "Heim : Gast"-Spielplan-Titeln)
     if (window.IO) {
