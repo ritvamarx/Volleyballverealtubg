@@ -2577,6 +2577,21 @@
         </div>
       </div>
       <div class="card mt">
+        <div class="card-head"><h3>🔐 Verschlüsselte Sicherung – für die Cloud & Gerätewechsel</h3></div>
+        <p class="soft" style="font-size:.88rem;margin-top:0">Erstellt eine <strong>passwortgeschützte Datei</strong>
+        (<code>.skv</code>, AES-256-verschlüsselt). Nur damit gehören persönliche Daten in eine Cloud!
+        <strong>So nutzt du die Plattform geräteübergreifend:</strong> ① Hier verschlüsselt exportieren →
+        ② Datei in deine Cloud legen (iCloud/Dropbox/OneDrive…) → ③ auf dem anderen Gerät die App öffnen und
+        die .skv-Datei mit dem Passwort importieren. Die App-Datei selbst enthält keine persönlichen Daten –
+        die liegen nur im Browser des jeweiligen Geräts und in deinen Sicherungen.</p>
+        <div class="flex flex-wrap">
+          <button class="btn" data-encex>🔐 Verschlüsselt exportieren</button>
+          <button class="btn secondary" data-encim>🔓 Verschlüsselt importieren</button>
+        </div>
+        <div id="encResult" class="mt"></div>
+      </div>
+
+      <div class="card mt">
         <div class="card-head"><h3>🧹 Zurücksetzen</h3></div>
         <div class="flex flex-wrap">
           <button class="btn outline" data-empty>Leerer Verein (ohne Demodaten)</button>
@@ -2599,6 +2614,57 @@
         Store.replaceAll(parsed.data);
         toast("Datensicherung wiederhergestellt", "good"); reload();
       }, "Importieren");
+    };
+    $("[data-encex]", el).onclick = () => {
+      modal({
+        title: "Verschlüsselt exportieren",
+        body: `<form id="exf"><div class="form-grid">
+          <div class="field full"><label>Passwort (mind. 8 Zeichen)</label><input type="password" name="pw1" minlength="8" required autocomplete="new-password"></div>
+          <div class="field full"><label>Passwort wiederholen</label><input type="password" name="pw2" minlength="8" required autocomplete="new-password"></div>
+        </div><p class="muted" style="font-size:.8rem">Wichtig: Ohne dieses Passwort lässt sich die Sicherung
+        <strong>nicht wiederherstellen</strong> – es gibt keine Zurücksetzen-Funktion.</p></form>`,
+        footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>🔐 Exportieren</button>`,
+        onOpen(m) {
+          m.querySelector("[data-x]").onclick = closeModal;
+          m.querySelector("[data-s]").onclick = async () => {
+            const f = m.querySelector("#exf"); if (!f.reportValidity()) return;
+            const d = formData(f);
+            if (d.pw1 !== d.pw2) { toast("Passwörter stimmen nicht überein", "bad"); return; }
+            try {
+              const payload = { exportedAt: new Date().toISOString(), club: Store.CLUB, state: S() };
+              const enc = await IO.encryptData(d.pw1, payload);
+              IO.download(`skv-mueritz-daten-${new Date().toISOString().slice(0, 10)}.skv`, enc, "application/json");
+              closeModal(); toast("Verschlüsselte Sicherung erstellt", "good");
+            } catch (err) { toast(err.message || "Verschlüsselung fehlgeschlagen", "bad"); }
+          };
+        },
+      });
+    };
+    $("[data-encim]", el).onclick = async () => {
+      const f = await IO.pickFile(".skv,application/json");
+      if (!f) return;
+      modal({
+        title: `Verschlüsselte Sicherung importieren`,
+        body: `<p class="soft" style="font-size:.88rem;margin-top:0">Datei: <strong>${esc(f.name)}</strong></p>
+          <form id="imf"><div class="field"><label>Passwort</label>
+          <input type="password" name="pw" required autocomplete="current-password"></div></form>
+          <p class="muted" style="font-size:.8rem">Der Import ersetzt den aktuellen Datenbestand vollständig.</p>`,
+        footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>🔓 Entschlüsseln & importieren</button>`,
+        onOpen(m) {
+          m.querySelector("[data-x]").onclick = closeModal;
+          m.querySelector("[data-s]").onclick = async () => {
+            const fo = m.querySelector("#imf"); if (!fo.reportValidity()) return;
+            const d = formData(fo);
+            try {
+              const payload = await IO.decryptData(d.pw, f.text);
+              const state = payload && payload.state ? payload.state : payload;
+              if (!state || !Array.isArray(state.players)) throw new Error("Datei enthält keinen gültigen Datenbestand");
+              Store.replaceAll(state);
+              closeModal(); toast("Sicherung wiederhergestellt", "good"); reload();
+            } catch (err) { toast(err.message || "Import fehlgeschlagen", "bad"); }
+          };
+        },
+      });
     };
     $("[data-empty]", el).onclick = () => confirmDialog("Alle Daten löschen und leer starten (Struktur bleibt)?", () => {
       Store.resetEmpty(); toast("Leer zurückgesetzt", "good"); reload();

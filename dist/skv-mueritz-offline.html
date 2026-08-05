@@ -574,7 +574,10 @@ textarea { resize: vertical; min-height: 72px; }
     // Vorlagen für Einverständniserklärungen (vom Trainer selbst verwaltbar)
     const consentTemplates = [
       ctpl("Datennutzung & Fotorechte", "Einverständnis zur Speicherung von Kontaktdaten sowie zur Veröffentlichung von Mannschafts- und Spielfotos auf Vereinswebsite und in Vereinsmedien.", true),
-      ctpl("Fahrten & Aufsicht", "Einverständnis zur Mitfahrt in privaten PKW zu Auswärtsspielen und zur Aufsicht durch das Trainerteam während Fahrten und Spielen.", true),
+      ctpl("Fahrten & Aufsicht",
+        "Zu Auswärtsspielen fahren wir wann immer möglich mit dem Vereinsbus; es begleitet immer mindestens ein Mitglied des Trainerteams die Mannschaft. " +
+        "Reichen die Plätze im Vereinsbus nicht aus, erfolgt die Fahrt in privaten PKW einzelner Eltern.\n\n" +
+        "Hiermit erkläre ich mich mit der Mitfahrt meines Kindes im Vereinsbus und in privaten PKW zu Auswärtsspielen sowie mit der Aufsicht durch das Trainerteam während Fahrten, Trainings und Spielen einverstanden.", true),
       ctpl("Medizinische Notfallversorgung", "Einverständnis zur Veranlassung notwendiger ärztlicher Maßnahmen im Notfall, wenn die Eltern nicht erreichbar sind.", true),
       ctpl("Teilnahme Trainingslager", "Einverständnis zur Teilnahme am Trainingslager inkl. Übernachtung.", false),
       ctpl("Teilnahme an der Erwachsenenliga",
@@ -1308,6 +1311,45 @@ textarea { resize: vertical; min-height: 72px; }
     return added;
   }
 
+  // ---------- Verschlüsselte Datensicherung (.skv) ----------
+  // AES-256-GCM, Schlüssel per PBKDF2 (SHA-256, 150.000 Iterationen) aus dem
+  // Passwort. Für die geräteübergreifende Ablage in der Cloud geeignet:
+  // ohne Passwort sind die Daten nicht lesbar.
+  function bufToB64(buf) {
+    const bytes = new Uint8Array(buf);
+    let s = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(s);
+  }
+  function b64ToBuf(s) { return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)); }
+  async function deriveKey(password, salt) {
+    const km = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 150000, hash: "SHA-256" }, km,
+      { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  }
+  async function encryptData(password, obj) {
+    if (!(window.crypto && crypto.subtle)) throw new Error("Verschlüsselung in diesem Browser nicht verfügbar");
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(password, salt);
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key,
+      new TextEncoder().encode(JSON.stringify(obj)));
+    return JSON.stringify({ skv: 1, kdf: "PBKDF2-SHA256-150k", cipher: "AES-256-GCM",
+      salt: bufToB64(salt), iv: bufToB64(iv), data: bufToB64(ct) });
+  }
+  async function decryptData(password, text) {
+    let env;
+    try { env = JSON.parse(text); } catch (e) { throw new Error("Keine gültige .skv-Datei"); }
+    if (!env || env.skv !== 1 || !env.salt || !env.iv || !env.data) throw new Error("Keine gültige .skv-Datei");
+    const key = await deriveKey(password, b64ToBuf(env.salt));
+    try {
+      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64ToBuf(env.iv) }, key, b64ToBuf(env.data));
+      return JSON.parse(new TextDecoder().decode(pt));
+    } catch (e) { throw new Error("Falsches Passwort oder beschädigte Datei"); }
+  }
+
   // ---------- Ferien-Abo: Schulferien & Feiertage Mecklenburg-Vorpommern ----------
   // Primärquelle: OpenHolidays API (offene Daten, CORS-freigegeben, speist sich aus
   // den offiziellen Terminen). Fallback: ferien-api.de. Ersetzt nur automatisch
@@ -1438,6 +1480,7 @@ textarea { resize: vertical; min-height: 72px; }
     download, pickFile, toCSV, parseCSV, toVCard,
     parseICS, parseFeed, fetchText, parseByType, mergeEvents, syncAllFeeds,
     guessType, exportAllCSV, importAllCSV, BACKUP_COLLECTIONS, syncHolidaysMV,
+    encryptData, decryptData,
   };
 })();
 
@@ -4023,6 +4066,21 @@ textarea { resize: vertical; min-height: 72px; }
         </div>
       </div>
       <div class="card mt">
+        <div class="card-head"><h3>🔐 Verschlüsselte Sicherung – für die Cloud & Gerätewechsel</h3></div>
+        <p class="soft" style="font-size:.88rem;margin-top:0">Erstellt eine <strong>passwortgeschützte Datei</strong>
+        (<code>.skv</code>, AES-256-verschlüsselt). Nur damit gehören persönliche Daten in eine Cloud!
+        <strong>So nutzt du die Plattform geräteübergreifend:</strong> ① Hier verschlüsselt exportieren →
+        ② Datei in deine Cloud legen (iCloud/Dropbox/OneDrive…) → ③ auf dem anderen Gerät die App öffnen und
+        die .skv-Datei mit dem Passwort importieren. Die App-Datei selbst enthält keine persönlichen Daten –
+        die liegen nur im Browser des jeweiligen Geräts und in deinen Sicherungen.</p>
+        <div class="flex flex-wrap">
+          <button class="btn" data-encex>🔐 Verschlüsselt exportieren</button>
+          <button class="btn secondary" data-encim>🔓 Verschlüsselt importieren</button>
+        </div>
+        <div id="encResult" class="mt"></div>
+      </div>
+
+      <div class="card mt">
         <div class="card-head"><h3>🧹 Zurücksetzen</h3></div>
         <div class="flex flex-wrap">
           <button class="btn outline" data-empty>Leerer Verein (ohne Demodaten)</button>
@@ -4045,6 +4103,57 @@ textarea { resize: vertical; min-height: 72px; }
         Store.replaceAll(parsed.data);
         toast("Datensicherung wiederhergestellt", "good"); reload();
       }, "Importieren");
+    };
+    $("[data-encex]", el).onclick = () => {
+      modal({
+        title: "Verschlüsselt exportieren",
+        body: `<form id="exf"><div class="form-grid">
+          <div class="field full"><label>Passwort (mind. 8 Zeichen)</label><input type="password" name="pw1" minlength="8" required autocomplete="new-password"></div>
+          <div class="field full"><label>Passwort wiederholen</label><input type="password" name="pw2" minlength="8" required autocomplete="new-password"></div>
+        </div><p class="muted" style="font-size:.8rem">Wichtig: Ohne dieses Passwort lässt sich die Sicherung
+        <strong>nicht wiederherstellen</strong> – es gibt keine Zurücksetzen-Funktion.</p></form>`,
+        footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>🔐 Exportieren</button>`,
+        onOpen(m) {
+          m.querySelector("[data-x]").onclick = closeModal;
+          m.querySelector("[data-s]").onclick = async () => {
+            const f = m.querySelector("#exf"); if (!f.reportValidity()) return;
+            const d = formData(f);
+            if (d.pw1 !== d.pw2) { toast("Passwörter stimmen nicht überein", "bad"); return; }
+            try {
+              const payload = { exportedAt: new Date().toISOString(), club: Store.CLUB, state: S() };
+              const enc = await IO.encryptData(d.pw1, payload);
+              IO.download(`skv-mueritz-daten-${new Date().toISOString().slice(0, 10)}.skv`, enc, "application/json");
+              closeModal(); toast("Verschlüsselte Sicherung erstellt", "good");
+            } catch (err) { toast(err.message || "Verschlüsselung fehlgeschlagen", "bad"); }
+          };
+        },
+      });
+    };
+    $("[data-encim]", el).onclick = async () => {
+      const f = await IO.pickFile(".skv,application/json");
+      if (!f) return;
+      modal({
+        title: `Verschlüsselte Sicherung importieren`,
+        body: `<p class="soft" style="font-size:.88rem;margin-top:0">Datei: <strong>${esc(f.name)}</strong></p>
+          <form id="imf"><div class="field"><label>Passwort</label>
+          <input type="password" name="pw" required autocomplete="current-password"></div></form>
+          <p class="muted" style="font-size:.8rem">Der Import ersetzt den aktuellen Datenbestand vollständig.</p>`,
+        footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>🔓 Entschlüsseln & importieren</button>`,
+        onOpen(m) {
+          m.querySelector("[data-x]").onclick = closeModal;
+          m.querySelector("[data-s]").onclick = async () => {
+            const fo = m.querySelector("#imf"); if (!fo.reportValidity()) return;
+            const d = formData(fo);
+            try {
+              const payload = await IO.decryptData(d.pw, f.text);
+              const state = payload && payload.state ? payload.state : payload;
+              if (!state || !Array.isArray(state.players)) throw new Error("Datei enthält keinen gültigen Datenbestand");
+              Store.replaceAll(state);
+              closeModal(); toast("Sicherung wiederhergestellt", "good"); reload();
+            } catch (err) { toast(err.message || "Import fehlgeschlagen", "bad"); }
+          };
+        },
+      });
     };
     $("[data-empty]", el).onclick = () => confirmDialog("Alle Daten löschen und leer starten (Struktur bleibt)?", () => {
       Store.resetEmpty(); toast("Leer zurückgesetzt", "good"); reload();
@@ -4203,6 +4312,18 @@ textarea { resize: vertical; min-height: 72px; }
         let body = l.body || "", changed = false;
         repl.forEach(([a, b]) => { if (body.includes(a)) { body = body.split(a).join(b); changed = true; } });
         if (changed) Store.update("letters", l.id, { body });
+      });
+    })();
+
+    // Formulierungs-Update in Einverständnis-Vorlagen (Sammeldokument):
+    // nur der exakte alte Standardtext wird ersetzt, eigene Texte bleiben
+    (function migrateConsentTemplateWording() {
+      const OLD = "Einverständnis zur Mitfahrt in privaten PKW zu Auswärtsspielen und zur Aufsicht durch das Trainerteam während Fahrten und Spielen.";
+      const NEW = "Zu Auswärtsspielen fahren wir wann immer möglich mit dem Vereinsbus; es begleitet immer mindestens ein Mitglied des Trainerteams die Mannschaft. " +
+        "Reichen die Plätze im Vereinsbus nicht aus, erfolgt die Fahrt in privaten PKW einzelner Eltern.\n\n" +
+        "Hiermit erkläre ich mich mit der Mitfahrt meines Kindes im Vereinsbus und in privaten PKW zu Auswärtsspielen sowie mit der Aufsicht durch das Trainerteam während Fahrten, Trainings und Spielen einverstanden.";
+      Store.get().consentTemplates.forEach((t) => {
+        if (t.text === OLD) Store.update("consentTemplates", t.id, { text: NEW });
       });
     })();
 

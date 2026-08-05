@@ -198,6 +198,45 @@
     return added;
   }
 
+  // ---------- Verschlüsselte Datensicherung (.skv) ----------
+  // AES-256-GCM, Schlüssel per PBKDF2 (SHA-256, 150.000 Iterationen) aus dem
+  // Passwort. Für die geräteübergreifende Ablage in der Cloud geeignet:
+  // ohne Passwort sind die Daten nicht lesbar.
+  function bufToB64(buf) {
+    const bytes = new Uint8Array(buf);
+    let s = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) {
+      s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    }
+    return btoa(s);
+  }
+  function b64ToBuf(s) { return Uint8Array.from(atob(s), (c) => c.charCodeAt(0)); }
+  async function deriveKey(password, salt) {
+    const km = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: 150000, hash: "SHA-256" }, km,
+      { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  }
+  async function encryptData(password, obj) {
+    if (!(window.crypto && crypto.subtle)) throw new Error("Verschlüsselung in diesem Browser nicht verfügbar");
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveKey(password, salt);
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key,
+      new TextEncoder().encode(JSON.stringify(obj)));
+    return JSON.stringify({ skv: 1, kdf: "PBKDF2-SHA256-150k", cipher: "AES-256-GCM",
+      salt: bufToB64(salt), iv: bufToB64(iv), data: bufToB64(ct) });
+  }
+  async function decryptData(password, text) {
+    let env;
+    try { env = JSON.parse(text); } catch (e) { throw new Error("Keine gültige .skv-Datei"); }
+    if (!env || env.skv !== 1 || !env.salt || !env.iv || !env.data) throw new Error("Keine gültige .skv-Datei");
+    const key = await deriveKey(password, b64ToBuf(env.salt));
+    try {
+      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64ToBuf(env.iv) }, key, b64ToBuf(env.data));
+      return JSON.parse(new TextDecoder().decode(pt));
+    } catch (e) { throw new Error("Falsches Passwort oder beschädigte Datei"); }
+  }
+
   // ---------- Ferien-Abo: Schulferien & Feiertage Mecklenburg-Vorpommern ----------
   // Primärquelle: OpenHolidays API (offene Daten, CORS-freigegeben, speist sich aus
   // den offiziellen Terminen). Fallback: ferien-api.de. Ersetzt nur automatisch
@@ -328,5 +367,6 @@
     download, pickFile, toCSV, parseCSV, toVCard,
     parseICS, parseFeed, fetchText, parseByType, mergeEvents, syncAllFeeds,
     guessType, exportAllCSV, importAllCSV, BACKUP_COLLECTIONS, syncHolidaysMV,
+    encryptData, decryptData,
   };
 })();

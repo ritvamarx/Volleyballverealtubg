@@ -90,6 +90,21 @@ assets/js/views.js         Alle Ansichten/Bereiche
 assets/js/app.js           Router & Initialisierung
 ```
 
+## ☁️ Geräteübergreifend nutzen (Cloud) & Passwortschutz
+
+Die App-Datei selbst enthält **keine persönlichen Daten** – Daten liegen im
+Browser des jeweiligen Geräts. Für Gerätewechsel und Cloud-Ablage gibt es in
+**Datensicherung** die **verschlüsselte Sicherung** (`.skv`,
+AES-256-GCM, Schlüssel per PBKDF2 aus deinem Passwort):
+
+1. Auf Gerät A: *Verschlüsselt exportieren* (Passwort wählen).
+2. Die `.skv`-Datei zusammen mit der App-Datei in die Cloud legen
+   (iCloud/Dropbox/OneDrive …) – ohne Passwort ist sie nicht lesbar.
+3. Auf Gerät B: App öffnen → *Verschlüsselt importieren* → Passwort eingeben.
+
+> Achtung: Ohne das Passwort lässt sich eine `.skv`-Sicherung nicht
+> wiederherstellen – es gibt keine „Passwort vergessen"-Funktion.
+
 ## 🔒 Datenschutz
 
 Es werden **keine Daten an einen Server übertragen** – alles bleibt lokal im

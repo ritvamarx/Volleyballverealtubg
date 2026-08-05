@@ -139,6 +139,18 @@
       });
     })();
 
+    // Formulierungs-Update in Einverständnis-Vorlagen (Sammeldokument):
+    // nur der exakte alte Standardtext wird ersetzt, eigene Texte bleiben
+    (function migrateConsentTemplateWording() {
+      const OLD = "Einverständnis zur Mitfahrt in privaten PKW zu Auswärtsspielen und zur Aufsicht durch das Trainerteam während Fahrten und Spielen.";
+      const NEW = "Zu Auswärtsspielen fahren wir wann immer möglich mit dem Vereinsbus; es begleitet immer mindestens ein Mitglied des Trainerteams die Mannschaft. " +
+        "Reichen die Plätze im Vereinsbus nicht aus, erfolgt die Fahrt in privaten PKW einzelner Eltern.\n\n" +
+        "Hiermit erkläre ich mich mit der Mitfahrt meines Kindes im Vereinsbus und in privaten PKW zu Auswärtsspielen sowie mit der Aufsicht durch das Trainerteam während Fahrten, Trainings und Spielen einverstanden.";
+      Store.get().consentTemplates.forEach((t) => {
+        if (t.text === OLD) Store.update("consentTemplates", t.id, { text: NEW });
+      });
+    })();
+
     // Bereits importierte Termine mit Art "Sonstiges" einmalig neu klassifizieren
     // (verbesserte Erkennung von "Heim : Gast"-Spielplan-Titeln)
     if (window.IO) {
