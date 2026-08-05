@@ -151,24 +151,24 @@
       }));
 
     el.innerHTML = `
-      ${head("Spielerverwaltung", "Kader, Kontaktdaten der Eltern und Status", `<button class="btn" data-add>＋ Spieler</button>`)}
+      ${head("Spielerverwaltung", "Kader, Kontaktdaten von Spielern und Eltern",
+        `<button class="btn outline" data-io>⇅ Import / Export</button><button class="btn" data-add>＋ Spieler</button>`)}
       <div class="chip-row mb">${chips.join("")}</div>
       <div class="card" style="padding:0">
         <div class="table-wrap"><table>
-          <thead><tr><th>Name</th><th>Nr.</th><th>Position</th><th>Abteilung</th><th>Jg.</th><th>Pass-Nr.</th><th>Eltern / Kontakt</th><th>Einverst.</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Nr.</th><th>Abteilung</th><th>Jg.</th><th>Pass-Nr.</th><th class="wrap">Kontakt (Erstkontakt ⭐)</th><th>Einverst.</th><th>Status</th><th></th></tr></thead>
           <tbody>${list.map((p) => `
             <tr>
-              <td><div class="flex">${avatar(p.firstName, p.lastName)}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong></div></td>
+              <td><div class="flex">${avatar(p.firstName, p.lastName)}<div><strong>${esc(p.firstName)} ${esc(p.lastName)}</strong><div class="sub soft">${esc(p.position)}</div></div></div></td>
               <td>#${esc(p.jerseyNumber)}</td>
-              <td>${esc(p.position)}</td>
               <td><span class="badge info">${esc(deptName(p.departmentId))}</span></td>
               <td>${jahrgang(p.birthDate)}</td>
               <td class="soft">${esc(p.passNumber || "—")}</td>
-              <td class="wrap"><div>${esc(p.parentName)}</div><div class="sub soft">${esc(p.parentEmail)} · ${esc(p.parentPhone)}</div></td>
+              <td class="wrap">${contactCell(p)}</td>
               <td>${p.consentOnFile ? '<span class="badge good">✓</span>' : '<span class="badge bad">fehlt</span>'}</td>
               <td>${statusBadge(p.membershipStatus)}</td>
               <td class="right nowrap">
-                <button class="btn sm ghost" data-mail="${p.id}" title="Eltern kontaktieren">✉️</button>
+                <button class="btn sm ghost" data-mail="${p.id}" title="Kontaktieren">✉️</button>
                 <button class="btn sm ghost" data-edit="${p.id}">✏️</button>
                 <button class="btn sm ghost" data-del="${p.id}">🗑️</button>
               </td>
@@ -178,6 +178,7 @@
 
     $$("[data-team]", el).forEach((c) => c.onclick = () => { players._team = c.dataset.team; reload(); });
     $("[data-add]", el).onclick = () => playerForm();
+    $("[data-io]", el).onclick = () => playerIO();
     $$("[data-edit]", el).forEach((b) => b.onclick = () => playerForm(Store.byId("players", b.dataset.edit)));
     $$("[data-del]", el).forEach((b) => b.onclick = () => {
       const p = Store.byId("players", b.dataset.del);
@@ -186,6 +187,137 @@
       });
     });
     $$("[data-mail]", el).forEach((b) => b.onclick = () => contactParent(Store.byId("players", b.dataset.mail)));
+  }
+
+  // Kontaktzelle: Spieler + Eltern 1/2, Erstkontakt mit ⭐ markiert
+  const prefLabel = { player: "Spieler", parents: "Eltern", both: "Spieler + Eltern" };
+  function contactCell(p) {
+    const starP = p.contactPreference === "player" || p.contactPreference === "both";
+    const starE = p.contactPreference === "parents" || p.contactPreference === "both";
+    const rows = [];
+    if (p.playerPhone || p.playerEmail) {
+      rows.push(`<div>${starP ? "⭐ " : ""}<strong>Spieler:</strong> <span class="soft">${esc([p.playerEmail, p.playerPhone].filter(Boolean).join(" · "))}</span></div>`);
+    }
+    if (p.parentName || p.parentEmail || p.parentPhone) {
+      rows.push(`<div>${starE ? "⭐ " : ""}<strong>${esc(p.parentName || "Eltern")}:</strong> <span class="soft">${esc([p.parentEmail, p.parentPhone].filter(Boolean).join(" · "))}</span></div>`);
+    }
+    if (p.parent2Name || p.parent2Email || p.parent2Phone) {
+      rows.push(`<div>${starE ? "⭐ " : ""}<strong>${esc(p.parent2Name || "Elternteil 2")}:</strong> <span class="soft">${esc([p.parent2Email, p.parent2Phone].filter(Boolean).join(" · "))}</span></div>`);
+    }
+    return rows.join("") || '<span class="muted">keine Kontaktdaten</span>';
+  }
+
+  /* ---------- Import / Export Spielerdaten ---------- */
+  const PLAYER_CSV_FIELDS = ["firstName", "lastName", "birthDate", "gender", "position", "jerseyNumber", "team", "departmentId", "passNumber",
+    "playerPhone", "playerEmail", "contactPreference", "parentName", "parentEmail", "parentPhone",
+    "parent2Name", "parent2Email", "parent2Phone", "membershipStatus", "notes"];
+  function playerIO() {
+    modal({
+      title: "Spielerdaten importieren / exportieren",
+      body: `
+        <h3 style="font-size:.95rem">⬇️ Export</h3>
+        <p class="soft" style="font-size:.85rem;margin-top:0">Exportiert alle ${S().players.length} Spieler.</p>
+        <div class="flex flex-wrap mb">
+          <button class="btn sm outline" data-ex="csv">CSV (Excel)</button>
+          <button class="btn sm outline" data-ex="json">JSON</button>
+          <button class="btn sm outline" data-ex="vcf">vCard (Kontakte)</button>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+        <h3 style="font-size:.95rem">⬆️ Import (CSV oder JSON)</h3>
+        <p class="soft" style="font-size:.85rem;margin-top:0">CSV mit Semikolon oder Komma; Spaltennamen wie im Export
+        (mind. <code>firstName</code>, <code>lastName</code>). Bestehende Spieler werden über Passnummer bzw.
+        Name+Geburtsdatum erkannt und aktualisiert, neue werden angelegt.</p>
+        <p class="soft" style="font-size:.85rem"><strong>🏐 SAMS-Mannschaftsliste (VVMV):</strong> Der CSV-Export von
+        <code>vvmv.sams-server.de</code> („Mannschaftsliste") wird automatisch erkannt – inkl. Umlaut-Kodierung.
+        Ideal für den Kader-Import <strong>einmal pro Saison</strong>; danach werden vorhandene Spieler nur aktualisiert.</p>
+        <div class="flex flex-wrap">
+          <button class="btn sm" data-im>📂 Datei wählen (CSV/JSON)</button>
+          <button class="btn sm ghost" data-tpl>Vorlage herunterladen</button>
+        </div>
+        <div id="ioResult" class="mt"></div>`,
+      footer: `<button class="btn ghost" data-x>Schließen</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        const stamp = new Date().toISOString().slice(0, 10);
+        m.querySelectorAll("[data-ex]").forEach((b) => b.onclick = () => {
+          const ps = S().players;
+          if (b.dataset.ex === "csv") IO.download(`skv-spieler-${stamp}.csv`, IO.toCSV(PLAYER_CSV_FIELDS, ps.map((p) => ({ ...p, departmentId: deptName(p.departmentId) }))), "text/csv");
+          if (b.dataset.ex === "json") IO.download(`skv-spieler-${stamp}.json`, JSON.stringify(ps, null, 2), "application/json");
+          if (b.dataset.ex === "vcf") IO.download(`skv-spieler-${stamp}.vcf`, IO.toVCard(ps, deptName), "text/vcard");
+          toast("Export erstellt", "good");
+        });
+        m.querySelector("[data-tpl]").onclick = () => {
+          IO.download("skv-spieler-vorlage.csv", IO.toCSV(PLAYER_CSV_FIELDS, [{
+            firstName: "Max", lastName: "Muster", birthDate: "2010-05-01", gender: "m", position: "Außenangriff",
+            jerseyNumber: 5, team: "U16", departmentId: "männliche U16", passNumber: "",
+            playerPhone: "", playerEmail: "", contactPreference: "parents",
+            parentName: "Erika Muster", parentEmail: "erika@example.de", parentPhone: "0170 0000000",
+            parent2Name: "", parent2Email: "", parent2Phone: "", membershipStatus: "aktiv", notes: "",
+          }]), "text/csv");
+        };
+        m.querySelector("[data-im]").onclick = async () => {
+          const f = await IO.pickFile(".csv,.json,text/csv,application/json");
+          if (!f) return;
+          let rows;
+          try {
+            rows = f.name.toLowerCase().endsWith(".json") || f.text.trim().startsWith("[")
+              ? JSON.parse(f.text) : IO.parseCSV(f.text);
+          } catch (err) { m.querySelector("#ioResult").innerHTML = `<span class="badge bad">Fehler: ${esc(err.message)}</span>`; return; }
+          const res = importPlayers(rows);
+          m.querySelector("#ioResult").innerHTML =
+            `<span class="badge good">✓ ${res.added} neu</span> <span class="badge info">${res.updated} aktualisiert</span>` +
+            (res.skipped ? ` <span class="badge warn">${res.skipped} übersprungen (kein Name)</span>` : "");
+          toast(`Import: ${res.added} neu, ${res.updated} aktualisiert`, "good");
+          App.reload();
+        };
+      },
+    });
+  }
+  // SAMS-Mannschaftsliste (vvmv.sams-server.de) → interne Felder übersetzen
+  function normalizeSamsRow(r) {
+    if (r.firstName || r.lastName || (!r.Nachname && !r.Vorname)) return r; // kein SAMS-Format
+    const out = { firstName: r.Vorname || "", lastName: r.Nachname || "" };
+    const g = (r.Geschlecht || "").toLowerCase();
+    if (g.startsWith("m")) out.gender = "m"; else if (g.startsWith("w")) out.gender = "w";
+    if (r.Trikot) out.jerseyNumber = r.Trikot;
+    if (r["Position/Funktion Offizieller"]) out.position = r["Position/Funktion Offizieller"];
+    const notes = [];
+    if (r["Größe"]) notes.push(`Größe: ${r["Größe"]} cm`);
+    if (r.Titel) notes.push(`Titel: ${r.Titel}`);
+    if (r.spielberechtigt) notes.push(`spielberechtigt (SAMS): ${r.spielberechtigt}`);
+    if (notes.length) out.notes = notes.join(" · ");
+    return out;
+  }
+  function importPlayers(rows) {
+    const s = S();
+    const byDeptName = {}; s.departments.forEach((d) => { byDeptName[d.name.toLowerCase()] = d.id; byDeptName[(d.code || "").toLowerCase()] = d.id; });
+    let added = 0, updated = 0, skipped = 0;
+    rows.map(normalizeSamsRow).forEach((r) => {
+      if (!r || !(r.firstName || "").trim() || !(r.lastName || "").trim()) { skipped++; return; }
+      const data = {};
+      PLAYER_CSV_FIELDS.forEach((k) => { if (r[k] != null && r[k] !== "") data[k] = r[k]; });
+      if (data.jerseyNumber != null) data.jerseyNumber = Number(data.jerseyNumber) || "";
+      // Abteilung: ID direkt oder über Namen/Code auflösen
+      if (data.departmentId && !s.departments.some((d) => d.id === data.departmentId)) {
+        data.departmentId = byDeptName[String(data.departmentId).toLowerCase()] || null;
+      }
+      if (!["player", "parents", "both"].includes(data.contactPreference)) delete data.contactPreference;
+      const ex = s.players.find((p) =>
+        (data.passNumber && p.passNumber && p.passNumber === data.passNumber) ||
+        (p.firstName.toLowerCase() === data.firstName.toLowerCase() && p.lastName.toLowerCase() === data.lastName.toLowerCase() &&
+          (!data.birthDate || !p.birthDate || p.birthDate === data.birthDate)));
+      if (ex) { Store.update("players", ex.id, data); updated++; }
+      else {
+        Store.add("players", Object.assign({
+          position: "Außenangriff", jerseyNumber: "", team: "", departmentId: null, gender: "m", passNumber: "",
+          playerPhone: "", playerEmail: "", contactPreference: "parents",
+          parentName: "", parentEmail: "", parentPhone: "", parent2Name: "", parent2Email: "", parent2Phone: "",
+          consentOnFile: false, membershipStatus: "aktiv", notes: "", birthDate: "",
+        }, data));
+        added++;
+      }
+    });
+    return { added, updated, skipped };
   }
 
   function statusBadge(st) {
@@ -198,11 +330,17 @@
   function playerForm(p) {
     const isEdit = !!p;
     const deps = S().departments;
-    p = p || { firstName: "", lastName: "", birthDate: "", position: "Außenangriff", jerseyNumber: "", team: "U18", departmentId: (deps[0] || {}).id || null, gender: "m", passNumber: "", parentName: "", parentEmail: "", parentPhone: "", membershipStatus: "aktiv", consentOnFile: false, notes: "" };
+    p = p || { firstName: "", lastName: "", birthDate: "", position: "Außenangriff", jerseyNumber: "", team: "U18", departmentId: (deps[0] || {}).id || null, gender: "m", passNumber: "",
+      playerPhone: "", playerEmail: "", contactPreference: "parents",
+      parentName: "", parentEmail: "", parentPhone: "", parent2Name: "", parent2Email: "", parent2Phone: "",
+      membershipStatus: "aktiv", consentOnFile: false, notes: "" };
     const positions = ["Zuspiel", "Außenangriff", "Mitte", "Diagonal", "Libero"];
+    const sect = (t) => `<div class="field full" style="margin-top:6px"><strong style="color:var(--primary)">${t}</strong></div>`;
     modal({
       title: isEdit ? "Spieler bearbeiten" : "Neuer Spieler",
+      wide: true,
       body: `<form id="pf"><div class="form-grid">
+        ${sect("🏐 Stammdaten")}
         <div class="field"><label>Vorname</label><input name="firstName" value="${esc(p.firstName)}" required></div>
         <div class="field"><label>Nachname</label><input name="lastName" value="${esc(p.lastName)}" required></div>
         <div class="field"><label>Geburtsdatum</label><input type="date" name="birthDate" value="${esc(p.birthDate)}" required></div>
@@ -213,11 +351,22 @@
         <div class="field"><label>Geschlecht</label><select name="gender">
           ${Object.entries(genderLabel).map(([k, v]) => `<option value="${k}" ${k === p.gender ? "selected" : ""}>${v}</option>`).join("")}</select></div>
         <div class="field"><label>Passnummer (Verband)</label><input name="passNumber" value="${esc(p.passNumber || "")}" placeholder="z. B. MV202512345"></div>
-        <div class="field"><label>Name Elternteil</label><input name="parentName" value="${esc(p.parentName)}"></div>
         <div class="field"><label>Status</label><select name="membershipStatus">
           ${["aktiv", "beitragsrückstand", "inaktiv"].map((x) => `<option ${x === p.membershipStatus ? "selected" : ""}>${x}</option>`).join("")}</select></div>
-        <div class="field"><label>E-Mail Eltern</label><input type="email" name="parentEmail" value="${esc(p.parentEmail)}"></div>
-        <div class="field"><label>Telefon Eltern</label><input name="parentPhone" value="${esc(p.parentPhone)}"></div>
+        <div class="field"><label>⭐ Erstkontakt (wer wird zuerst angeschrieben?)</label><select name="contactPreference">
+          ${Object.entries(prefLabel).map(([k, v]) => `<option value="${k}" ${k === p.contactPreference ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+        ${sect("📱 Kontakt Spieler")}
+        <div class="field"><label>Telefon Spieler</label><input name="playerPhone" value="${esc(p.playerPhone || "")}" placeholder="Handy des Spielers"></div>
+        <div class="field"><label>E-Mail Spieler</label><input type="email" name="playerEmail" value="${esc(p.playerEmail || "")}"></div>
+        ${sect("👪 Elternteil 1")}
+        <div class="field"><label>Name</label><input name="parentName" value="${esc(p.parentName)}"></div>
+        <div class="field"><label>Telefon</label><input name="parentPhone" value="${esc(p.parentPhone)}"></div>
+        <div class="field full"><label>E-Mail</label><input type="email" name="parentEmail" value="${esc(p.parentEmail)}"></div>
+        ${sect("👪 Elternteil 2 <span class='soft' style='font-weight:400'>(optional, z. B. bei getrennten Eltern)</span>")}
+        <div class="field"><label>Name</label><input name="parent2Name" value="${esc(p.parent2Name || "")}"></div>
+        <div class="field"><label>Telefon</label><input name="parent2Phone" value="${esc(p.parent2Phone || "")}"></div>
+        <div class="field full"><label>E-Mail</label><input type="email" name="parent2Email" value="${esc(p.parent2Email || "")}"></div>
+        ${sect("📝 Sonstiges")}
         <div class="field full"><label>Notizen</label><textarea name="notes">${esc(p.notes)}</textarea></div>
         <div class="field full"><label><input type="checkbox" name="consentOnFile" ${p.consentOnFile ? "checked" : ""} style="width:auto"> Einverständniserklärung liegt vor</label></div>
       </div></form>`,
@@ -238,21 +387,36 @@
   }
 
   function contactParent(p) {
+    // Empfängerliste mit Vorauswahl nach Erstkontakt-Einstellung
+    const recips = [];
+    const preferP = p.contactPreference === "player" || p.contactPreference === "both";
+    const preferE = p.contactPreference === "parents" || p.contactPreference === "both";
+    if (p.playerEmail || p.playerPhone) recips.push({ key: "player", label: `Spieler (${p.firstName})`, email: p.playerEmail, phone: p.playerPhone, star: preferP, checked: preferP });
+    if (p.parentName || p.parentEmail || p.parentPhone) recips.push({ key: "p1", label: p.parentName || "Elternteil 1", email: p.parentEmail, phone: p.parentPhone, star: preferE, checked: preferE });
+    if (p.parent2Name || p.parent2Email || p.parent2Phone) recips.push({ key: "p2", label: p.parent2Name || "Elternteil 2", email: p.parent2Email, phone: p.parent2Phone, star: preferE, checked: preferE });
     modal({
-      title: `Eltern kontaktieren – ${esc(p.firstName)} ${esc(p.lastName)}`,
-      body: `<div class="kv mb">
-          <dt>Elternteil</dt><dd>${esc(p.parentName || "—")}</dd>
-          <dt>E-Mail</dt><dd>${p.parentEmail ? `<a href="mailto:${esc(p.parentEmail)}">${esc(p.parentEmail)}</a>` : "—"}</dd>
-          <dt>Telefon</dt><dd>${p.parentPhone ? `<a href="tel:${esc(p.parentPhone)}">${esc(p.parentPhone)}</a>` : "—"}</dd>
+      title: `Kontaktieren – ${esc(p.firstName)} ${esc(p.lastName)}`,
+      body: `
+        <p class="soft" style="margin-top:0;font-size:.85rem">Erstkontakt laut Einstellung: <strong>${prefLabel[p.contactPreference] || "Eltern"}</strong> ⭐</p>
+        <div class="list mb">
+          ${recips.length ? recips.map((r) => `
+            <label class="list-item" style="cursor:pointer;padding:10px 12px">
+              <input type="checkbox" data-rc="${r.key}" ${r.checked ? "checked" : ""} style="width:auto">
+              <div class="grow"><div class="title">${r.star ? "⭐ " : ""}${esc(r.label)}</div>
+                <div class="sub">${r.email ? esc(r.email) : ""}${r.email && r.phone ? " · " : ""}${r.phone ? `<a href="tel:${esc(r.phone)}">${esc(r.phone)}</a>` : ""}</div></div>
+            </label>`).join("") : '<div class="muted">Keine Kontaktdaten hinterlegt.</div>'}
         </div>
-        <form id="cf"><div class="field"><label>Betreff</label><input name="subject" value="SKV Volleyball – Info zu ${esc(p.firstName)}"></div>
-        <div class="field mt"><label>Nachricht</label><textarea name="msg" rows="5">Liebe/r ${esc(p.parentName)},\n\n</textarea></div></form>`,
+        <form id="cf"><div class="field"><label>Betreff</label><input name="subject" value="SKV Müritz – Info zu ${esc(p.firstName)}"></div>
+        <div class="field mt"><label>Nachricht</label><textarea name="msg" rows="5">Hallo,\n\n</textarea></div></form>`,
       footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn" data-send>E-Mail öffnen</button>`,
       onOpen(m) {
         m.querySelector("[data-x]").onclick = closeModal;
         m.querySelector("[data-send]").onclick = () => {
+          const picked = Array.from(m.querySelectorAll("[data-rc]:checked")).map((c) => c.dataset.rc);
+          const emails = recips.filter((r) => picked.includes(r.key) && r.email).map((r) => r.email);
+          if (!emails.length) { toast("Kein Empfänger mit E-Mail ausgewählt", "bad"); return; }
           const d = formData(m.querySelector("#cf"));
-          const href = `mailto:${encodeURIComponent(p.parentEmail || "")}?subject=${encodeURIComponent(d.subject)}&body=${encodeURIComponent(d.msg)}`;
+          const href = `mailto:${encodeURIComponent(emails.join(","))}?subject=${encodeURIComponent(d.subject)}&body=${encodeURIComponent(d.msg)}`;
           window.location.href = href;
           closeModal(); toast("E-Mail-Programm geöffnet");
         };
@@ -291,9 +455,11 @@
     const dows = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
     const upcoming = upcomingEvents(8);
 
+    const feeds = S().calendarFeeds;
     el.innerHTML = `
-      ${head("Kalender", "Alle Trainings und Spieltage auf einen Blick", `<button class="btn" data-add>＋ Termin</button>`)}
-      <div class="grid" style="grid-template-columns: 1fr 340px; gap:16px; align-items:start">
+      ${head("Kalender", "Alle Trainings und Spieltage auf einen Blick",
+        `<button class="btn outline" data-import>⬇️ Termine importieren</button><button class="btn" data-add>＋ Termin</button>`)}
+      <div class="grid cols-side">
         <div class="card">
           <div class="cal-head">
             <button class="btn sm outline" data-prev>‹</button>
@@ -310,13 +476,28 @@
             <span class="chip pill-type-other">Sonstiges</span>
           </div>
         </div>
-        <div class="card">
-          <div class="card-head"><h3>Nächste Termine</h3></div>
-          <div class="list">
-            ${upcoming.map((e) => `
-              <div class="list-item" data-ev="${e.id}" style="cursor:pointer">
-                <div class="grow"><div class="title">${esc(e.title)} ${eventPill(e.type)}</div>
-                <div class="sub">${fmtDateShort(e.start)} · ${fmtTime(e.start)} Uhr · ${esc(e.location)}</div></div></div>`).join("")}
+        <div>
+          <div class="card mb">
+            <div class="card-head"><h3>Nächste Termine</h3></div>
+            <div class="list">
+              ${upcoming.map((e) => `
+                <div class="list-item" data-ev="${e.id}" style="cursor:pointer">
+                  <div class="grow"><div class="title">${esc(e.title)} ${eventPill(e.type)}</div>
+                  <div class="sub">${fmtDateShort(e.start)} · ${fmtTime(e.start)} Uhr · ${esc(e.location)}</div></div></div>`).join("")}
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>🔄 Kalender-Abos</h3><span class="spacer"></span>
+              <button class="btn sm outline" data-sync title="Alle Abos jetzt abrufen">↻</button></div>
+            <div class="list">
+              ${feeds.length ? feeds.map((f) => `
+                <div class="list-item" style="padding:10px">
+                  <div class="grow"><div class="title" style="font-size:.86rem">${esc(f.name)}</div>
+                    <div class="sub">${f.type === "rss" ? "RSS-Feed" : "iCal"} · ${f.autoSync ? "🟢 automatisch" : "⚪ manuell"}${f.lastSync ? ` · zuletzt ${fmtDateShort(f.lastSync)}` : ""}</div></div>
+                  <button class="btn sm ghost" data-ftoggle="${f.id}" title="Automatik umschalten">${f.autoSync ? "⏸" : "▶"}</button>
+                  <button class="btn sm ghost" data-fdel="${f.id}">🗑️</button>
+                </div>`).join("") : `<div class="muted" style="font-size:.85rem">Keine Abos – über „Termine importieren" anlegen.</div>`}
+            </div>
           </div>
         </div>
       </div>`;
@@ -325,7 +506,99 @@
     $("[data-next]", el).onclick = () => { calendar._month = new Date(y, mo + 1, 1).toISOString(); reload(); };
     $("[data-today]", el).onclick = () => { calendar._month = null; reload(); };
     $("[data-add]", el).onclick = () => eventForm();
+    $("[data-import]", el).onclick = () => calendarImport();
+    $("[data-sync]", el).onclick = async () => {
+      toast("Abos werden abgerufen …");
+      const r = await IO.syncAllFeeds();
+      S().calendarFeeds.forEach((f) => { if (f.autoSync) Store.update("calendarFeeds", f.id, { lastSync: new Date().toISOString() }); });
+      toast(`Synchronisiert: ${r.added} neue Termine${r.errors ? `, ${r.errors} Feed(s) nicht erreichbar` : ""}`, r.errors ? "bad" : "good");
+      reload();
+    };
+    $$("[data-ftoggle]", el).forEach((b) => b.onclick = () => {
+      const f = Store.byId("calendarFeeds", b.dataset.ftoggle);
+      Store.update("calendarFeeds", f.id, { autoSync: !f.autoSync }); reload();
+    });
+    $$("[data-fdel]", el).forEach((b) => b.onclick = () => confirmDialog("Abo entfernen? Bereits importierte Termine bleiben erhalten.", () => {
+      Store.remove("calendarFeeds", b.dataset.fdel); toast("Abo entfernt"); reload();
+    }));
     $$("[data-ev]", el).forEach((n) => n.onclick = () => eventDetail(n.dataset.ev));
+  }
+
+  /* ---------- Termin-Import (iCal / Google Kalender / RSS) ---------- */
+  function calendarImport() {
+    modal({
+      title: "Termine importieren",
+      wide: true,
+      body: `
+        <h3 style="font-size:.95rem">📂 Aus Datei (.ics)</h3>
+        <p class="soft" style="font-size:.85rem;margin-top:0">iCal-Export z. B. aus Apple Kalender, Outlook oder
+        <strong>Google Kalender</strong> (dort: Einstellungen → „Exportieren" → .ics-Datei).</p>
+        <button class="btn sm mb" data-file>📂 .ics-Datei wählen</button>
+        <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+
+        <h3 style="font-size:.95rem">🔗 Von URL (iCal-Adresse oder RSS-Feed)</h3>
+        <p class="soft" style="font-size:.85rem;margin-top:0">Google Kalender: Einstellungen des Kalenders →
+        „Kalender integrieren" → <em>„Geheime Adresse im iCal-Format"</em> kopieren und hier einfügen.
+        RSS-Feeds (z. B. Vereins-News mit Terminen) funktionieren ebenso.</p>
+        <div class="form-grid">
+          <div class="field full"><label>URL</label><input id="feedUrl" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"></div>
+          <div class="field"><label>Format</label><select id="feedType"><option value="ical">iCal (.ics)</option><option value="rss">RSS/Atom-Feed</option></select></div>
+          <div class="field"><label>Name (für Abo)</label><input id="feedName" placeholder="z. B. Hallenbelegung"></div>
+          <div class="field full"><label><input type="checkbox" id="feedAuto" checked style="width:auto">
+            Als Abo speichern und <strong>automatisch synchronisieren</strong> (bei jedem App-Start und per ↻)</label></div>
+        </div>
+        <button class="btn sm mt" data-url>⬇️ Von URL importieren</button>
+        <hr style="border:none;border-top:1px solid var(--border);margin:14px 0">
+
+        <h3 style="font-size:.95rem">📋 Text einfügen</h3>
+        <p class="soft" style="font-size:.85rem;margin-top:0">Falls eine URL wegen Browser-Sicherheit (CORS) nicht
+        abrufbar ist: Inhalt der .ics-/Feed-Datei einfach hier einfügen.</p>
+        <textarea id="pasteBox" rows="4" placeholder="BEGIN:VCALENDAR …"></textarea>
+        <button class="btn sm mt" data-paste>⬇️ Aus Text importieren</button>
+        <div id="calImpResult" class="mt"></div>`,
+      footer: `<button class="btn ghost" data-x>Schließen</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        const showResult = (added, note) => {
+          m.querySelector("#calImpResult").innerHTML =
+            `<span class="badge good">✓ ${added} neue Termine importiert</span>${note ? ` <span class="badge">${esc(note)}</span>` : ""}`;
+          toast(`${added} Termine importiert`, "good"); App.reload();
+        };
+        const showError = (err) => {
+          m.querySelector("#calImpResult").innerHTML = `<span class="badge bad">Fehler: ${esc(err.message || err)}</span>`;
+        };
+        m.querySelector("[data-file]").onclick = async () => {
+          const f = await IO.pickFile(".ics,text/calendar");
+          if (!f) return;
+          try { showResult(IO.mergeEvents(IO.parseICS(f.text))); } catch (e) { showError(e); }
+        };
+        m.querySelector("[data-paste]").onclick = () => {
+          const text = m.querySelector("#pasteBox").value.trim();
+          if (!text) { showError(new Error("Kein Text eingefügt")); return; }
+          try {
+            const list = text.includes("BEGIN:VCALENDAR") || text.includes("BEGIN:VEVENT") ? IO.parseICS(text) : IO.parseFeed(text);
+            showResult(IO.mergeEvents(list));
+          } catch (e) { showError(e); }
+        };
+        m.querySelector("[data-url]").onclick = async () => {
+          const url = m.querySelector("#feedUrl").value.trim();
+          const type = m.querySelector("#feedType").value;
+          const name = m.querySelector("#feedName").value.trim() || url.slice(0, 40);
+          const auto = m.querySelector("#feedAuto").checked;
+          if (!url) { showError(new Error("Bitte URL eingeben")); return; }
+          try {
+            const text = await IO.fetchText(url);
+            const added = IO.mergeEvents(IO.parseByType(type, text));
+            if (auto) {
+              Store.add("calendarFeeds", { name, url, type, autoSync: true, lastSync: new Date().toISOString(), lastResult: "ok" });
+              showResult(added, "Abo gespeichert – wird automatisch aktualisiert");
+            } else showResult(added);
+          } catch (e) {
+            showError(new Error("URL nicht abrufbar (evtl. CORS-Sperre des Anbieters). Tipp: Datei herunterladen und über „.ics-Datei wählen“ importieren, oder Inhalt unten als Text einfügen."));
+          }
+        };
+      },
+    });
   }
 
   function eventDetail(id) {
@@ -688,7 +961,7 @@
           <td class="right"><button class="btn sm outline" data-remind="${p.id}">Erinnern</button>
           <button class="btn sm" data-upload="${p.id}">Hochladen</button></td></tr>`).join("")}</tbody></table></div></div>` : ""}
 
-      <div class="card" style="padding:0"><div class="card-head" style="padding:18px 18px 0"><h3>📁 Abgelegte Formulare</h3></div>
+      <div class="card mb" style="padding:0"><div class="card-head" style="padding:18px 18px 0"><h3>📁 Abgelegte Formulare</h3></div>
         <div class="table-wrap"><table>
           <thead><tr><th>Spieler</th><th>Art</th><th>Datei</th><th>Unterschrift</th><th>Erfasst am</th><th class="right"></th></tr></thead>
           <tbody>${s.consents.map((c) => `<tr>
@@ -699,7 +972,27 @@
             <td class="soft">${fmtDateShort(c.uploadedAt)}</td>
             <td class="right"><button class="btn sm ghost" data-cdel="${c.id}">🗑️</button></td></tr>`).join("")
             || `<tr><td colspan="6">${empty("📄", "Noch keine Formulare erfasst")}</td></tr>`}</tbody>
-        </table></div></div>`;
+        </table></div></div>
+
+      <div class="card">
+        <div class="card-head"><h3>🗂️ Formular-Vorlagen</h3><span class="spacer"></span>
+          <button class="btn sm" data-tadd>＋ Vorlage</button></div>
+        <p class="soft" style="font-size:.85rem;margin-top:0">Eigene Einverständnis-Vorlagen anlegen, ändern und löschen.
+        Vorlagen erscheinen als Auswahl beim Hochladen und lassen sich als Formular drucken/als PDF sichern.</p>
+        <div class="list">
+          ${s.consentTemplates.map((t) => {
+            const cnt = s.consents.filter((c) => c.type === t.name).length;
+            return `<div class="list-item">
+              <div class="grow"><div class="title">${esc(t.name)} ${t.required ? '<span class="badge bad">Pflicht</span>' : '<span class="badge">optional</span>'}</div>
+                <div class="sub">${esc(t.text.slice(0, 110))}${t.text.length > 110 ? "…" : ""}</div></div>
+              <span class="badge info nowrap">${cnt}× erfasst</span>
+              <button class="btn sm ghost" data-tprint="${t.id}" title="Formular drucken">🖨️</button>
+              <button class="btn sm ghost" data-tedit="${t.id}">✏️</button>
+              <button class="btn sm ghost" data-tdel="${t.id}">🗑️</button>
+            </div>`;
+          }).join("") || empty("🗂️", "Noch keine Vorlagen – jetzt anlegen")}
+        </div>
+      </div>`;
 
     $("[data-add]", el).onclick = () => consentForm();
     $$("[data-upload]", el).forEach((b) => b.onclick = () => consentForm(b.dataset.upload));
@@ -709,6 +1002,66 @@
     $$("[data-cdel]", el).forEach((b) => b.onclick = () => confirmDialog("Formular-Eintrag löschen?", () => {
       Store.remove("consents", b.dataset.cdel); toast("Eintrag gelöscht"); reload();
     }));
+    $("[data-tadd]", el).onclick = () => consentTemplateForm();
+    $$("[data-tedit]", el).forEach((b) => b.onclick = () => consentTemplateForm(Store.byId("consentTemplates", b.dataset.tedit)));
+    $$("[data-tdel]", el).forEach((b) => b.onclick = () => {
+      const t = Store.byId("consentTemplates", b.dataset.tdel);
+      confirmDialog(`Vorlage „${t.name}" löschen? Bereits abgelegte Formulare bleiben erhalten.`, () => {
+        Store.remove("consentTemplates", t.id); toast("Vorlage gelöscht"); reload();
+      });
+    });
+    $$("[data-tprint]", el).forEach((b) => b.onclick = () => printConsentTemplate(Store.byId("consentTemplates", b.dataset.tprint)));
+  }
+
+  function consentTemplateForm(t) {
+    const isEdit = !!t;
+    t = t || { name: "", text: "", required: false };
+    modal({
+      title: isEdit ? "Vorlage bearbeiten" : "Neue Formular-Vorlage",
+      body: `<form id="tf"><div class="form-grid">
+        <div class="field full"><label>Name der Erklärung</label><input name="name" value="${esc(t.name)}" required placeholder="z. B. Teilnahme Turnierfahrt"></div>
+        <div class="field full"><label>Text / Inhalt der Erklärung</label><textarea name="text" rows="6" required placeholder="Hiermit erkläre ich mich einverstanden, dass …">${esc(t.text)}</textarea></div>
+        <div class="field full"><label><input type="checkbox" name="required" ${t.required ? "checked" : ""} style="width:auto"> Pflicht-Formular (für alle Spieler erforderlich)</label></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#tf"); if (!f.reportValidity()) return;
+          const d = formData(f);
+          if (isEdit) {
+            // Umbenennung auch in bereits abgelegten Formularen nachziehen
+            if (d.name !== t.name) S().consents.forEach((c) => { if (c.type === t.name) Store.update("consents", c.id, { type: d.name }); });
+            Store.update("consentTemplates", t.id, d);
+          } else Store.add("consentTemplates", d);
+          closeModal(); toast("Vorlage gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
+
+  // Druckbares Formular (zum Austeilen an die Eltern) aus einer Vorlage
+  function printConsentTemplate(t) {
+    const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>${esc(t.name)}</title>
+      <style>body{font-family:Arial,sans-serif;color:#111;margin:40px;max-width:700px}
+      h1{font-size:19px}h2{font-size:15px;color:#444;font-weight:normal;margin-top:0}
+      .box{border:1px solid #999;border-radius:6px;padding:16px;margin:18px 0;line-height:1.6;font-size:14px}
+      .fields{margin:22px 0;font-size:14px}.fields div{margin:14px 0;border-bottom:1px solid #333;padding-bottom:2px}
+      .sign{margin-top:46px;display:flex;gap:50px}.sign div{border-top:1px solid #333;padding-top:4px;font-size:12px;flex:1}</style></head><body>
+      <h1>SKV Müritz – ${esc(t.name)}</h1>
+      <h2>www.skv-mueritz.de · Abteilung Volleyball</h2>
+      <div class="box">${esc(t.text).replace(/\n/g, "<br>")}</div>
+      <div class="fields">
+        <div>Name des Spielers: &nbsp;</div>
+        <div>Geburtsdatum: &nbsp;</div>
+        <div>Name der/des Erziehungsberechtigten: &nbsp;</div>
+      </div>
+      <div class="sign"><div>Ort, Datum</div><div>Unterschrift Erziehungsberechtigte/r</div></div>
+      </body></html>`;
+    const w = window.open("", "_blank");
+    if (!w) { toast("Bitte Pop-ups erlauben, um zu drucken", "bad"); return; }
+    w.document.write(html); w.document.close(); w.focus();
+    setTimeout(() => w.print(), 300);
   }
 
   function consentForm(preselectPlayer) {
@@ -718,8 +1071,9 @@
       body: `<form id="cf"><div class="form-grid">
         <div class="field"><label>Spieler</label><select name="playerId">
           ${s.players.map((p) => `<option value="${p.id}" ${p.id === preselectPlayer ? "selected" : ""}>${esc(p.firstName)} ${esc(p.lastName)}</option>`).join("")}</select></div>
-        <div class="field"><label>Art der Erklärung</label><select name="type">
-          ${["Datennutzung & Fotorechte", "Fahrten & Aufsicht", "Medizinische Notfallversorgung", "Teilnahme Trainingslager"].map((x) => `<option>${x}</option>`).join("")}</select></div>
+        <div class="field"><label>Art der Erklärung (Vorlage)</label><select name="type">
+          ${s.consentTemplates.map((t) => `<option>${esc(t.name)}</option>`).join("")}
+          <option>Sonstige</option></select></div>
         <div class="field"><label>Unterschrieben von</label><input name="signedBy" placeholder="Name Elternteil"></div>
         <div class="field full"><label>Datei (PDF/Bild)</label>
           <label class="file-drop" id="fd">📎 Klicken zum Auswählen<div class="sub" id="fdname"></div>
@@ -1052,7 +1406,7 @@
         ${stat("📈", "Satzverhältnis", (() => { const t = rows.find((r) => /skv/i.test(r.team)); return t ? `${t.setsW}:${t.setsL}` : "—"; })())}
       </div>
 
-      <div class="grid" style="grid-template-columns: 1.4fr 1fr; gap:16px; align-items:start">
+      <div class="grid cols-wide">
         <div class="card" style="padding:0">
           <div class="card-head" style="padding:18px 18px 0"><h3>📊 Tabelle Verbandsliga MV</h3></div>
           <div class="table-wrap"><table>
@@ -1134,7 +1488,7 @@
 
     el.innerHTML = `
       ${head("Volleyball-Wiki", "Regeln, Techniken und Begriffe – ideal für neue Spieler und Eltern")}
-      <div class="grid" style="grid-template-columns: 240px 1fr; gap:16px; align-items:start">
+      <div class="grid cols-toc">
         <div class="card wiki-toc" style="position:sticky;top:80px">
           <h3 style="font-size:.9rem">Inhalt</h3>
           ${articles.map((a) => `<a href="#/wiki" data-goto="${a.id}">${esc(a.h)}</a>`).join("")}

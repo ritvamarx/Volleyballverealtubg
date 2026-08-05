@@ -106,6 +106,17 @@
       $("#overlay").classList.toggle("show");
     };
     $("#overlay").addEventListener("click", () => { $("#sidebar").classList.remove("open"); });
+
+    // Kalender-Abos automatisch synchronisieren (still im Hintergrund)
+    if (window.IO && navigator.onLine !== false) {
+      IO.syncAllFeeds().then((r) => {
+        if (r.added > 0) {
+          Store.get().calendarFeeds.forEach((f) => { if (f.autoSync) Store.update("calendarFeeds", f.id, { lastSync: new Date().toISOString() }); });
+          U.toast(`🔄 ${r.added} neue Termine aus Kalender-Abos importiert`, "good");
+          App.reload();
+        }
+      }).catch(() => { /* offline oder CORS – still bleiben */ });
+    }
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

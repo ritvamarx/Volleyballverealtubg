@@ -7,7 +7,7 @@
 (function () {
   "use strict";
 
-  const KEY = "skv_vb_data_v3";
+  const KEY = "skv_vb_data_v4";
   const CLUB = "SKV Müritz";
   const WEBSITE = "https://www.skv-mueritz.de";
 
@@ -52,6 +52,13 @@
       pl.departmentId = deptId(teamToDept[pl.team] || null);
       pl.passNumber = `MV${SEASON.year}${String(10001 + i)}`;
     });
+    // Beispiel-Kontaktdaten: ältere Spieler mit eigener Nummer/Mail, teils Erstkontakt Spieler
+    Object.assign(players[0], { playerPhone: "0151 2340001", playerEmail: "ben.bauer@example.de", contactPreference: "both" });
+    Object.assign(players[1], { playerPhone: "0151 2340002", playerEmail: "luca.schulz@example.de", contactPreference: "player" });
+    Object.assign(players[4], { playerPhone: "0151 2340005", contactPreference: "both" });
+    // Beispiel: getrennte Eltern – zweites Elternfeld belegt
+    Object.assign(players[2], { parent2Name: "Dirk Wagner", parent2Email: "dirk.wagner@example.de", parent2Phone: "0170 5554503" });
+    Object.assign(players[8], { parent2Name: "Peter Meyer", parent2Email: "peter.meyer@example.de", parent2Phone: "0170 5554509" });
 
     const events = [
       ev("training", "Training mU18", d(0, 18, 0), d(0, 20, 0), "Sporthalle SKV, Halle 1", ""),
@@ -97,6 +104,19 @@
       job(homeB, "catering", "Grillstand betreuen", "", false),
       job(homeB, "helper", "Abbau & Halle reinigen", "", false),
       job(homeB, "helper", "Sanitätsdienst / Erste Hilfe", "Anke Fischer", true),
+    ];
+
+    // Vorlagen für Einverständniserklärungen (vom Trainer selbst verwaltbar)
+    const consentTemplates = [
+      ctpl("Datennutzung & Fotorechte", "Einverständnis zur Speicherung von Kontaktdaten sowie zur Veröffentlichung von Mannschafts- und Spielfotos auf Vereinswebsite und in Vereinsmedien.", true),
+      ctpl("Fahrten & Aufsicht", "Einverständnis zur Mitfahrt in privaten PKW zu Auswärtsspielen und zur Aufsicht durch das Trainerteam während Fahrten und Spielen.", true),
+      ctpl("Medizinische Notfallversorgung", "Einverständnis zur Veranlassung notwendiger ärztlicher Maßnahmen im Notfall, wenn die Eltern nicht erreichbar sind.", true),
+      ctpl("Teilnahme Trainingslager", "Einverständnis zur Teilnahme am Trainingslager inkl. Übernachtung.", false),
+    ];
+
+    // Kalender-Abos (iCal/RSS) für automatischen Termin-Import
+    const calendarFeeds = [
+      feed("VVMV Spielplan (Beispiel)", "https://mv.sams-ticket.de/public/ical-beispiel.ics", "ical", false),
     ];
 
     // Einverständniserklärungen
@@ -194,14 +214,24 @@
 
     return {
       club: CLUB, website: "https://www.skv-mueritz.de", season: SEASON,
-      departments, players, events, responses, drivers, jobs, consents, finances,
-      clothing, clothingRequests, sponsors, announcements, tasks, inventory, standings, meldungen,
+      departments, players, events, responses, drivers, jobs, consents, consentTemplates,
+      calendarFeeds, finances, clothing, clothingRequests, sponsors, announcements,
+      tasks, inventory, standings, meldungen,
     };
   }
 
   // ---- Entity-Factories ----
   function p(firstName, lastName, birthDate, position, jerseyNumber, team, parentName, parentEmail, parentPhone, consentOnFile, membershipStatus) {
-    return { id: uid("pl"), firstName, lastName, birthDate, position, jerseyNumber, team, parentName, parentEmail, parentPhone, consentOnFile, membershipStatus, notes: "", gender: "m", passNumber: "", departmentId: null };
+    return { id: uid("pl"), firstName, lastName, birthDate, position, jerseyNumber, team,
+      // Kontakt Spieler selbst
+      playerPhone: "", playerEmail: "",
+      // Erstkontakt: "player" | "parents" | "both"
+      contactPreference: "parents",
+      // Elternteil 1
+      parentName, parentEmail, parentPhone,
+      // Elternteil 2 (z. B. bei getrennten Eltern)
+      parent2Name: "", parent2Email: "", parent2Phone: "",
+      consentOnFile, membershipStatus, notes: "", gender: "m", passNumber: "", departmentId: null };
   }
   function dept(code, name, category, gender, league, ageGroup, trainer, email, times, venue) {
     return { id: uid("de"), code, name, category, gender, league, ageGroup, trainer, email, times, venue, active: true };
@@ -223,6 +253,12 @@
   }
   function consent(playerId, type, fileName, dataUrl, signedBy) {
     return { id: uid("co"), playerId, type, fileName, dataUrl: dataUrl || null, signedBy, uploadedAt: new Date().toISOString() };
+  }
+  function ctpl(name, text, required) {
+    return { id: uid("ct"), name, text, required: !!required };
+  }
+  function feed(name, url, type, autoSync) {
+    return { id: uid("cf"), name, url, type: type || "ical", autoSync: !!autoSync, lastSync: null, lastResult: "" };
   }
   function fin(type, description, amount, date, paid, playerId) {
     return { id: uid("fi"), type, description, amount, date, paid: !!paid, playerId: playerId || null };

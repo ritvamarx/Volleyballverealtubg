@@ -106,7 +106,8 @@
     const overlay = $("#overlay");
     const m = $(".modal");
     overlay.classList.remove("show");
-    if (m) { m.classList.remove("show"); setTimeout(() => { $("#modalRoot").innerHTML = ""; }, 200); }
+    // nur DIESES Modal entfernen – ein direkt danach geöffnetes neues Modal bleibt erhalten
+    if (m) { m.classList.remove("show"); setTimeout(() => m.remove(), 200); }
   }
 
   function confirmDialog(message, onYes, yesLabel = "Löschen") {

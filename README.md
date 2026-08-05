@@ -43,12 +43,12 @@ node build.js
 |---|---|
 | **Übersicht** | Trainer-Cockpit mit Kennzahlen, nächsten Terminen, offenen Aufgaben, Geburtstagen und Warnhinweisen. |
 | **Abteilungen** | Verschiedene Mannschaften/Abteilungen (Herren I, männl. U20/U18/U16/U14, Mini-Volleyball, Hobby) mit Liga, Altersklasse, Trainingszeiten, Halle und Ansprechpartner. |
-| **Spielerverwaltung** | Kader mit Position, Trikotnummer, **Abteilung**, **Jahrgang**, **Passnummer**, Geschlecht sowie Elternkontakt (E-Mail/Telefon) und Status. Direkter „Eltern kontaktieren"-Button (öffnet vorbereitete E-Mail). |
+| **Spielerverwaltung** | Kader mit Position, Trikotnummer, **Abteilung**, **Jahrgang**, **Passnummer**, Geschlecht. Kontaktdaten von **Spieler und beiden Elternteilen** (auch bei getrennten Eltern), **Erstkontakt-Kennzeichnung** (⭐ Spieler/Eltern/beide) und Kontakt-Dialog mit Empfängerauswahl. **Import/Export**: CSV (inkl. **SAMS-Mannschaftsliste** von vvmv.sams-server.de mit automatischer Umlaut-Erkennung – ideal einmal pro Saison), JSON und vCard; Re-Import aktualisiert statt zu duplizieren. |
 | **Verbandsmeldung** | Mannschaftsmeldung an den VVMV: Abteilung wählen → Kader wird mit **Jahrgang** und **Passnummer** automatisch übernommen; Rolle (Kapitän/Libero/…), Staffel und Status pflegbar; **Druck-/PDF-Ausgabe** und Link zum SAMS-Meldeportal. |
 | **Ankündigungen** | Nachrichten an Team und Eltern zentral veröffentlichen (Zielgruppen-Auswahl). |
 | **Geburtstage** | Automatisch sortierte Geburtstagsliste inkl. „nächste 30 Tage" und Countdown. |
-| **Einverständniserklärungen** | Von den Eltern unterschriebene Formulare hochladen und ablegen (Datei-Upload, lokal gespeichert). Offene Formulare werden angemahnt. |
-| **Kalender** | Monatsansicht aller Trainings und Spieltage, farblich nach Terminart, plus Terminverwaltung. |
+| **Einverständniserklärungen** | Von den Eltern unterschriebene Formulare hochladen und ablegen (Datei-Upload, lokal gespeichert). Offene Formulare werden angemahnt. **Eigene Formular-Vorlagen** anlegen, ändern, löschen – inkl. Druckausgabe zum Austeilen. |
+| **Kalender** | Monatsansicht aller Trainings und Spieltage, farblich nach Terminart, plus Terminverwaltung. **Termin-Import** aus iCal (.ics, z. B. Google Kalender/Apple/Outlook) und RSS-Feeds – per Datei, Text oder URL; URL-Abos mit **automatischer Synchronisation** bei jedem App-Start und auf Knopfdruck (↻); Duplikate werden erkannt. |
 | **Trainingsrückmeldung** | Spieler melden sich **verbindlich** zu, ab oder unsicher – mit Live-Zählung pro Training. |
 | **Fahrerplanung** | Fahrer für Auswärtsspiele eintragen, Plätze zuordnen und offene Mitfahrgelegenheiten erkennen. |
 | **Heimspiel-Jobs** | Catering, Helfer und sonstige Aufgaben für Heimspiele/Events vergeben und abhaken. |
