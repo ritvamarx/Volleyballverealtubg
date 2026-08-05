@@ -698,6 +698,7 @@ textarea { resize: vertical; min-height: 72px; }
 
     // Bearbeitbare Link-Sammlung (Übersicht & Verbandsseite)
     const links = [
+      lnk("💬", "WhatsApp-Elterngruppe", "Einladungslink der Gruppe – eigenen Link per ✏️ eintragen", "https://chat.whatsapp.com/"),
       lnk("🏠", "Vereinswebsite SKV Müritz", "Offizielle Seite des Vereins", WEBSITE),
       lnk("🏐", "Volleyball-Verband MV (VVMV)", "Startseite des Landesverbands", "https://www.vvmv.de/"),
       lnk("📊", "Ligen & Tabellen", "Aktuelle Tabellen im SAMS-Spielbetrieb", "https://mv.sams-ticket.de/public/ranking.html"),
@@ -860,7 +861,19 @@ textarea { resize: vertical; min-height: 72px; }
   function load() {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const s = JSON.parse(raw);
+        // Migration: neue Sammlungen/Felder aus der Struktur ergänzen, damit
+        // ältere Datenstände nach einem Update nicht crashen. Bestehende
+        // Nutzerdaten bleiben unangetastet.
+        const base = seed(false);
+        let migrated = false;
+        Object.keys(base).forEach((k) => {
+          if (s[k] === undefined) { s[k] = base[k]; migrated = true; }
+        });
+        if (migrated) persist(s);
+        return s;
+      }
     } catch (e) { /* ignore */ }
     // Erststart: OHNE Demodaten (leerer Verein mit Struktur)
     const s = seed(false);
@@ -1628,9 +1641,10 @@ textarea { resize: vertical; min-height: 72px; }
         return `<button class="chip ${filter === d.id ? "active" : ""}" data-team="${d.id}">${esc(d.name)} (${n})</button>`;
       }));
 
+    const wa = waGroupLink();
     el.innerHTML = `
       ${head("Spielerverwaltung", "Kader, Kontaktdaten von Spielern und Eltern",
-        `<button class="btn outline" data-io>⇅ Import / Export</button><button class="btn" data-add>＋ Spieler</button>`)}
+        `${wa ? `<a class="btn secondary" href="${esc(wa.url)}" target="_blank" rel="noopener">💬 WhatsApp-Gruppe</a>` : ""}<button class="btn outline" data-io>⇅ Import / Export</button><button class="btn" data-add>＋ Spieler</button>`)}
       <div class="chip-row mb">${chips.join("")}</div>
       <div class="card" style="padding:0">
         <div class="table-wrap"><table>
@@ -1667,22 +1681,33 @@ textarea { resize: vertical; min-height: 72px; }
     $$("[data-mail]", el).forEach((b) => b.onclick = () => contactParent(Store.byId("players", b.dataset.mail)));
   }
 
-  // Kontaktzelle: Spieler + Eltern 1/2, Erstkontakt mit ⭐ markiert
+  // Kontaktzelle: Spieler + Eltern 1/2, Erstkontakt mit ⭐ markiert.
+  // E-Mail und Telefon sind direkt klickbar (mailto:/tel: – öffnet Standardprogramm des Geräts)
   const prefLabel = { player: "Spieler", parents: "Eltern", both: "Spieler + Eltern" };
+  function mailtoLink(email) { return email ? `<a href="mailto:${esc(email)}">${esc(email)}</a>` : ""; }
+  function telLink(phone) { return phone ? `<a href="tel:${esc(String(phone).replace(/[^+\d]/g, ""))}">${esc(phone)}</a>` : ""; }
+  function contactLine(email, phone) {
+    return [mailtoLink(email), telLink(phone)].filter(Boolean).join(" · ");
+  }
   function contactCell(p) {
     const starP = p.contactPreference === "player" || p.contactPreference === "both";
     const starE = p.contactPreference === "parents" || p.contactPreference === "both";
     const rows = [];
     if (p.playerPhone || p.playerEmail) {
-      rows.push(`<div>${starP ? "⭐ " : ""}<strong>Spieler:</strong> <span class="soft">${esc([p.playerEmail, p.playerPhone].filter(Boolean).join(" · "))}</span></div>`);
+      rows.push(`<div>${starP ? "⭐ " : ""}<strong>Spieler:</strong> <span class="soft">${contactLine(p.playerEmail, p.playerPhone)}</span></div>`);
     }
     if (p.parentName || p.parentEmail || p.parentPhone) {
-      rows.push(`<div>${starE ? "⭐ " : ""}<strong>${esc(p.parentName || "Eltern")}:</strong> <span class="soft">${esc([p.parentEmail, p.parentPhone].filter(Boolean).join(" · "))}</span></div>`);
+      rows.push(`<div>${starE ? "⭐ " : ""}<strong>${esc(p.parentName || "Eltern")}:</strong> <span class="soft">${contactLine(p.parentEmail, p.parentPhone)}</span></div>`);
     }
     if (p.parent2Name || p.parent2Email || p.parent2Phone) {
-      rows.push(`<div>${starE ? "⭐ " : ""}<strong>${esc(p.parent2Name || "Elternteil 2")}:</strong> <span class="soft">${esc([p.parent2Email, p.parent2Phone].filter(Boolean).join(" · "))}</span></div>`);
+      rows.push(`<div>${starE ? "⭐ " : ""}<strong>${esc(p.parent2Name || "Elternteil 2")}:</strong> <span class="soft">${contactLine(p.parent2Email, p.parent2Phone)}</span></div>`);
     }
     return rows.join("") || '<span class="muted">keine Kontaktdaten</span>';
+  }
+
+  // Hinterlegter WhatsApp-Gruppenlink (aus der Link-Sammlung)
+  function waGroupLink() {
+    return S().links.find((l) => /chat\.whatsapp\.com|wa\.me/.test(l.url || "")) || null;
   }
 
   /* ---------- Import / Export Spielerdaten ---------- */
@@ -1881,9 +1906,10 @@ textarea { resize: vertical; min-height: 72px; }
             <label class="list-item" style="cursor:pointer;padding:10px 12px">
               <input type="checkbox" data-rc="${r.key}" ${r.checked ? "checked" : ""} style="width:auto">
               <div class="grow"><div class="title">${r.star ? "⭐ " : ""}${esc(r.label)}</div>
-                <div class="sub">${r.email ? esc(r.email) : ""}${r.email && r.phone ? " · " : ""}${r.phone ? `<a href="tel:${esc(r.phone)}">${esc(r.phone)}</a>` : ""}</div></div>
+                <div class="sub">${contactLine(r.email, r.phone)}</div></div>
             </label>`).join("") : '<div class="muted">Keine Kontaktdaten hinterlegt.</div>'}
         </div>
+        ${(() => { const wa = waGroupLink(); return wa ? `<a class="btn sm secondary mb" href="${esc(wa.url)}" target="_blank" rel="noopener">💬 WhatsApp-Gruppe öffnen</a>` : ""; })()}
         <form id="cf"><div class="field"><label>Betreff</label><input name="subject" value="SKV Müritz – Info zu ${esc(p.firstName)}"></div>
         <div class="field mt"><label>Nachricht</label><textarea name="msg" rows="5">Hallo,\n\n</textarea></div></form>`,
       footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn" data-send>E-Mail öffnen</button>`,
@@ -2634,7 +2660,7 @@ textarea { resize: vertical; min-height: 72px; }
         <div class="table-wrap"><table><thead><tr><th>Spieler</th><th>Eltern</th><th>Kontakt</th><th class="right">Aktion</th></tr></thead>
         <tbody>${missing.map((p) => `<tr>
           <td>${esc(p.firstName)} ${esc(p.lastName)}</td><td>${esc(p.parentName)}</td>
-          <td class="soft">${esc(p.parentEmail)}</td>
+          <td class="soft">${mailtoLink(p.parentEmail) || "—"}</td>
           <td class="right"><button class="btn sm outline" data-remind="${p.id}">Erinnern</button>
           <button class="btn sm" data-upload="${p.id}">Hochladen</button></td></tr>`).join("")}</tbody></table></div></div>` : ""}
 

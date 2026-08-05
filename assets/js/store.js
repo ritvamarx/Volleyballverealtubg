@@ -233,6 +233,7 @@
 
     // Bearbeitbare Link-Sammlung (Übersicht & Verbandsseite)
     const links = [
+      lnk("💬", "WhatsApp-Elterngruppe", "Einladungslink der Gruppe – eigenen Link per ✏️ eintragen", "https://chat.whatsapp.com/"),
       lnk("🏠", "Vereinswebsite SKV Müritz", "Offizielle Seite des Vereins", WEBSITE),
       lnk("🏐", "Volleyball-Verband MV (VVMV)", "Startseite des Landesverbands", "https://www.vvmv.de/"),
       lnk("📊", "Ligen & Tabellen", "Aktuelle Tabellen im SAMS-Spielbetrieb", "https://mv.sams-ticket.de/public/ranking.html"),
@@ -395,7 +396,19 @@
   function load() {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const s = JSON.parse(raw);
+        // Migration: neue Sammlungen/Felder aus der Struktur ergänzen, damit
+        // ältere Datenstände nach einem Update nicht crashen. Bestehende
+        // Nutzerdaten bleiben unangetastet.
+        const base = seed(false);
+        let migrated = false;
+        Object.keys(base).forEach((k) => {
+          if (s[k] === undefined) { s[k] = base[k]; migrated = true; }
+        });
+        if (migrated) persist(s);
+        return s;
+      }
     } catch (e) { /* ignore */ }
     // Erststart: OHNE Demodaten (leerer Verein mit Struktur)
     const s = seed(false);
