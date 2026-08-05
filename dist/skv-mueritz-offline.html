@@ -393,6 +393,8 @@ textarea { resize: vertical; min-height: 72px; }
   .sidebar {
     position: fixed; left: 0; top: 0; transform: translateX(-100%);
     transition: transform .25s; box-shadow: var(--shadow);
+    /* über dem Overlay (60), unter Modalen (70) – sonst fängt das Overlay alle Menü-Tipps ab */
+    z-index: 65;
   }
   .sidebar.open { transform: none; }
   .hamburger { display: block; }
