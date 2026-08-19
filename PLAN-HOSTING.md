@@ -25,66 +25,74 @@ Trainer ────┐                       ┌──────────�
 Spieler ────┼─ HTTPS + Session ────▶│ volleyball.nettverwaltet.de (Hetzner) │
 Eltern  ────┘  (Cookie, HttpOnly)   │ Reverse Proxy (TLS) → App-Container   │
                                     │  ├─ statische App (wie heute)         │
-                                    │  ├─ API  /api/… (Node.js)             │
+                                    │  ├─ API  /api/… (Flask/Gunicorn)      │
                                     │  └─ SQLite: Nutzer · Rollen · Daten   │
                                     └───────────────────────────────────────┘
 ```
 
-## 2. Getroffene Entscheidungen
+## 2. Der Server — tatsächlicher Stand (vom Betreiber verifiziert, Aug. 2026)
 
-- **Server:** eigener Hetzner-Server (dort läuft bereits deine
-  Vereinsverwaltung). → Deployment als **Docker-Container hinter dem
-  vorhandenen Reverse-Proxy**; falls noch keiner läuft, bringt das Paket einen
-  Caddy mit (TLS automatisch via Let's Encrypt).
-- **Nutzerkreis:** **Trainer + Spieler + Eltern** mit eigenen Zugängen und
-  abgestuften Rechten (Rollenmodell unten).
-- **Technik Backend:** Node.js (Express) + SQLite — ein Container, keine
-  externen Dienste, Backups = eine Datei. Passwörter mit Argon2id.
+- **Hetzner-Cloud-VM** `ubuntu-4gb-fsn1-1` (Falkenstein, 4 GB RAM,
+  Ubuntu 26.04 LTS).
+- **Bestehende Plattform „nettverwaltet":** Python/**Flask** + **SQLite**
+  (je Verein eigene DB-Datei), gebaut aus `python:3.12-slim`, **Gunicorn**
+  (1 Worker / 8 Threads), unprivilegierter Nutzer `appuser`. Ein Image
+  (`werkhaus-app:latest`), fünf Container (werkhaus, kitawabe, verein/Demo,
+  wdb, mueritzhilft) unter `/opt/werkhaus` bzw. `/opt/nettverwaltet`, je
+  Container eigener `.env`- und `data`-Ordner (per `deploy/konfig-generieren.sh`).
+- **Ein Caddy 2** als Reverse-Proxy für alle Domains (Let's Encrypt
+  automatisch, gzip, Logs); nur Caddy hat 80/443, App-Container intern :8000.
+- **Daten** liegen in `./data`-Volumes und überleben jeden Image-Neubau.
+- **Cron-Jobs** klassisch in `/etc/cron.d/` (Backups, Healthcheck, Automatiken).
+- **Deployment:** `rsync` vom Mac → `docker compose up -d --build` →
+  Erreichbarkeits-Check. Kein Git auf dem Server.
+- Die „WerkHausApp" ist **die Website als PWA** (Manifest + Service Worker
+  `sw.js`, Web-Push über `pywebpush`).
 
-## 2a. Erkenntnisse aus der Bestandsaufnahme (August 2026)
+### Getroffene Entscheidungen
 
-**Die „Vereinsverwaltung" ist die WerkHausApp** (`mein.werkhauswaren.de`,
-WerkHausWaren e. V.) — laut deiner Mitglieder-Anleitung eine App mit genau den
-Mustern, die wir brauchen: **Mitglied-Login**, Termine mit **Zu-/Absagen**,
-**offene Schichten übernehmen/tauschen** (≈ unsere Heimspiel-Jobs), Dokumente,
-Umfragen/Terminfindung, Abwesenheiten, Geburtstage, **eigene Daten pflegen**,
-Installation **„Zum Home-Bildschirm"/„App installieren" (PWA)** und
-**Benachrichtigungen**. Konsequenzen für diesen Plan:
+- **Nutzerkreis:** Trainer + Spieler + Eltern mit eigenen Zugängen (Rollen
+  unten).
+- **Technik-Backend: Python/Flask + SQLite — nicht Node.** Begründung: Der
+  Server fährt bereits ausschließlich diesen Stack; die Volleyball-App wird
+  damit **deploygleich** gewartet (gleiches Basis-Image, gleiches
+  Gunicorn-Muster 1 Worker/8 Threads, gleiche Volume-/Cron-/rsync-Routinen,
+  Push später mit `pywebpush` wie gehabt). Ein zweiter Stack (Node) wäre
+  vermeidbarer Wartungs-Zoo.
+- **Einbindung:** eigenes, kleines Image `volleyball-app:latest` in eigenem
+  Ordner **`/opt/volleyball`** (analog `/opt/werkhaus`): eigenes
+  `docker-compose.yml`, eigener `data/`-Ordner (`volleyball.db`), `.env` mit
+  `SECRET_KEY`. Im Caddyfile ein zusätzlicher vHost-Block
+  `volleyball.nettverwaltet.de → volleyball-app:8000` (Container ins
+  bestehende Caddy-Docker-Netz hängen). Cron-Konvention wie gehabt:
+  `/etc/cron.d/volleyball-backup`, `volleyball-ferien` (s. u.).
 
-1. **Gleiches Bedienmuster übernehmen:** Login-Flow, PWA-Installation und
-   Mitglieder-Anleitung der Volleyball-App orientieren sich 1:1 an der
-   WerkHausApp — die Familien kennen das Muster ggf. schon, und für dich
-   bleibt die Verwaltung beider Apps einheitlich.
-2. **Der Server hostet bereits mehrere Domains** (werkhauswaren.de neben
-   nettverwaltet.de) → ein Reverse-Proxy mit vHosts existiert praktisch
-   sicher; die Volleyball-App wird ein weiterer Eintrag darin.
-3. **Push-Benachrichtigungen** (wie in der WerkHausApp) nehmen wir als
-   optionalen Baustein in Phase 4 auf (Web-Push: Termin-Erinnerung,
-   „Rückmeldung fehlt noch", neuer Elternbrief).
-4. **Noch offen:** Mit welchem Stack/Deployment die WerkHausApp gebaut ist
-   (Docker? Node? PHP?). Ich konnte deine anderen Claude-Sitzungen aus dieser
-   Sitzung heraus nicht öffnen (Freigabe erforderlich). → Bitte frag im
-   offenen Chrome-Tab der Vereinsverwaltungs-Sitzung kurz: *„Mit welcher
-   Technik und welchem Deployment (Docker/Proxy) läuft die WerkHausApp auf dem
-   Server?"* — mit der Antwort baue ich die Volleyball-App **deploygleich**
-   (gleicher Proxy, gleiches Update-Verfahren). Idealerweise sogar gleicher
-   Stack, damit sich der Server einheitlich wartet.
+### Zwei Wege — und die Empfehlung
 
-**Aus dieser Sitzung übernehmbar** (bereits gebaut und getestet):
-das komplette Frontend mit 18 Bereichen, das Datenmodell (ein JSON-Bestand mit
-20 Tabellen inkl. CSV-Komplettbackup), die AES-256-Verschlüsselung der
-`.skv`-Sicherung, SAMS-/iCal-/RSS-Import, Elternbriefe/Serienbrief/
-Sammeldokument sowie die frisch polierte Mobil-Oberfläche. Serverhosting löst
-zudem drei bekannte Schmerzpunkte dieser Sitzung: iPhone-Zugriff (echte URL
-statt Datei-Umwege), Ferien-/Kalender-Abos ohne Browser-CORS-Grenzen (der
-Server ruft die Quellen ab) und automatische Backups.
+| | **A: Volleyball als 6. Mandant der bestehenden Flask-Plattform** | **B: Diese Volleyball-App + eigenes kleines Flask-Backend (Empfehlung)** |
+|---|---|---|
+| Login/PWA/Push | geschenkt (vorhanden) | nachbauen nach WerkHaus-Vorbild (überschaubar) |
+| Volleyball-Funktionen (Verbandsmeldung, Fahrerplanung, Trainingsrückmeldung, Elternbriefe/Serienbrief, SAMS-Import, Ferien MV, Tabelle, Wiki, Kleidung …) | **müssten alle neu** in der Vereinsverwaltung entwickelt werden | **fertig und getestet** (diese Sitzung) |
+| Wartung | ein Image für 6 Vereine | zweites (kleines) Image, aber identischer Stack & identische Routinen |
+| Risiko | Funktionsverlust/lange Nachbauphase | gering; klarer Schnitt: Verwaltung generisch, Volleyball speziell |
 
-### Noch zu klären (bitte kurz beantworten)
-1. Wie ist der Server heute aufgesetzt — läuft schon **Docker** und ein
-   **Reverse-Proxy** (Caddy/Traefik/nginx) für die Vereinsverwaltung, oder ein
-   Panel (Plesk o. ä.)? Danach richtet sich das Deployment-Snippet.
-2. Soll die DNS-Subdomain `volleyball` auf dieselbe IP zeigen wie die
-   bestehende Vereinsverwaltung? (Vermutlich ja.)
+**Empfehlung: B.** Die Volleyball-App ist das Ergebnis vieler Review-Runden
+dieser Sitzung; Weg A würde sie faktisch wegwerfen. Weg B hält den Server
+homogen (alles Flask/SQLite/Docker/Caddy) und die Zuständigkeiten sauber
+getrennt.
+
+### Aus dieser Sitzung wiederverwendbar
+Komplettes Frontend (18 Bereiche), Datenmodell (ein JSON-Bestand, 20 Tabellen,
+CSV-Komplettbackup), AES-256-`.skv`-Sicherung, SAMS-/iCal-/RSS-Import,
+Elternbriefe/Serienbrief/Sammeldokument, Mobil-Layout. Serverhosting löst
+zugleich drei bekannte Schmerzpunkte: iPhone-Zugriff (echte URL), Ferien-/
+Kalender-Abos ohne Browser-CORS (Cron auf dem Server ruft OpenHolidays/SAMS
+ab und schreibt in die DB) und automatische Backups.
+
+### Noch zu klären
+1. ~~Server-Setup~~ → **geklärt** (siehe oben: Docker + Caddy 2 + Flask/SQLite).
+2. DNS: `volleyball.nettverwaltet.de` als A-/AAAA-Record auf die IP der
+   bestehenden VM legen (gleiche IP wie die übrigen nettverwaltet-Domains).
 
 ## 3. Rollenmodell (Kernstück)
 
@@ -98,14 +106,26 @@ Server ruft die Quellen ab) und automatische Backups.
 | Vereinskleidung ansehen / anfordern | ✔ | ✔ (für sich) | ✔ (fürs Kind) |
 | Eigene Kontaktdaten einsehen/ändern | ✔ | ✔ (eigene) | ✔ (eigene + Kind) |
 | Kontaktdaten **anderer** Familien | ✔ | ✖ | ✖ |
+| **Namen anderer Kinder/Spieler** | ✔ | ✔ (eigener Kader) | **✖ — Eltern sehen ausschließlich das eigene Kind** |
 | Ankündigungen, Links, Wiki, Tabelle | ✔ | ✔ | ✔ (Zielgruppen-Filter) |
 | Finanzen: eigener Beitragsstatus | ✔ (alle) | ✖ | ✔ (nur eigener) |
 
-**Konto-Anlage ohne offene Registrierung:** Der Trainer erzeugt pro Spieler
-**Einladungscodes** (einen für den Spieler, einen für die Eltern). Mit dem Code
-registriert man sich selbst (Name vorausgefüllt, Passwort selbst wählen) und
-ist automatisch mit dem richtigen Spieler verknüpft. Eltern mit mehreren
-Kindern lassen sich auf mehrere Spieler verknüpfen.
+**Privatsphäre-Regel (beschlossen):** Die Eltern-Sicht enthält **keine Namen
+anderer Kinder** — nirgends: Rückmeldungs-Übersichten zeigen Eltern nur
+anonyme Zähler („8 Zusagen"), die Fahrer-Koordination zeigt ihnen nur das
+eigene Angebot (die Zuordnung von Mitfahrern sieht und macht allein das
+Trainerteam), Job-Listen zeigen Aufgaben ohne Personenbezug. Der Server
+liefert diese Daten an Eltern-Konten gar nicht erst aus.
+
+**Konto-Anlage ohne offene Registrierung (beschlossen):** Das Trainerteam
+erzeugt pro Spieler **Einladungscodes** (einen für den Spieler, einen für die
+Eltern) und verschickt sie **per WhatsApp**: Die App erzeugt zu jedem Code
+einen fertigen WhatsApp-Teilen-Knopf (vorformulierte Nachricht mit
+Registrierungslink + Code, geöffnet über WhatsApp/Systemteilen — kein
+Mailserver nötig). Mit dem Code registriert man sich selbst (Name
+vorausgefüllt, Passwort selbst wählen) und ist automatisch mit dem richtigen
+Spieler verknüpft; Eltern mit mehreren Kindern werden auf mehrere Spieler
+verknüpft. Codes sind einmalig gültig und laufen ab.
 
 ## 4. Bausteine
 
@@ -114,7 +134,9 @@ Kindern lassen sich auf mehrere Spieler verknüpfen.
 der Reverse-Proxy automatisch (Let's Encrypt), HTTPS wird erzwungen (+ HSTS).
 
 ### 4.2 Backend-API (baue ich)
-Node.js + SQLite im Docker-Container. Endpunkte:
+Flask + SQLite im Docker-Container (Gunicorn, 1 Worker / 8 Threads — wie
+die bestehende Plattform; der eine Worker macht die Versionsprüfung des
+Datenbestands ohne Wettlauf-Probleme). Endpunkte:
 
 | Endpunkt | Rolle | Zweck |
 |---|---|---|
@@ -134,8 +156,12 @@ Konto ↔ Spieler — niemand kann für fremde Kinder melden oder fremde Daten l
 
 ### 4.3 Login & Sicherheit (baue ich)
 Argon2id-Hashes · HttpOnly/Secure/SameSite-Cookies · Login-Rate-Limit ·
-CSRF-Token · Anmeldeprotokoll · Sicherheits-Header (CSP, X-Frame-Options) ·
-optional TOTP-2FA für Trainerkonten. Einladungscodes einmalig + ablaufend.
+CSRF-Token · Anmeldeprotokoll · Sicherheits-Header (CSP, X-Frame-Options).
+**2FA (beschlossen):** TOTP per Authenticator-App — für **Trainerkonten
+verpflichtend** ab Phase 1 (bevor echte Daten online sind), für Spieler-/
+Eltern-Konten optional aktivierbar. Backup-Codes beim Einrichten; verlorene
+2FA setzt das Trainerteam zurück. Einladungscodes einmalig + ablaufend,
+Versand per WhatsApp-Teilen (siehe Abschnitt 3).
 
 ### 4.4 Frontend (baue ich)
 - **Login-/Registrierungs-Bildschirm** im bestehenden Design.
@@ -177,10 +203,10 @@ dann die zentrale Wahrheit.
 | Phase | Inhalt | Wer | Umfang |
 |---|---|---|---|
 | **0** | Server-Setup klären (Docker? Proxy?), DNS-Record, ggf. AV-Vertrag | du | ~30 Min. |
-| **1** | Backend (Auth + Trainer-Vollsync + Versionierung), Login-UI, Deployment-Paket → **App läuft mit Trainer-Login unter der Domain** | ich | 1 große Runde |
+| **1** | Backend (Auth inkl. **TOTP-2FA für Trainer** + Trainer-Vollsync + Versionierung), Login-UI, Deployment-Paket (`/opt/volleyball`, Caddy-vHost-Snippet) → **App läuft mit Trainer-Login unter der Domain** | ich | 1 große Runde |
 | **2** | PWA (Manifest, Icons, Service Worker) | ich | klein |
-| **3** | **Portal für Spieler & Eltern**: Rollen, Einladungscodes, gefilterte Sicht, Aktionen (Rückmeldung, Fahrer, Jobs, Kleidung, Kontaktdaten), Trainer-Verwaltung der Zugänge | ich | 1–2 große Runden |
-| **4** | Härtung + DSGVO-Seiten + Backup-Automatik (+ optional TOTP) | ich | mittel |
+| **3** | **Portal für Spieler & Eltern**: Rollen, Einladungscodes mit WhatsApp-Versand, gefilterte Sicht (ohne fremde Kindernamen), Aktionen (Rückmeldung, Fahrer, Jobs, Kleidung, Kontaktdaten), Trainer-Verwaltung der Zugänge | ich | 1–2 große Runden |
+| **4** | Härtung + DSGVO-Seiten + Backup-/Ferien-Cron + Web-Push (pywebpush, wie WerkHausApp) | ich | mittel |
 
 Reihenfolge bewusst: Nach Phase 1 arbeitest du bereits produktiv über die
 Domain; Phase 3 öffnet die Plattform für Familien.
