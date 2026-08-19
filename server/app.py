@@ -29,6 +29,7 @@ INVITE_DAYS = 14
 
 def create_app() -> Flask:
     app = Flask(__name__, static_folder=None)
+    app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "")
     app.config["MAX_CONTENT_LENGTH"] = STATE_MAX_BYTES + 1024 * 1024
     db.init_db()
 

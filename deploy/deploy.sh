@@ -8,6 +8,7 @@ ZIEL_PFAD="/opt/volleyball"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 echo "1/4 · rsync nach ${ZIEL_HOST}:${ZIEL_PFAD}"
+ssh "${ZIEL_HOST}" "mkdir -p ${ZIEL_PFAD}/data"
 rsync -az --delete \
   --exclude '.git' --exclude 'data' --exclude '.env' --exclude 'dist' \
   --exclude 'node_modules' \
@@ -16,7 +17,7 @@ rsync -az --delete \
   "${ZIEL_HOST}:${ZIEL_PFAD}/"
 
 echo "2/4 · docker-compose.yml an Ort und Stelle"
-ssh "${ZIEL_HOST}" "cd ${ZIEL_PFAD} && cp deploy/docker-compose.yml . && [ -f .env ] || (cp deploy/.env.example .env && echo '!! .env erzeugt – SECRET_KEY setzen !!')"
+ssh "${ZIEL_HOST}" "cd ${ZIEL_PFAD} && cp deploy/docker-compose.yml . && [ -f .env ] || echo SECRET_KEY=\$(python3 -c 'import secrets;print(secrets.token_hex(32))') > .env"
 
 echo "3/4 · Image bauen & starten"
 ssh "${ZIEL_HOST}" "cd ${ZIEL_PFAD} && docker compose up -d --build app"

@@ -1,14 +1,15 @@
-# In euer bestehendes Caddyfile aufnehmen (dann Caddy neu laden):
+# In euer bestehendes Caddyfile aufnehmen, dann Caddy neu laden:
 #   docker exec caddy caddy reload --config /etc/caddy/Caddyfile
 # TLS holt Caddy automatisch, sobald der DNS-Record auf die Server-IP zeigt.
+#
+# Wichtig: "volleyball-app" ist der Container-Name – Caddy und die App müssen
+# im selben Docker-Netz hängen (Netzname in docker-compose.yml, Standard "caddy").
 
 volleyball.nettverwaltet.de {
     encode gzip
     reverse_proxy volleyball-app:8000
-    log {
-        output file /var/log/caddy/volleyball.log {
-            roll_size 10mb
-            roll_keep 5
-        }
-    }
+    # Optional – nur aktivieren, wenn das Log-Verzeichnis im Caddy-Container existiert:
+    # log {
+    #     output file /var/log/caddy/volleyball.log { roll_size 10mb roll_keep 5 }
+    # }
 }
