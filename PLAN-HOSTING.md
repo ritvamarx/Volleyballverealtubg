@@ -41,6 +41,44 @@ Eltern  ────┘  (Cookie, HttpOnly)   │ Reverse Proxy (TLS) → App-Co
 - **Technik Backend:** Node.js (Express) + SQLite — ein Container, keine
   externen Dienste, Backups = eine Datei. Passwörter mit Argon2id.
 
+## 2a. Erkenntnisse aus der Bestandsaufnahme (August 2026)
+
+**Die „Vereinsverwaltung" ist die WerkHausApp** (`mein.werkhauswaren.de`,
+WerkHausWaren e. V.) — laut deiner Mitglieder-Anleitung eine App mit genau den
+Mustern, die wir brauchen: **Mitglied-Login**, Termine mit **Zu-/Absagen**,
+**offene Schichten übernehmen/tauschen** (≈ unsere Heimspiel-Jobs), Dokumente,
+Umfragen/Terminfindung, Abwesenheiten, Geburtstage, **eigene Daten pflegen**,
+Installation **„Zum Home-Bildschirm"/„App installieren" (PWA)** und
+**Benachrichtigungen**. Konsequenzen für diesen Plan:
+
+1. **Gleiches Bedienmuster übernehmen:** Login-Flow, PWA-Installation und
+   Mitglieder-Anleitung der Volleyball-App orientieren sich 1:1 an der
+   WerkHausApp — die Familien kennen das Muster ggf. schon, und für dich
+   bleibt die Verwaltung beider Apps einheitlich.
+2. **Der Server hostet bereits mehrere Domains** (werkhauswaren.de neben
+   nettverwaltet.de) → ein Reverse-Proxy mit vHosts existiert praktisch
+   sicher; die Volleyball-App wird ein weiterer Eintrag darin.
+3. **Push-Benachrichtigungen** (wie in der WerkHausApp) nehmen wir als
+   optionalen Baustein in Phase 4 auf (Web-Push: Termin-Erinnerung,
+   „Rückmeldung fehlt noch", neuer Elternbrief).
+4. **Noch offen:** Mit welchem Stack/Deployment die WerkHausApp gebaut ist
+   (Docker? Node? PHP?). Ich konnte deine anderen Claude-Sitzungen aus dieser
+   Sitzung heraus nicht öffnen (Freigabe erforderlich). → Bitte frag im
+   offenen Chrome-Tab der Vereinsverwaltungs-Sitzung kurz: *„Mit welcher
+   Technik und welchem Deployment (Docker/Proxy) läuft die WerkHausApp auf dem
+   Server?"* — mit der Antwort baue ich die Volleyball-App **deploygleich**
+   (gleicher Proxy, gleiches Update-Verfahren). Idealerweise sogar gleicher
+   Stack, damit sich der Server einheitlich wartet.
+
+**Aus dieser Sitzung übernehmbar** (bereits gebaut und getestet):
+das komplette Frontend mit 18 Bereichen, das Datenmodell (ein JSON-Bestand mit
+20 Tabellen inkl. CSV-Komplettbackup), die AES-256-Verschlüsselung der
+`.skv`-Sicherung, SAMS-/iCal-/RSS-Import, Elternbriefe/Serienbrief/
+Sammeldokument sowie die frisch polierte Mobil-Oberfläche. Serverhosting löst
+zudem drei bekannte Schmerzpunkte dieser Sitzung: iPhone-Zugriff (echte URL
+statt Datei-Umwege), Ferien-/Kalender-Abos ohne Browser-CORS-Grenzen (der
+Server ruft die Quellen ab) und automatische Backups.
+
 ### Noch zu klären (bitte kurz beantworten)
 1. Wie ist der Server heute aufgesetzt — läuft schon **Docker** und ein
    **Reverse-Proxy** (Caddy/Traefik/nginx) für die Vereinsverwaltung, oder ein
