@@ -85,6 +85,67 @@
     </main>
   </div>
 
+  <!-- Login-Gate (nur im Server-Modus sichtbar; bei file:// bleibt es verborgen) -->
+  <div id="authGate" hidden>
+    <div class="auth-card">
+      <div class="auth-brand">
+        <svg viewBox="0 0 100 100" width="46" height="46" aria-hidden="true">
+          <circle cx="50" cy="50" r="46" fill="#f97316"/>
+          <path d="M50 4a46 46 0 0 1 0 92M14 25c22 6 40 24 46 46M22 78c8-24 30-42 56-44" stroke="#fff" stroke-width="4" fill="none"/>
+        </svg>
+        <div><strong>SKV Müritz</strong><span>Volleyball · Vereinsplattform</span></div>
+      </div>
+      <div id="authMsg" class="auth-msg"></div>
+
+      <div id="auth-checking"><p class="auth-hint">Verbindung wird geprüft …</p></div>
+
+      <form id="auth-login" hidden>
+        <div class="field"><label>Benutzername</label><input id="loginUser" autocomplete="username" required></div>
+        <div class="field"><label>Passwort</label><input id="loginPass" type="password" autocomplete="current-password" required></div>
+        <button class="btn auth-btn" type="submit">Anmelden</button>
+        <p class="auth-hint"><a href="#" id="gotoRegister">Mit Einladungscode registrieren</a></p>
+      </form>
+
+      <form id="auth-totp" hidden>
+        <p class="auth-hint">Zwei-Faktor-Bestätigung: Gib den 6-stelligen Code aus deiner Authenticator-App ein (oder einen Backup-Code).</p>
+        <div class="field"><label>Code</label><input id="totpCode" inputmode="numeric" autocomplete="one-time-code" required></div>
+        <button class="btn auth-btn" type="submit">Bestätigen</button>
+      </form>
+
+      <form id="auth-setup" hidden>
+        <p class="auth-hint"><strong>2FA einrichten</strong> (für Trainerkonten verpflichtend):<br>
+        1. Authenticator-App öffnen (z. B. Google Authenticator, Authy).<br>
+        2. Diesen Schlüssel manuell eintragen — oder auf dem Handy direkt antippen:</p>
+        <p class="auth-secret" id="setupSecret"></p>
+        <p class="auth-hint"><a id="setupLink" href="#">📲 In Authenticator-App öffnen</a></p>
+        <div class="field"><label>3. Code aus der App eingeben</label><input id="setupCode" inputmode="numeric" required></div>
+        <button class="btn auth-btn" type="submit">2FA aktivieren</button>
+      </form>
+
+      <div id="auth-backupcodes" hidden>
+        <p class="auth-hint"><strong>Backup-Codes</strong> — bitte jetzt sicher aufbewahren (jeder Code funktioniert einmal, falls die Authenticator-App nicht verfügbar ist):</p>
+        <pre class="auth-secret" id="backupCodesBox"></pre>
+        <button class="btn auth-btn" id="backupDone" type="button">Ich habe sie gespeichert – weiter</button>
+      </div>
+
+      <form id="auth-register" hidden>
+        <div class="field"><label>Einladungscode</label><input id="regCode" placeholder="XXXX-XXXX-XXXX" required></div>
+        <div class="field"><label>Dein Name</label><input id="regName" autocomplete="name"></div>
+        <div class="field"><label>Benutzername</label><input id="regUser" autocomplete="username" required></div>
+        <div class="field"><label>Passwort (mind. 8 Zeichen)</label><input id="regPass" type="password" minlength="8" autocomplete="new-password" required></div>
+        <button class="btn auth-btn" type="submit">Konto anlegen</button>
+        <p class="auth-hint"><a href="#" id="gotoLogin">Zurück zur Anmeldung</a></p>
+      </form>
+
+      <div id="auth-portal" hidden>
+        <p class="auth-hint">Hallo <strong id="portalName"></strong>! 👋<br>
+        Der Spieler-/Eltern-Bereich wird gerade gebaut und in Kürze freigeschaltet.
+        Dein Konto ist bereits aktiv.</p>
+        <button class="btn auth-btn" id="portalLogout" type="button">Abmelden</button>
+      </div>
+    </div>
+  </div>
+
   <div class="overlay" id="overlay"></div>
   <div id="modalRoot"></div>
   <div id="toastRoot" class="toast-root"></div>
@@ -94,5 +155,6 @@
   <script src="assets/js/io.js"></script>
   <script src="assets/js/views.js"></script>
   <script src="assets/js/app.js"></script>
+  <script src="assets/js/sync.js"></script>
 </body>
 </html>

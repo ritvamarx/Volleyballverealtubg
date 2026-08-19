@@ -233,7 +233,7 @@ dann die zentrale Wahrheit.
 | Phase | Inhalt | Wer | Umfang |
 |---|---|---|---|
 | **0** | DNS-Record anlegen, AV-Vertrag bei Hetzner prüfen | du | ~15 Min. |
-| **1** | Backend (Auth inkl. **TOTP-2FA für Trainer** + Trainer-Vollsync + Versionierung), Login-UI, Deployment-Paket (`/opt/volleyball`, Caddy-vHost-Snippet) → **App läuft unter der Domain, mehrere Trainerkonten möglich** | ich | 1 große Runde |
+| **1** ✅ | Backend (Auth inkl. **TOTP-2FA für Trainer** + Trainer-Vollsync + Versionierung), Login-UI, Deployment-Paket (`/opt/volleyball`, Caddy-vHost-Snippet) → **umgesetzt & Ende-zu-Ende getestet** (siehe `server/`, `deploy/`, `assets/js/sync.js`) | ich | erledigt Aug. 2026 |
 | **2** | PWA (Manifest, Icons, Service Worker) | ich | klein |
 | **3** | **Portal für Spieler & Eltern**: Rollen, Einladungscodes mit WhatsApp-Versand, gefilterte Sicht (ohne fremde Kindernamen), Aktionen (Rückmeldung, Fahrer, Jobs, Kleidung, Kontaktdaten), Trainer-Verwaltung der Zugänge | ich | 1–2 große Runden |
 | **4** | Härtung + DSGVO-Seiten + Backup-/Ferien-Cron + Web-Push (pywebpush, wie WerkHausApp) | ich | mittel |

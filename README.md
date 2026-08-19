@@ -90,6 +90,16 @@ assets/js/views.js         Alle Ansichten/Bereiche
 assets/js/app.js           Router & Initialisierung
 ```
 
+## 🖥️ Server-Betrieb (volleyball.nettverwaltet.de)
+
+Die App kann auf dem eigenen Server mit **Login** betrieben werden
+(Flask/SQLite-Backend in `server/`, Deployment-Paket in `deploy/` –
+siehe `deploy/README-DEPLOY.md` und `PLAN-HOSTING.md`). Trainer melden sich
+mit Passwort + **TOTP-2FA** an; der Datenbestand liegt zentral mit
+Versionsprüfung, Verlauf und Konfliktwarnung. Wird die Datei lokal
+(Doppelklick) geöffnet, bleibt alles wie gehabt – der Server-Modus aktiviert
+sich nur hinter dem eigenen Backend.
+
 ## ☁️ Geräteübergreifend nutzen (Cloud) & Passwortschutz
 
 Die App-Datei selbst enthält **keine persönlichen Daten** – Daten liegen im

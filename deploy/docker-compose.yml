@@ -1,0 +1,30 @@
+# SKV Müritz Volleyball – /opt/volleyball/docker-compose.yml
+# Läuft neben den bestehenden nettverwaltet-Diensten hinter dem einen Caddy.
+#
+# Voraussetzung: das externe Docker-Netz, in dem euer Caddy hängt.
+# Namen prüfen mit:  docker network ls   (unten ggf. "caddy" anpassen)
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile
+    image: volleyball-app:latest
+    container_name: volleyball-app
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./data:/app/data
+    networks:
+      - caddy
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/gesund')"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+
+networks:
+  caddy:
+    external: true

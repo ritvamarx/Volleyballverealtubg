@@ -421,7 +421,11 @@
   function persist(s) {
     try { localStorage.setItem(KEY, JSON.stringify(s || state)); } catch (e) { /* quota */ }
   }
-  function save() { persist(state); }
+  let onSave = null; // Hook für den Server-Abgleich (sync.js)
+  function save() {
+    persist(state);
+    if (onSave) { try { onSave(); } catch (e) { /* Sync darf Speichern nie blockieren */ } }
+  }
 
   function resetDemo() {
     _idc = 1;
@@ -448,6 +452,7 @@
     get: () => state,
     save,
     resetDemo, resetEmpty, replaceAll,
+    setOnSave(fn) { onSave = fn; },
     uid,
     // generische CRUD-Helfer für eine Collection
     add(coll, obj) { obj.id = obj.id || uid(coll.slice(0, 2)); state[coll].push(obj); save(); return obj; },
