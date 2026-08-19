@@ -34,13 +34,25 @@ else
 fi
 
 # ------------------------------------------- 2. Caddy-Netz erkennen
-schritt "2/8 Docker-Netz des Caddy erkennen"
-NETZ="$(ssh "$HOST" "docker inspect caddy -f '{{json .NetworkSettings.Networks}}'" 2>/dev/null \
-        | sed 's/^{\"//; s/\".*//' || true)"
-if [ -z "$NETZ" ]; then
-  warn "Container 'caddy' nicht gefunden – verwende Netzname 'caddy'."
+schritt "2/8 Caddy-Container und Docker-Netz erkennen"
+# Container übers Image finden – der Name kann alles Mögliche sein (caddy, caddy-caddy-1, …)
+CADDY_CTN="$(ssh "$HOST" "docker ps --format '{{.Names}}\t{{.Image}}'" 2>/dev/null \
+        | awk -F'\t' 'tolower($2) ~ /caddy/ {print $1; exit}' || true)"
+if [ -z "$CADDY_CTN" ]; then
+  CADDY_CTN="$(ssh "$HOST" "docker ps --format '{{.Names}}'" 2>/dev/null \
+          | grep -im1 caddy || true)"
+fi
+if [ -z "$CADDY_CTN" ]; then
+  warn "Kein laufender Caddy-Container gefunden – laufende Container:"
+  ssh "$HOST" "docker ps --format '  {{.Names}}  ({{.Image}})'" || true
+  warn "Verwende Netzname 'caddy' – Caddy-Schritte müssen ggf. manuell erfolgen."
+  CADDY_CTN=""
   NETZ="caddy"
 else
+  ok "Caddy-Container: $CADDY_CTN"
+  NETZ="$(ssh "$HOST" "docker inspect '$CADDY_CTN' -f '{{json .NetworkSettings.Networks}}'" 2>/dev/null \
+          | sed 's/^{\"//; s/\".*//' || true)"
+  if [ -z "$NETZ" ]; then NETZ="caddy"; fi
   ok "Caddy hängt im Netz: $NETZ"
 fi
 
@@ -72,8 +84,11 @@ fi
 
 # --------------------------------------------------- 5. Caddy-vHost
 schritt "5/8 Caddy-vHost eintragen"
-CADDYFILE="$(ssh "$HOST" "docker inspect caddy -f '{{range .Mounts}}{{.Destination}}={{.Source}}
+CADDYFILE=""
+if [ -n "$CADDY_CTN" ]; then
+  CADDYFILE="$(ssh "$HOST" "docker inspect '$CADDY_CTN' -f '{{range .Mounts}}{{.Destination}}={{.Source}}
 {{end}}'" 2>/dev/null | grep '^/etc/caddy/Caddyfile=' | cut -d= -f2 || true)"
+fi
 if [ -z "$CADDYFILE" ]; then
   warn "Caddyfile-Pfad nicht automatisch gefunden."
   warn "→ Bitte Block aus deploy/Caddyfile-snippet.txt manuell eintragen und Caddy neu laden."
@@ -90,8 +105,8 @@ $DOMAIN {
 EOF
     ok "vHost angehängt (Sicherungskopie des Caddyfile liegt daneben)"
   fi
-  if ssh "$HOST" "docker exec caddy caddy validate --config /etc/caddy/Caddyfile" >/dev/null 2>&1; then
-    ssh "$HOST" "docker exec caddy caddy reload --config /etc/caddy/Caddyfile"
+  if ssh "$HOST" "docker exec '$CADDY_CTN' caddy validate --config /etc/caddy/Caddyfile" >/dev/null 2>&1; then
+    ssh "$HOST" "docker exec '$CADDY_CTN' caddy reload --config /etc/caddy/Caddyfile"
     ok "Caddy neu geladen"
   else
     warn "Caddyfile-Validierung fehlgeschlagen – Eintrag bitte prüfen (Sicherung liegt bereit)."
