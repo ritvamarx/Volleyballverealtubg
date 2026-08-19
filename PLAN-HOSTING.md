@@ -1,165 +1,156 @@
 # Plan: volleyball.nettverwaltet.de — von der Datei zur gehosteten Vereins-App
 
-Stand: August 2026 · Ziel: Die SKV-Müritz-Plattform läuft als Web-App mit Login
-auf deinem eigenen Server unter **https://volleyball.nettverwaltet.de** und ist
-vom iPhone, MacBook und jedem anderen Gerät aus nutzbar — mit **einem
-gemeinsamen, geschützten Datenbestand** statt Gerätespeicher.
+Stand: August 2026 · Zielbild: Die SKV-Müritz-Plattform läuft als Web-App auf
+**deinem Hetzner-Server** unter **https://volleyball.nettverwaltet.de**.
+**Trainer, Spieler und Eltern melden sich mit eigenen Zugängen an** und sehen
+jeweils genau das, was ihre Rolle erlaubt. Ein gemeinsamer, geschützter
+Datenbestand für alle Geräte; auf dem iPhone wie eine App installierbar.
 
 ---
 
-## 1. Ausgangslage und Ziel
+## 1. Ausgangslage und Grundprinzip
 
-**Heute:** Eine einzelne HTML-Datei; Daten liegen im Browser-Speicher des
-jeweiligen Geräts (localStorage); Austausch nur manuell per verschlüsselter
-`.skv`-Datei.
+**Heute:** Eine einzelne HTML-Datei; Daten im Browser-Speicher des jeweiligen
+Geräts; Austausch manuell per verschlüsselter `.skv`-Datei.
 
-**Ziel:** Dieselbe App, aber:
-- erreichbar unter `volleyball.nettverwaltet.de` (HTTPS)
-- **Login vorgeschaltet** — ohne Anmeldung keine Daten (persönliche Daten!)
-- Daten liegen **zentral auf dem Server** — alle Geräte sehen denselben Stand
-- auf dem iPhone **wie eine App installierbar** (PWA / „Zum Home-Bildschirm")
-- weiterhin offline benutzbar, mit Abgleich sobald wieder online
-
-**Grundprinzip des Umbaus:** Die App bleibt zu ~95 % unverändert. Es kommt ein
-schlankes Backend dazu, das genau zwei Dinge kann: **Anmelden** und den
-**Datenbestand speichern/laden**. Der bestehende Store synchronisiert statt nur
-mit localStorage zusätzlich mit dem Server.
+**Umbau-Prinzip:** Die App bleibt optisch und funktional erhalten. Neu ist ein
+schlankes Backend auf dem Hetzner-Server mit drei Aufgaben:
+**(1) Anmeldung/Rollen**, **(2) zentrale Datenhaltung**, **(3) rollenbasierte
+Sichten** — der Server entscheidet, welche Daten ein Konto überhaupt erhält.
+Das ist der entscheidende Sicherheitspunkt: Bei Eltern-/Spieler-Zugängen darf
+die Filterung **niemals im Browser** stattfinden.
 
 ```
-iPhone/Safari ─┐                        ┌────────────────────────────┐
-MacBook  ──────┼── HTTPS + Session ────▶│ volleyball.nettverwaltet.de │
-Tablet  ───────┘   (Cookie, HttpOnly)   │  ├─ App (statisch, wie heute)│
-                                        │  ├─ API: /api/login, /api/state
-                                        │  └─ DB: Nutzer + Datenbestand │
-                                        └────────────────────────────┘
+Trainer ────┐                       ┌───────────────────────────────────────┐
+Spieler ────┼─ HTTPS + Session ────▶│ volleyball.nettverwaltet.de (Hetzner) │
+Eltern  ────┘  (Cookie, HttpOnly)   │ Reverse Proxy (TLS) → App-Container   │
+                                    │  ├─ statische App (wie heute)         │
+                                    │  ├─ API  /api/… (Node.js)             │
+                                    │  └─ SQLite: Nutzer · Rollen · Daten   │
+                                    └───────────────────────────────────────┘
 ```
 
----
+## 2. Getroffene Entscheidungen
 
-## 2. Entscheidung 1: Welche Art Server ist es?
+- **Server:** eigener Hetzner-Server (dort läuft bereits deine
+  Vereinsverwaltung). → Deployment als **Docker-Container hinter dem
+  vorhandenen Reverse-Proxy**; falls noch keiner läuft, bringt das Paket einen
+  Caddy mit (TLS automatisch via Let's Encrypt).
+- **Nutzerkreis:** **Trainer + Spieler + Eltern** mit eigenen Zugängen und
+  abgestuften Rechten (Rollenmodell unten).
+- **Technik Backend:** Node.js (Express) + SQLite — ein Container, keine
+  externen Dienste, Backups = eine Datei. Passwörter mit Argon2id.
 
-| | **Variante A: Webhosting-Paket** (empfohlen, wenn vorhanden) | **Variante B: eigener Server/VPS** |
-|---|---|---|
-| Typisch | All-Inkl, IONOS, Strato, Hetzner Webhosting … | Hetzner Cloud, NAS, Root-Server |
-| Backend | **PHP 8 + SQLite** — läuft ohne Installation auf praktisch jedem deutschen Hosting | **Node.js** oder Docker (z. B. Caddy + kleine API) |
-| Deployment | Dateien per FTP/SFTP hochladen, fertig | Docker-Compose / systemd-Dienst |
-| TLS/HTTPS | beim Hoster per Klick (Let's Encrypt) | Caddy/Traefik automatisch |
-| Wartung | minimal | Updates selbst einspielen |
+### Noch zu klären (bitte kurz beantworten)
+1. Wie ist der Server heute aufgesetzt — läuft schon **Docker** und ein
+   **Reverse-Proxy** (Caddy/Traefik/nginx) für die Vereinsverwaltung, oder ein
+   Panel (Plesk o. ä.)? Danach richtet sich das Deployment-Snippet.
+2. Soll die DNS-Subdomain `volleyball` auf dieselbe IP zeigen wie die
+   bestehende Vereinsverwaltung? (Vermutlich ja.)
 
-**Empfehlung:** Variante A, falls `nettverwaltet.de` bei einem klassischen
-Hoster liegt — geringste Komplexität, kein laufender Prozess, Backups über den
-Hoster. Der Plan unten ist für A ausformuliert; für B ändert sich nur die
-API-Schicht (gleiches Konzept, gleiche Endpunkte).
+## 3. Rollenmodell (Kernstück)
 
-## 3. Entscheidung 2: Wer bekommt Zugänge?
+| Recht / Bereich | 🧑‍🏫 Trainer | 🏐 Spieler | 👪 Eltern |
+|---|---|---|---|
+| Alles sehen & bearbeiten (Kader, Finanzen, Briefe, Meldungen …) | ✔ | ✖ | ✖ |
+| Kalender (Trainings, Spiele, Ferien) | ✔ | ✔ | ✔ |
+| Trainingsrückmeldung abgeben | für alle | **für sich** | **für das eigene Kind** |
+| Fahrer-Angebot für Auswärtsspiele eintragen | ✔ | ✖ | ✔ (sich selbst) |
+| Heimspiel-Job übernehmen (Buffet, Helfer) | vergeben | ✖ | ✔ (offene Jobs) |
+| Vereinskleidung ansehen / anfordern | ✔ | ✔ (für sich) | ✔ (fürs Kind) |
+| Eigene Kontaktdaten einsehen/ändern | ✔ | ✔ (eigene) | ✔ (eigene + Kind) |
+| Kontaktdaten **anderer** Familien | ✔ | ✖ | ✖ |
+| Ankündigungen, Links, Wiki, Tabelle | ✔ | ✔ | ✔ (Zielgruppen-Filter) |
+| Finanzen: eigener Beitragsstatus | ✔ (alle) | ✖ | ✔ (nur eigener) |
 
-- **Stufe 1 (Start):** 1–3 Konten für das Trainerteam. Alle sehen/ändern alles.
-- **Stufe 2 (später, optional):** Eltern-/Spieler-Zugänge mit eigener Rolle —
-  z. B. nur Kalender sehen und die eigene Trainingsrückmeldung abgeben.
-  Das wäre der eigentliche Langfrist-Gewinn der Server-Version, ist aber ein
-  eigenes Ausbaupaket (Rollenrechte in jeder Ansicht).
+**Konto-Anlage ohne offene Registrierung:** Der Trainer erzeugt pro Spieler
+**Einladungscodes** (einen für den Spieler, einen für die Eltern). Mit dem Code
+registriert man sich selbst (Name vorausgefüllt, Passwort selbst wählen) und
+ist automatisch mit dem richtigen Spieler verknüpft. Eltern mit mehreren
+Kindern lassen sich auf mehrere Spieler verknüpfen.
 
----
+## 4. Bausteine
 
-## 4. Bausteine im Detail
-
-### 4.1 Domain & TLS (machst du beim Hoster, ~15 Min.)
-- Subdomain `volleyball.nettverwaltet.de` im Hoster-Panel anlegen und auf das
-  Hosting-Verzeichnis bzw. die Server-IP zeigen lassen (A/CNAME-Record).
-- Let's-Encrypt-Zertifikat für die Subdomain aktivieren; **HTTPS erzwingen**
-  (Redirect) + HSTS-Header. Ohne HTTPS kein Login-Betrieb.
+### 4.1 DNS & TLS (machst du, ~10 Min.)
+`volleyball.nettverwaltet.de` als A-/AAAA-Record auf die Server-IP; TLS macht
+der Reverse-Proxy automatisch (Let's Encrypt), HTTPS wird erzwungen (+ HSTS).
 
 ### 4.2 Backend-API (baue ich)
-Ein bewusst kleines PHP-Backend (`/api/`), Datenhaltung in **SQLite** (eine
-Datei, vom Webroot aus unerreichbar abgelegt):
+Node.js + SQLite im Docker-Container. Endpunkte:
 
-| Endpunkt | Zweck |
-|---|---|
-| `POST /api/login` | Anmeldung (Benutzername + Passwort) → Session-Cookie |
-| `POST /api/logout` | Abmelden |
-| `GET /api/state` | Gesamten Datenbestand laden (JSON + Versionsnummer) |
-| `PUT /api/state` | Datenbestand speichern (mit Versionsprüfung) |
-| `GET /api/me` | Sitzungsstatus prüfen |
+| Endpunkt | Rolle | Zweck |
+|---|---|---|
+| `POST /api/login` · `POST /api/logout` · `GET /api/me` | alle | Sitzung |
+| `POST /api/register` (nur mit Einladungscode) | Spieler/Eltern | Konto anlegen |
+| `GET/PUT /api/state` | Trainer | kompletter Datenbestand, mit Versionsprüfung (optimistisches Sperren) + Verlauf (letzte 30 Stände) |
+| `GET /api/portal` | Spieler/Eltern | **serverseitig gefilterte Sicht** (nur erlaubte Daten) |
+| `POST /api/portal/rsvp` | Spieler/Eltern | Trainingsrückmeldung setzen |
+| `POST /api/portal/driver` | Eltern | Fahrer-Angebot (Plätze) für ein Auswärtsspiel |
+| `POST /api/portal/job` | Eltern | offenen Heimspiel-Job übernehmen |
+| `POST /api/portal/clothing` | Spieler/Eltern | Kleidung anfordern |
+| `POST /api/portal/contact` | Spieler/Eltern | eigene Kontaktdaten aktualisieren |
+| `GET /api/invites` · `POST /api/invites` | Trainer | Einladungscodes verwalten |
 
-- **Versionierung:** Jeder Speichervorgang zählt eine Version hoch; gespeichert
-  wird nur, wenn der Client die aktuelle Version kannte (optimistisches
-  Sperren). Bei Konflikt (zwei Geräte gleichzeitig) bekommt das zweite Gerät
-  eine Warnung und lädt neu — für 1–3 Trainer völlig ausreichend.
-- **Verlauf:** Die letzten 30 Versionen bleiben als automatische Sicherung in
-  der DB (Wiederherstellen-Knopf in der Datensicherung).
+Alle Portal-Schreibzugriffe validiert der Server gegen die Verknüpfung
+Konto ↔ Spieler — niemand kann für fremde Kinder melden oder fremde Daten lesen.
 
 ### 4.3 Login & Sicherheit (baue ich)
-- Passwörter mit **Argon2id** gehasht (PHP `password_hash`), niemals Klartext.
-- **Session-Cookie**: HttpOnly, Secure, SameSite=Lax; Ablauf nach Inaktivität
-  (konfigurierbar, z. B. 30 Tage „angemeldet bleiben").
-- **Rate-Limiting** auf Login (Bremse nach Fehlversuchen), generische
-  Fehlermeldung, Protokoll der letzten Anmeldungen.
-- **CSRF-Schutz** für schreibende Aufrufe (Token).
-- Benutzerverwaltung Stufe 1: Konten werden per kleinem CLI/Setup-Skript
-  angelegt (kein offenes „Registrieren" — geschlossener Nutzerkreis).
-- Optional (empfohlen, +1 Baustein): **TOTP-Zweitfaktor** (Authenticator-App).
-- Sicherheits-Header: CSP, X-Frame-Options, Referrer-Policy.
+Argon2id-Hashes · HttpOnly/Secure/SameSite-Cookies · Login-Rate-Limit ·
+CSRF-Token · Anmeldeprotokoll · Sicherheits-Header (CSP, X-Frame-Options) ·
+optional TOTP-2FA für Trainerkonten. Einladungscodes einmalig + ablaufend.
 
-### 4.4 Frontend-Anpassungen (baue ich)
-- **Login-Bildschirm** vor der App (im bestehenden Design).
-- **Store-Sync:** `Store.save()` schreibt weiter sofort in localStorage
-  (Offline-Fähigkeit!) und schiebt Änderungen gebündelt (debounced) per
-  `PUT /api/state` zum Server; beim Start `GET /api/state`.
-  Offline erfasste Änderungen werden beim nächsten Online-Start abgeglichen.
-- Statusanzeige „☁️ synchronisiert / 📴 offline, 3 Änderungen ausstehend".
-- Die bestehende `.skv`-/CSV-Datensicherung bleibt als zusätzliche Absicherung.
+### 4.4 Frontend (baue ich)
+- **Login-/Registrierungs-Bildschirm** im bestehenden Design.
+- **Trainer-Modus:** App wie heute; `Store.save()` synchronisiert zusätzlich
+  gebündelt zum Server (localStorage bleibt Offline-Puffer, Statusanzeige
+  „☁️ synchronisiert / 📴 offline"). Konfliktfall: Warnung + Neuladen
+  („Letzter gewinnt" — für ein kleines Trainerteam angemessen, ehrlich gesagt
+  kein Echtzeit-Merge).
+- **Portal-Modus (Spieler/Eltern):** reduziertes Menü (Übersicht, Kalender,
+  Rückmeldung, Mithelfen [Jobs/Fahrer], Kleidung, Links, Wiki) auf Basis der
+  gefilterten `/api/portal`-Daten; große Touch-Buttons „Zusagen/Absagen".
 
-### 4.5 PWA — „echte App" auf dem iPhone (baue ich)
-- **Web-App-Manifest** (Name, 🏐-Icons in allen Größen, Farben, Standalone-
-  Modus) + **Service Worker** (App-Dateien offline gecacht).
-- Ergebnis: Safari → Teilen → „Zum Home-Bildschirm" → startet vollbild wie
-  eine native App, eigenes Icon, funktioniert auch offline (Daten aus dem
-  letzten Sync).
+### 4.5 PWA — „echte App" (baue ich)
+Manifest + 🏐-Icons + Service Worker: Safari → Teilen → „Zum Home-Bildschirm"
+→ Vollbild-App mit eigenem Icon, App-Gerüst offline verfügbar.
 
-### 4.6 Datenübernahme (einmalig, machst du in 2 Min.)
-- Erster Login auf der neuen Domain → Datensicherung → „Verschlüsselt
-  importieren" mit deiner aktuellen `.skv`-Datei. Fertig — ab dann ist der
-  Server die zentrale Wahrheit.
+### 4.6 Deployment-Paket (baue ich)
+`deploy/`-Ordner im Repo: `Dockerfile`, `docker-compose.yml` (inkl.
+Volume für SQLite + optionalem Caddy), Beispiel-Snippets für vorhandenen
+nginx/Traefik, `setup`-Skript (erstes Trainerkonto anlegen), Update-Anleitung
+(„git pull && docker compose up -d --build").
 
-### 4.7 DSGVO & Betrieb (gemeinsam)
-- **AV-Vertrag** mit dem Hoster abschließen (bei deutschen Hostern ein
-  Formular-Klick); Hosting in der EU.
-- **Datenschutzerklärung + Impressum** als Seiten der App (Vorlage liefere ich;
-  Inhalte Verein/Verantwortlicher trägst du ein). Einverständnis-Vorlage
-  „Datennutzung" um den Hinweis auf die Online-Plattform ergänzen.
-- **Backups:** Hoster-Backup + wöchentlicher automatischer verschlüsselter
-  Export (die vorhandene `.skv`-Mechanik, serverseitig).
-- **Löschkonzept:** Spieler löschen entfernt alle personenbezogenen Einträge;
-  Versionshistorie läuft nach 30 Ständen automatisch aus.
-- Klartext-Grenze: WhatsApp bleibt freiwilliger Zusatzkanal, wie im
-  Einverständnis formuliert.
+### 4.7 Datenübernahme (machst du, 2 Min.)
+Erster Trainer-Login → Datensicherung → `.skv` importieren → Server ist ab
+dann die zentrale Wahrheit.
 
----
+### 4.8 DSGVO & Betrieb (gemeinsam)
+- Hetzner = EU-Hosting; **AV-Vertrag** bei Hetzner aktivieren (Konto-Klick).
+- **Datenschutzerklärung + Impressum** als App-Seiten (Vorlage liefere ich).
+- Einverständnis-Vorlage „Datennutzung" um Online-Plattform + Zugänge ergänzen.
+- **Backups:** tägliches SQLite-Snapshot aufs Volume + wöchentlicher
+  verschlüsselter Export; Hetzner-Server-Backup falls gebucht.
+- **Löschkonzept:** Spieler löschen entfernt zugehörige personenbezogene Daten
+  und deaktiviert verknüpfte Konten; Versionsverlauf läuft automatisch aus.
+- Betriebsverantwortung bleibt real: OS-/Docker-Updates, Backup-Kontrolle.
 
-## 5. Phasen, Reihenfolge, Aufwand
+## 5. Phasen & Reihenfolge
 
-| Phase | Inhalt | Wer | Aufwand |
+| Phase | Inhalt | Wer | Umfang |
 |---|---|---|---|
-| **0** | Hosting-Typ klären, Subdomain + TLS einrichten, FTP-Zugang bereitlegen | du | ~30 Min. |
-| **1** | Backend-API + Login + Store-Sync + Login-UI; Deployment-Paket (`dist/server/` zum Hochladen) inkl. Setup-Anleitung | ich | 1 Runde |
-| **2** | PWA (Manifest, Icons, Service Worker, Offline-Cache) | ich | klein |
-| **3** | Härtung: Rate-Limit-Feinschliff, CSRF, Anmeldeprotokoll, optional TOTP-2FA; DSGVO-Seiten; serverseitiger Backup-Export | ich | 1 Runde |
-| **4** | *Optional:* Eltern-/Spieler-Rollen (eigene Zugänge, Rückmeldung selbst abgeben, nur eigene Daten sehen) | ich | größer, eigenes Paket |
+| **0** | Server-Setup klären (Docker? Proxy?), DNS-Record, ggf. AV-Vertrag | du | ~30 Min. |
+| **1** | Backend (Auth + Trainer-Vollsync + Versionierung), Login-UI, Deployment-Paket → **App läuft mit Trainer-Login unter der Domain** | ich | 1 große Runde |
+| **2** | PWA (Manifest, Icons, Service Worker) | ich | klein |
+| **3** | **Portal für Spieler & Eltern**: Rollen, Einladungscodes, gefilterte Sicht, Aktionen (Rückmeldung, Fahrer, Jobs, Kleidung, Kontaktdaten), Trainer-Verwaltung der Zugänge | ich | 1–2 große Runden |
+| **4** | Härtung + DSGVO-Seiten + Backup-Automatik (+ optional TOTP) | ich | mittel |
 
-Nach Phase 1 ist die App bereits mit Login unter der Domain nutzbar; Phase 2–3
-machen sie komfortabel und robust.
+Reihenfolge bewusst: Nach Phase 1 arbeitest du bereits produktiv über die
+Domain; Phase 3 öffnet die Plattform für Familien.
 
-## 6. Was du konkret brauchst
-1. Zugang zum Hoster-Panel von `nettverwaltet.de` (Subdomain + TLS + FTP).
-2. Info an mich: **Variante A oder B** (bzw. welcher Hoster/Serverart).
-3. Später: gewünschte Benutzernamen fürs Trainerteam (Passwörter werden beim
-   ersten Login selbst gesetzt).
-
-## 7. Risiken & Grenzen (ehrlich)
-- **Gleichzeitiges Bearbeiten** auf zwei Geräten löst v1 mit „Letzter gewinnt +
-  Warnung" — kein Echtzeit-Merge. Für ein kleines Trainerteam okay; echte
-  Mehrbenutzer-Gleichzeitigkeit wäre Phase-4-Thema.
-- **Uploads** (Einverständnis-PDFs) wandern in v1 als Teil des Datenbestands
-  mit (Größenlimit ~4 MB/Datei bleibt); ein eigener Datei-Store wäre Ausbau.
-- Ein selbst gehosteter Server bedeutet **Betriebsverantwortung** (Updates,
-  Backups prüfen). Variante A minimiert das, auf null geht es nie.
+## 6. Grenzen (ehrlich)
+- Kein Echtzeit-Kollaborations-Merge; Konflikte beim Trainer-Vollzugriff werden
+  erkannt und gemeldet, nicht automatisch verschmolzen.
+- Datei-Uploads (Einverständnis-PDFs) bleiben zunächst Teil des Datenbestands
+  (~4 MB/Datei); eigener Datei-Store wäre späterer Ausbau.
+- E-Mail-Versand (z. B. „Passwort vergessen") braucht einen Mail-Weg; v1 löst
+  das über den Trainer (Code neu ausstellen) statt über E-Mails.
