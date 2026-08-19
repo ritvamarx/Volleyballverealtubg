@@ -96,7 +96,13 @@ ab und schreibt in die DB) und automatische Backups.
 
 ## 3. Rollenmodell (Kernstück)
 
-| Recht / Bereich | 🧑‍🏫 Trainer | 🏐 Spieler | 👪 Eltern |
+**Rollen, nicht Personen (beschlossen):** `trainer`, `spieler`, `eltern` sind
+Rollen — je Rolle sind **beliebig viele Konten** möglich. Insbesondere gibt es
+nicht „den Trainer": Jedes Mitglied des Trainerteams bekommt ein **eigenes
+Konto mit Rolle trainer** (kein geteiltes Sammelkonto — wichtig für 2FA und
+Nachvollziehbarkeit, wer wann gespeichert hat).
+
+| Recht / Bereich | 🧑‍🏫 Rolle Trainer | 🏐 Rolle Spieler | 👪 Rolle Eltern |
 |---|---|---|---|
 | Alles sehen & bearbeiten (Kader, Finanzen, Briefe, Meldungen …) | ✔ | ✖ | ✖ |
 | Kalender (Trainings, Spiele, Ferien) | ✔ | ✔ | ✔ |
@@ -108,7 +114,7 @@ ab und schreibt in die DB) und automatische Backups.
 | Kontaktdaten **anderer** Familien | ✔ | ✖ | ✖ |
 | **Namen anderer Kinder/Spieler** | ✔ | ✔ (eigener Kader) | **✖ — Eltern sehen ausschließlich das eigene Kind** |
 | Ankündigungen, Links, Wiki, Tabelle | ✔ | ✔ | ✔ (Zielgruppen-Filter) |
-| Finanzen: eigener Beitragsstatus | ✔ (alle) | ✖ | ✔ (nur eigener) |
+| Finanzen / Beiträge | ✔ (alle) | ✖ | **nur den jeweils eigenen Beitrag** (Status des eigenen Kindes; keine Beträge oder Status anderer Familien) |
 
 **Privatsphäre-Regel (beschlossen):** Die Eltern-Sicht enthält **keine Namen
 anderer Kinder** — nirgends: Rückmeldungs-Übersichten zeigen Eltern nur
@@ -117,15 +123,22 @@ eigene Angebot (die Zuordnung von Mitfahrern sieht und macht allein das
 Trainerteam), Job-Listen zeigen Aufgaben ohne Personenbezug. Der Server
 liefert diese Daten an Eltern-Konten gar nicht erst aus.
 
-**Konto-Anlage ohne offene Registrierung (beschlossen):** Das Trainerteam
-erzeugt pro Spieler **Einladungscodes** (einen für den Spieler, einen für die
-Eltern) und verschickt sie **per WhatsApp**: Die App erzeugt zu jedem Code
-einen fertigen WhatsApp-Teilen-Knopf (vorformulierte Nachricht mit
-Registrierungslink + Code, geöffnet über WhatsApp/Systemteilen — kein
-Mailserver nötig). Mit dem Code registriert man sich selbst (Name
-vorausgefüllt, Passwort selbst wählen) und ist automatisch mit dem richtigen
-Spieler verknüpft; Eltern mit mehreren Kindern werden auf mehrere Spieler
-verknüpft. Codes sind einmalig gültig und laufen ab.
+**Konto-Anlage ohne offene Registrierung (beschlossen):** Alle Konten
+entstehen über **Einladungscodes mit Rolle**, verschickt **per WhatsApp**
+(die App erzeugt zu jedem Code einen fertigen Teilen-Knopf mit vorformulierter
+Nachricht: Registrierungslink + Code — kein Mailserver nötig; Link und Code
+enthalten keine Personendaten):
+
+- **Spieler-/Eltern-Codes** erzeugt das Trainerteam pro Spieler (je einen für
+  Spieler und Eltern); die Registrierung verknüpft das Konto automatisch mit
+  dem richtigen Spieler. Eltern mit mehreren Kindern werden auf mehrere
+  Spieler verknüpft.
+- **Trainer-Codes** können nur bestehende Trainer erzeugen — so wächst das
+  Trainerteam kontrolliert. Das **erste Trainerkonto** legt das Setup-Skript
+  beim Deployment an.
+
+Mit dem Code registriert man sich selbst (Name vorausgefüllt, Passwort selbst
+wählen). Codes sind einmalig gültig und laufen ab.
 
 ## 4. Bausteine
 
@@ -141,8 +154,8 @@ Datenbestands ohne Wettlauf-Probleme). Endpunkte:
 | Endpunkt | Rolle | Zweck |
 |---|---|---|
 | `POST /api/login` · `POST /api/logout` · `GET /api/me` | alle | Sitzung |
-| `POST /api/register` (nur mit Einladungscode) | Spieler/Eltern | Konto anlegen |
-| `GET/PUT /api/state` | Trainer | kompletter Datenbestand, mit Versionsprüfung (optimistisches Sperren) + Verlauf (letzte 30 Stände) |
+| `POST /api/register` (nur mit Einladungscode) | alle | Konto anlegen — der Code bestimmt Rolle und Spieler-Verknüpfung |
+| `GET/PUT /api/state` | Trainer | kompletter Datenbestand, mit Versionsprüfung (optimistisches Sperren) + Verlauf (letzte 30 Stände, **je Stand mit Autor und Zeitpunkt** — bei mehreren Trainern nachvollziehbar) |
 | `GET /api/portal` | Spieler/Eltern | **serverseitig gefilterte Sicht** (nur erlaubte Daten) |
 | `POST /api/portal/rsvp` | Spieler/Eltern | Trainingsrückmeldung setzen |
 | `POST /api/portal/driver` | Eltern | Fahrer-Angebot (Plätze) für ein Auswärtsspiel |
@@ -157,19 +170,24 @@ Konto ↔ Spieler — niemand kann für fremde Kinder melden oder fremde Daten l
 ### 4.3 Login & Sicherheit (baue ich)
 Argon2id-Hashes · HttpOnly/Secure/SameSite-Cookies · Login-Rate-Limit ·
 CSRF-Token · Anmeldeprotokoll · Sicherheits-Header (CSP, X-Frame-Options).
-**2FA (beschlossen):** TOTP per Authenticator-App — für **Trainerkonten
+Sitzungen liegen in SQLite (nicht im Prozessspeicher) — ein Deployment/
+Neustart loggt niemanden aus.
+**2FA (beschlossen):** TOTP per Authenticator-App — für **alle Trainerkonten
 verpflichtend** ab Phase 1 (bevor echte Daten online sind), für Spieler-/
-Eltern-Konten optional aktivierbar. Backup-Codes beim Einrichten; verlorene
-2FA setzt das Trainerteam zurück. Einladungscodes einmalig + ablaufend,
-Versand per WhatsApp-Teilen (siehe Abschnitt 3).
+Eltern-Konten optional aktivierbar. Backup-Codes beim Einrichten. Verlorene
+2FA oder Passwörter setzt ein anderes Trainerkonto zurück; **Notfall-Weg**,
+falls kein Trainer mehr hineinkommt: Admin-Skript auf dem Server per SSH
+(`docker compose exec app ./manage.py reset-2fa <konto>`). Einladungscodes
+einmalig + ablaufend, Versand per WhatsApp-Teilen (siehe Abschnitt 3).
 
 ### 4.4 Frontend (baue ich)
 - **Login-/Registrierungs-Bildschirm** im bestehenden Design.
 - **Trainer-Modus:** App wie heute; `Store.save()` synchronisiert zusätzlich
   gebündelt zum Server (localStorage bleibt Offline-Puffer, Statusanzeige
-  „☁️ synchronisiert / 📴 offline"). Konfliktfall: Warnung + Neuladen
-  („Letzter gewinnt" — für ein kleines Trainerteam angemessen, ehrlich gesagt
-  kein Echtzeit-Merge).
+  „☁️ synchronisiert / 📴 offline"). Konfliktfall: Warnung **mit Namen des
+  anderen Trainers und Uhrzeit** („Katrin hat vor 2 Minuten gespeichert") +
+  Neuladen; „Letzter gewinnt" — für ein kleines Trainerteam angemessen,
+  ehrlich gesagt kein Echtzeit-Merge.
 - **Portal-Modus (Spieler/Eltern):** reduziertes Menü (Übersicht, Kalender,
   Rückmeldung, Mithelfen [Jobs/Fahrer], Kleidung, Links, Wiki) auf Basis der
   gefilterten `/api/portal`-Daten; große Touch-Buttons „Zusagen/Absagen".
@@ -178,11 +196,21 @@ Versand per WhatsApp-Teilen (siehe Abschnitt 3).
 Manifest + 🏐-Icons + Service Worker: Safari → Teilen → „Zum Home-Bildschirm"
 → Vollbild-App mit eigenem Icon, App-Gerüst offline verfügbar.
 
-### 4.6 Deployment-Paket (baue ich)
-`deploy/`-Ordner im Repo: `Dockerfile`, `docker-compose.yml` (inkl.
-Volume für SQLite + optionalem Caddy), Beispiel-Snippets für vorhandenen
-nginx/Traefik, `setup`-Skript (erstes Trainerkonto anlegen), Update-Anleitung
-(„git pull && docker compose up -d --build").
+### 4.6 Deployment-Paket (baue ich — nach deiner bestehenden Routine)
+`deploy/`-Ordner im Repo, zugeschnitten auf deinen Server:
+- `Dockerfile` (python:3.12-slim, Gunicorn 1 Worker/8 Threads, `appuser`) und
+  `docker-compose.yml` für **`/opt/volleyball`** (data-Volume, `.env`,
+  Anbindung ans bestehende Caddy-Docker-Netz).
+- **Caddyfile-vHost-Snippet** für deinen vorhandenen Caddy 2
+  (`volleyball.nettverwaltet.de → volleyball-app:8000`).
+- `manage.py`-Kommandos: erstes Trainerkonto anlegen, 2FA/Passwort
+  zurücksetzen, Backup ausführen.
+- Cron-Vorlagen für `/etc/cron.d/`: `volleyball-backup` (nach dem Muster
+  deiner vereins-backup-Jobs, gleiches Ziel), `volleyball-ferien`
+  (OpenHolidays-Abruf serverseitig).
+- **Update-Ablauf wie gewohnt, ohne Git auf dem Server:** `rsync` vom Mac
+  nach `/opt/volleyball/` → `docker compose up -d --build` →
+  Erreichbarkeits-Check (fertiges `deploy.sh` liegt bei).
 
 ### 4.7 Datenübernahme (machst du, 2 Min.)
 Erster Trainer-Login → Datensicherung → `.skv` importieren → Server ist ab
@@ -192,7 +220,9 @@ dann die zentrale Wahrheit.
 - Hetzner = EU-Hosting; **AV-Vertrag** bei Hetzner aktivieren (Konto-Klick).
 - **Datenschutzerklärung + Impressum** als App-Seiten (Vorlage liefere ich).
 - Einverständnis-Vorlage „Datennutzung" um Online-Plattform + Zugänge ergänzen.
-- **Backups:** tägliches SQLite-Snapshot aufs Volume + wöchentlicher
+- **Backups:** täglicher Cron `volleyball-backup` nach dem Muster deiner
+  bestehenden vereins-backup-Jobs (gleiches Ziel/Ablageort — ein Snapshot nur
+  auf derselben VM schützt nicht vor Serververlust) + wöchentlicher
   verschlüsselter Export; Hetzner-Server-Backup falls gebucht.
 - **Löschkonzept:** Spieler löschen entfernt zugehörige personenbezogene Daten
   und deaktiviert verknüpfte Konten; Versionsverlauf läuft automatisch aus.
@@ -202,8 +232,8 @@ dann die zentrale Wahrheit.
 
 | Phase | Inhalt | Wer | Umfang |
 |---|---|---|---|
-| **0** | Server-Setup klären (Docker? Proxy?), DNS-Record, ggf. AV-Vertrag | du | ~30 Min. |
-| **1** | Backend (Auth inkl. **TOTP-2FA für Trainer** + Trainer-Vollsync + Versionierung), Login-UI, Deployment-Paket (`/opt/volleyball`, Caddy-vHost-Snippet) → **App läuft mit Trainer-Login unter der Domain** | ich | 1 große Runde |
+| **0** | DNS-Record anlegen, AV-Vertrag bei Hetzner prüfen | du | ~15 Min. |
+| **1** | Backend (Auth inkl. **TOTP-2FA für Trainer** + Trainer-Vollsync + Versionierung), Login-UI, Deployment-Paket (`/opt/volleyball`, Caddy-vHost-Snippet) → **App läuft unter der Domain, mehrere Trainerkonten möglich** | ich | 1 große Runde |
 | **2** | PWA (Manifest, Icons, Service Worker) | ich | klein |
 | **3** | **Portal für Spieler & Eltern**: Rollen, Einladungscodes mit WhatsApp-Versand, gefilterte Sicht (ohne fremde Kindernamen), Aktionen (Rückmeldung, Fahrer, Jobs, Kleidung, Kontaktdaten), Trainer-Verwaltung der Zugänge | ich | 1–2 große Runden |
 | **4** | Härtung + DSGVO-Seiten + Backup-/Ferien-Cron + Web-Push (pywebpush, wie WerkHausApp) | ich | mittel |
@@ -217,4 +247,5 @@ Domain; Phase 3 öffnet die Plattform für Familien.
 - Datei-Uploads (Einverständnis-PDFs) bleiben zunächst Teil des Datenbestands
   (~4 MB/Datei); eigener Datei-Store wäre späterer Ausbau.
 - E-Mail-Versand (z. B. „Passwort vergessen") braucht einen Mail-Weg; v1 löst
-  das über den Trainer (Code neu ausstellen) statt über E-Mails.
+  das über das Trainerteam (Zurücksetzen im Trainer-Bereich, für Trainer
+  selbst über ein anderes Trainerkonto oder das Server-Admin-Skript).
