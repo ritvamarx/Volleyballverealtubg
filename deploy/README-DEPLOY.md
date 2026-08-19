@@ -3,6 +3,23 @@
 Zugeschnitten auf den bestehenden Hetzner-Server (Docker Compose, ein Caddy 2
 für alle Domains, rsync-Deployment ohne Git auf dem Server).
 
+## ⚡ Schnellstart: alles in einem Befehl
+
+```bash
+./deploy/livegang.sh benutzer@server
+```
+
+`livegang.sh` erledigt die komplette Einrichtung automatisch: DNS-Check,
+Caddy-Netz erkennen, Dateien übertragen, `.env` mit SECRET_KEY erzeugen,
+Image bauen & starten, Caddy-vHost eintragen (mit Sicherungskopie) und neu
+laden, erstes Trainerkonto anlegen, Backup-Cron installieren, Endkontrolle.
+Das Skript ist mehrfach ausführbar – erledigte Schritte werden übersprungen.
+Einzige Voraussetzung: der DNS-A-Record `volleyball` → Server-IP existiert
+(oder wird kurz danach angelegt; TLS zieht Caddy dann automatisch nach).
+
+Die folgenden Abschnitte beschreiben dieselben Schritte einzeln – für
+manuelles Vorgehen oder zum Nachschlagen.
+
 ## Einmalige Einrichtung
 
 1. **DNS:** `volleyball.nettverwaltet.de` als A-/AAAA-Record auf die Server-IP

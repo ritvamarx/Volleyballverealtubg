@@ -24,5 +24,6 @@ ssh "${ZIEL_HOST}" "cd ${ZIEL_PFAD} && docker compose up -d --build app"
 
 echo "4/4 · Erreichbarkeits-Check"
 sleep 3
-ssh "${ZIEL_HOST}" "curl -fsS http://127.0.0.1:8000/gesund >/dev/null 2>&1 || docker compose -f ${ZIEL_PFAD}/docker-compose.yml logs --tail 20 app"
+# Port 8000 ist nur im Docker-Netz erreichbar (expose, nicht ports) – daher im Container prüfen
+ssh "${ZIEL_HOST}" "cd ${ZIEL_PFAD} && docker compose exec -T app python3 -c \"import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/gesund')\" >/dev/null 2>&1 || docker compose logs --tail 20 app"
 curl -fsS "https://volleyball.nettverwaltet.de/gesund" && echo " ✔ volleyball.nettverwaltet.de erreichbar" || echo " (extern noch nicht erreichbar – DNS/Caddy prüfen)"
