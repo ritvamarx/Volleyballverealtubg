@@ -50,6 +50,7 @@
     const teamToDept = { U20: "MU20", U18: "MU18", U16: "MU16", U14: "MU14", Herren: "HER1" };
     players.forEach((pl, i) => {
       pl.departmentId = deptId(teamToDept[pl.team] || null);
+      pl.departmentIds = pl.departmentId ? [pl.departmentId] : [];
       pl.passNumber = `MV${SEASON.year}${String(10001 + i)}`;
     });
     // Beispiel-Kontaktdaten: ältere Spieler mit eigener Nummer/Mail, teils Erstkontakt Spieler
@@ -106,6 +107,54 @@
       job(homeB, "helper", "Sanitätsdienst / Erste Hilfe", "Anke Fischer", true),
     ];
 
+    // Trainings-Bausteine für die Trainingsplanung (vom Trainerteam erweiterbar).
+    // Aufbau nach klassischer Trainingslehre: Erwärmung → Technik → Spielform →
+    // Abschlussspiel → Cool-down. minSp/maxSp = sinnvolle Teilnehmerzahl (0 = egal).
+    const uebungen = [
+      ueb("Lauf-ABC & Mobilisation", "aufwaermen", 10, 0, 0, "Zwei Runden lockeres Einlaufen, dann Lauf-ABC über die Hallenlänge (Skippings, Anfersen, Seitgalopp, Hopserlauf), dazwischen Schulterkreisen und Hüftmobilisation. Puls langsam hochfahren, Sprunggelenke gezielt vorbereiten."),
+      ueb("Ballgewöhnung in Paaren", "aufwaermen", 10, 2, 0, "Je zwei mit einem Ball: Zuwerfen und Fangen in Bewegung, dann Pritschen und Baggern im Wechsel, Abstand schrittweise vergrößern. Viele Kontakte ohne Druck – auf saubere Grundposition und Beinarbeit achten."),
+      ueb("Chaosball / Fangspiel", "aufwaermen", 8, 6, 0, "Fang- oder Ballspiel mit hohem Tempo (z. B. zwei Fänger:innen, Ball in der Hand schützt). Alle in Bewegung, Regeln alle 2–3 Minuten variieren – Puls und Stimmung steigen gemeinsam."),
+      ueb("Athletik-Zirkel", "aufwaermen", 12, 4, 0, "4–6 Stationen à 40 Sekunden (Plank, Ausfallschritte, Linien-Sprünge, Seilspringen, Wandsitz), 20 Sekunden Wechselpause, zwei Runden. Saubere Ausführung vor Tempo; für Jugend die Belastung halbieren."),
+      ueb("Baggern in Paaren", "technik", 10, 2, 0, "Zuwurf – Bagger zurück, dann Bagger-Bagger direkt. Fokus: ruhige, stabile Plattform, Beine arbeiten, Ballkontakt vor dem Körper. Steigerung: seitliches Verschieben vor jedem Kontakt oder Zielzonen am Boden."),
+      ueb("Pritschen übers Netz", "technik", 10, 4, 0, "Paare oder Dreiecke am Netz: hohes Zuspiel in markierte Zonen, erst frontal, dann über Kopf. Körper unter den Ball, Kontakt auf Stirnhöhe, symmetrische Handarbeit. Wettkampf: Wer trifft zuerst 10-mal die Zone?"),
+      ueb("Aufschlag-Serie", "technik", 12, 4, 0, "Erst Sicherheit (fünf Aufschläge ins Feld), dann Zielfelder mit Hütchen (Zonen 1/5/6). Mini-Wettkampf mit Teamzähler: Treffer zählen, Fehlaufschlag kostet einen Sprint zur Linie."),
+      ueb("Annahme-Riegel", "technik", 15, 6, 0, "Dreier-Riegel nimmt echte Aufschläge an, am Netz wird gefangen oder gestellt. Jede Annahme bewerten (3 = perfekt, 2 = spielbar, 1 = Notlösung); nach zehn Aufschlägen rotieren – der beste Riegel gewinnt."),
+      ueb("Angriff aus Zuspiel", "technik", 15, 6, 0, "Hohe Bälle auf Position 4 (später 2), Angriff mit vollem Anlauf: Drei-Schritt-Rhythmus, Absprung hinter dem Ball, Schlag über der Schulter. Erst ohne, dann gegen Einerblock."),
+      ueb("Blocktraining am Netz", "technik", 12, 4, 0, "Fußarbeit am Netz (Side-Steps, Kreuzschritt), Blocksprung mit aktiven Händen über der Kante, Timing gegen Angriff von Kiste oder Zuwurf. Ab acht Teilnehmenden Doppelblock mit Absprache üben."),
+      ueb("Abwehr-Drill (Dig)", "technik", 12, 4, 0, "Harte Bälle aus Trainerhand auf die Abwehr: tiefe Position, Arme früh raus, Ball hoch in die Feldmitte. Hechttechnik nur nach Einweisung und altersgerecht dosieren."),
+      ueb("Kleinfeld 2:2", "spielform", 15, 4, 8, "Feld längs geteilt, 2 gegen 2 mit drei Pflichtkontakten (Annahme – Zuspiel – Angriff). Jede:r macht alles, maximale Ballkontakte. Bis 11 zählen; Gewinnerpaar rückt Richtung Kaiserfeld auf."),
+      ueb("Kleinfeld 3:3", "spielform", 15, 6, 12, "3 gegen 3 auf halbem Feld mit Pflicht-Zuspiel über die Mitte. Sauberer Aufbau mit drei Kontakten und lauter Kommunikation („Ich!“). Varianten: nur Longline-Angriff oder Pflicht-Finte."),
+      ueb("4 gegen 4 mit Aufgaben", "spielform", 15, 8, 12, "4 gegen 4 auf dem Großfeld mit Zusatzregeln – z. B. Punkt zählt nur nach drei Berührungen oder nach Angriff aus dem Rückraum. Zwingt zu Taktik, Lücken erkennen und ansagen."),
+      ueb("Königsfeld", "spielform", 15, 9, 0, "Zwei Felder: Wer den Ballwechsel gewinnt, bleibt auf dem Königsfeld, Herausforderer rücken nach. Kurze Ballwechsel, hohes Tempo, große Motivation. Über Dankeball-Einwürfe des Trainerteams steuerbar."),
+      ueb("Sideout-Spiel 6:6", "spielform", 20, 12, 0, "6 gegen 6, ein Team ausschließlich in Annahme (Sideout): Punkt für den sauberen K1-Abschluss, das Aufschlagteam punktet beim Break. Nach fünf Aufschlägen Wechsel – spielnäher geht Annahmetraining nicht."),
+      ueb("Abschlussspiel 6:6", "abschluss", 15, 12, 0, "Freies 6:6 mit einer Zusatzaufgabe aus dem Technikteil des Tages (z. B. jeder Angriff mit Absicherung). Normale Zählweise und Rotation – das Gelernte unter Wettkampfdruck anwenden."),
+      ueb("Match-Satz bis 15", "abschluss", 15, 8, 0, "Verkürzter Satz bis 15 mit allem, was dazugehört: feste Aufstellung, Auszeiten, Coaching wie am Spieltag. Ideal als Generalprobe vor Punktspielen."),
+      ueb("Kleinfeld-Turnier", "abschluss", 15, 6, 0, "Schnellturnier 2:2 oder 3:3 mit Fünf-Minuten-Spielen: Gewinner rücken auf, Punkte werden je Person gezählt. Motivierender Abschluss mit vielen Ballkontakten – auch für kleine Gruppen."),
+      ueb("Dehnen & Feedback", "cooldown", 5, 0, 0, "Dehnprogramm im Kreis (Schultern, hintere Kette, Hüfte) mit kurzer Trainingsauswertung: Was lief gut, woran arbeiten wir nächstes Mal? Ausblick auf die kommenden Termine."),
+      ueb("Auslaufen & Abschlusskreis", "cooldown", 5, 0, 0, "Zwei lockere Runden auslaufen, danach Abschlusskreis mit Teamritual (gemeinsamer Ruf). Kurz und verbindlich – ein gleichbleibendes Ende gibt jedem Training Struktur."),
+      // ---- Bausteine nach Ideen von volleyballkompass.de und VolleyballFREAK (mit Quelle/Link) ----
+      ueb("Lauftennis", "aufwaermen", 10, 6, 0, "Tennisartige Spielform über das Netz für zwei Teams: Nach jeder eigenen Aktion wird auf die andere Feldseite durchgelaufen (Rundlauf-Prinzip). Bringt Puls, Orientierung und erste Ballkontakte in einem – Regeln und Varianten im Übungsblatt.", "volleyballkompass.de", "https://volleyballkompass.de/pdf/PDF___K_Lauftennis.pdf"),
+      ueb("Netz-und-Matte-Challenge", "aufwaermen", 12, 8, 0, "Erwärmungs-Wettkampf zweier Teams rund um Netz und Weichbodenmatte: Pritschen und Baggern sind fest in die Spielform eingebaut, gezählt wird in kleinen Challenges. Kompletter Aufbau im Übungsblatt.", "volleyballkompass.de", "https://volleyballkompass.de/pdf/__K_Netz_Matte.pdf"),
+      ueb("WarmUp-Challenge mit Wasserkisten", "aufwaermen", 10, 8, 0, "Zwei Teams räumen per lockerem Aufschlag Wasserkisten-Ziele auf der Gegenseite ab – Aufschlag-Sicherheit im Wettkampfformat, schon beim Warmmachen. Ablauf im Video.", "volleyballkompass.de (Video)", "https://youtu.be/Azcgwyy9ozI"),
+      ueb("Koordinationsleiter-Drills", "aufwaermen", 10, 0, 0, "Frequenzläufe, In-In-Out-Out und seitliche Muster durch die Koordinationsleiter – erst langsam und sauber, dann mit Tempo. Volleyballnah wird es mit anschließendem Block- oder Abwehrsprint; Übungskatalog im PDF.", "volleyballkompass.de", "https://volleyballkompass.de/pdf/Koordinationsleiter_Drills.pdf"),
+      ueb("SA-Zirkel (Schnellkraft-Ausdauer)", "aufwaermen", 15, 4, 0, "Stationszirkel für Schnellkraft- und Schnelligkeitsausdauer: kurze maximale Belastungen (Sprünge, Sprints, Würfe) im Wechsel mit knappen Pausen. Stationen und Dosierung im Video – stark in der Saisonvorbereitung.", "volleyballkompass.de (Video)", "https://youtu.be/BTCdoNZ3Sv0"),
+      ueb("Kraftausdauer-Zirkel (Endurance-Circuit)", "aufwaermen", 15, 4, 0, "Kraftausdauer-Stationen für das ganze Team (Rumpf, Beine, Schultergürtel) – ohne Geräte in jeder Halle umsetzbar. Stationskarten mit Belastungs- und Pausenzeiten im PDF.", "volleyballkompass.de", "https://volleyballkompass.de/pdf/Kraftausdauerzirkel_2018_Kompass.pdf"),
+      ueb("Zirkeltraining 12 × 1 Minute", "aufwaermen", 12, 4, 0, "Zwölf Stationen à eine Minute praktisch ohne Pause – kompakter Konditionsblock für die Schnelligkeitsausdauer, komplett in einer Viertelstunde erledigt. Stationsliste im PDF.", "volleyballkompass.de", "https://volleyballkompass.de/pdf/Schnelligkeitsausdauerzirkel1.pdf"),
+      ueb("Mobilisation & Stabilisation (Mobi/Stabi)", "aufwaermen", 10, 0, 0, "Geführtes Programm zur Mobilisation (Schulter, Brustwirbelsäule, Hüfte) und Stabilisation (Rumpf, Schulterblatt) – Verletzungsprophylaxe speziell für Volleyball. Leitfaden mit Übungen im PDF, auch als ruhiger Ausklang geeignet.", "volleyballkompass.de", "https://volleyballkompass.de/pdf/SA_Mobi_Stabi_Ausgabe1_.pdf"),
+      ueb("Sprungkraft-Programm", "aufwaermen", 12, 0, 0, "Sprungkraft ohne Geräte: Aufsteigen auf Kasten oder Bank, Seitsprünge, beidbeinige Sprünge und mehr – als kurzer Block in jedes Training integrierbar. Im Artikel: zehn Übungen mit Videos und Hinweisen zur altersgerechten Dosierung.", "VolleyballFREAK", "https://www.volleyballfreak.de/steigerung-sprungkraft-volleyball-training"),
+      ueb("Aufschlag-Annahme-Rundlauf", "technik", 15, 6, 0, "Der Klassiker: Auf einer Seite wird aufgeschlagen, auf der anderen angenommen – nach jeder Aktion rücken alle eine Station weiter (Aufschlag → Annahme → Ball holen). Hohe Wiederholungszahl für beide Techniken, niemand steht herum. Ablauf im Video.", "VolleyballFREAK (Video)", "https://www.volleyballfreak.de/der-aufschlag-annahme-rundlauf"),
+      ueb("Baggertennis-Varianten", "technik", 12, 4, 0, "Baggertennis über das Netz (1:1 bis 3:3): gespielt wird ausschließlich im unteren Zuspiel, wahlweise mit einem erlaubten Bodenkontakt. Mehrere Varianten mit steigender Schwierigkeit im PDF – spielerische Schule für Plattform und Beinarbeit.", "volleyballkompass.de", "https://volleyballkompass.de/pdf/A36_Baggertennis2.pdf"),
+      ueb("Einschlagen mal anders", "technik", 10, 6, 0, "Spielnahe Alternative zum klassischen Einschlagen über Position 4: mit Annahme- bzw. Abwehranteil vor dem Angriff, damit das Einschlagen echte Spielsituationen abbildet. Ablauf im Video – auch als Routine vor Punktspielen.", "volleyballkompass.de (Video)", "https://youtu.be/XQrHZfGPK2I"),
+      ueb("Aufschlag-Taktik-Training", "technik", 10, 4, 0, "Drei sofort anwendbare Aufschlag-Taktiken (auf die schwächste Annahme, in Laufwege, auf die Nahtstelle zwischen zwei Spieler:innen) mit passenden Übungsformen. Video ansehen, Zielzonen markieren, in Serien üben.", "volleyballkompass.de (Video)", "https://youtu.be/g3L8wAlzoY4"),
+      ueb("Abwehr-Übungspaket", "technik", 15, 6, 0, "Übungsreihe für die Feldabwehr: vom Einzeldrill (Position, Plattform) über Zweierabwehr mit Absprache bis zur Sechser-Teamabwehr gegen echten Angriff. Aufbauten und Steigerungen im PDF.", "volleyballkompass.de", "https://volleyballkompass.de/pdf/A53_Abwehr.pdf"),
+      ueb("Mehrball-Übungen", "technik", 15, 6, 0, "Mehrballtraining mit hoher Schlagzahl: Das Trainerteam bringt in schneller Folge Bälle ins Spiel (Annahme → Abwehr → Freeball …), die Gruppe spielt jede Situation zu Ende. Viele Aktionen pro Minute; Übungsbeispiele im PDF.", "volleyballkompass.de", "https://volleyballkompass.de/pdf/A25_Mehrballu__bungen.pdf"),
+      ueb("Annahmekönig (K1-Spielaufbau)", "spielform", 15, 8, 0, "Wettkampfform für den Komplex 1: Annahme-Riegel, Zuspiel und Angriff spielen den Ballwechsel strukturiert aus, gepunktet wird nach Qualität von Annahme und Abschluss. Wer verteidigt den Titel Annahmekönig:in? Aufbau im PDF.", "volleyballkompass.de", "https://volleyballkompass.de/pdf/A65_Annahmek__nig.pdf"),
+      ueb("Angriff „Hase“ (komplex)", "spielform", 15, 8, 0, "Komplexe Angriffsübung: Nach dem eigenen Angriff folgt sofort die nächste Aufgabe (Absicherung, Abwehr, erneuter Angriff) – spielnahe Dauerbelastung für Angreifer:innen mit Wettkampf-Zählung. Kompletter Aufbau im PDF.", "volleyballkompass.de", "https://volleyballkompass.de/pdf/A64_AngriffHase.pdf"),
+      ueb("Kleinfeldspiele-Sammlung", "spielform", 15, 4, 12, "Ideenkatalog kleiner Spielformen von 1:1 bis 4:4 mit Feldgrößen, Regeln und Zählweisen – für jede Gruppengröße und jedes Niveau die passende Form mit maximalen Ballkontakten. Sammlung im PDF.", "volleyballkompass.de", "https://volleyballkompass.de/pdf/A7_Kleinfeldspiele.pdf"),
+      ueb("Dankeball vermeiden & bestrafen", "spielform", 12, 6, 0, "Spielform zur Dankeball-Situation: Ein Team übt, aus Drucksituationen keinen einfachen Freeball zu schenken; das andere trainiert, Dankebälle konsequent zu verwerten (aggressive Feldposition, schneller Gegenaufbau). Hintergrund und Video im Artikel.", "VolleyballFREAK (Video)", "https://www.volleyballfreak.de/dankeball-freeball-volleyball"),
+      ueb("Hallengewöhnung auswärts", "aufwaermen", 10, 6, 0, "Feste Routine für fremde Hallen: Decke und Licht mit hohen Bällen austesten, Boden- und Raumgefühl über Annahme-/Abwehrserien aufbauen, Aufschläge auf Zonen kalibrieren. Ablauf im Video – gibt dem Team Sicherheit am Auswärtsspieltag.", "volleyballkompass.de (Video)", "https://youtu.be/ZFJHjLLRUh8"),
+    ];
+
     // Vorlagen für Einverständniserklärungen (vom Trainer selbst verwaltbar)
     const consentTemplates = [
       ctpl("Datennutzung & Fotorechte", "Einverständnis zur Speicherung von Kontaktdaten sowie zur Veröffentlichung von Mannschafts- und Spielfotos auf Vereinswebsite und in Vereinsmedien.", true),
@@ -132,7 +181,7 @@
 
     // Kalender-Abos (iCal/RSS) für automatischen Termin-Import
     const calendarFeeds = [
-      feed("VVMV Spielplan (Beispiel)", "https://mv.sams-ticket.de/public/ical-beispiel.ics", "ical", false),
+      feed("VMV-Spielplan (Beispiel – echte iCal-Adresse aus dem SAMS-Portal eintragen)", "", "ical", false),
     ];
 
     // Einverständniserklärungen
@@ -238,13 +287,12 @@
     const links = [
       lnk("💬", "WhatsApp-Elterngruppe", "Einladungslink der Gruppe – eigenen Link per ✏️ eintragen", "https://chat.whatsapp.com/"),
       lnk("🏠", "Vereinswebsite SKV Müritz", "Offizielle Seite des Vereins", WEBSITE),
-      lnk("🏐", "Volleyball-Verband MV (VVMV)", "Startseite des Landesverbands", "https://www.vvmv.de/"),
-      lnk("📊", "Ligen & Tabellen", "Aktuelle Tabellen im SAMS-Spielbetrieb", "https://mv.sams-ticket.de/public/ranking.html"),
-      lnk("📅", "Spielplan & Termine", "Ansetzungen der Verbandsliga", "https://mv.sams-ticket.de/public/schedule.html"),
-      lnk("📋", "Spielbetrieb / Meldung", "Infos zum Spielbetrieb des VVMV", "https://www.vvmv.de/spielbetrieb/"),
-      lnk("⚖️", "Regeln & Ordnungen", "Spielordnung und Regelwerk", "https://www.volleyball-verband.de/regelwerk"),
-      lnk("🧑‍⚖️", "Schiedsrichterwesen", "Ansetzungen & Ausbildung", "https://www.vvmv.de/schiedsrichter/"),
-      lnk("🏖", "Ferientermine MV (offiziell)", "Bildungsserver Mecklenburg-Vorpommern", "https://www.bildung-mv.de/schueler/ferien/"),
+      lnk("🏐", "Volleyball-Verband MV (VMV)", "Startseite des Landesverbands", "https://www.vmv24.de/"),
+      lnk("📊", "Ligen & Tabellen", "Offizielle Tabellen der Hallensaison", "https://www.vmv24.de/"),
+      lnk("📅", "Live-Ticker & Ergebnisse", "SAMS-Ticker des VMV", "https://vmv.sams-ticker.de/"),
+      lnk("📋", "Spielbetrieb / Meldung", "SAMS-Meldeportal des VMV", "https://vmv.sams-server.de/ma/"),
+      lnk("⚖️", "Regeln & Ordnungen", "Spielordnung und Regelwerk (DVV)", "https://www.volleyball-verband.de/de/service/schiedsrichter/regelwerk/"),
+      lnk("🏖", "Ferientermine MV (offiziell)", "Bildungsministerium Mecklenburg-Vorpommern", "https://www.regierung-mv.de/Landesregierung/bm/Schule/Schulorganisation/Ferientermine/"),
     ];
 
     // Elternbriefe des Trainers (bearbeitbar, mehrere möglich)
@@ -264,10 +312,10 @@
         "Das übernehmen die Eltern der Heimmannschaft gemeinsam – wenn jede Familie einmal pro Saison etwas beisteuert, ist es für alle leicht zu stemmen. " +
         "Zusätzlich sollten pro Heimspiel zwei Elternteile anwesend sein, die den Stand betreuen. " +
         "Bitte tragen Sie sich dafür in die Listen ein, die das Trainerteam vor jedem Heimspiel herumgibt.\n\n" +
-        "## 📱 Kommunikation\n" +
-        "Damit Informationen zu Training, Spielen und Fahrten Sie schnell erreichen, möchte das Trainerteam Sie gern direkt kontaktieren können und organisiert die Eltern in einer WhatsApp-Gruppe. " +
-        "Bitte geben Sie dazu unten Ihre E-Mail-Adresse und Mobilnummer an. Die Daten werden ausschließlich für die Vereinskommunikation genutzt; " +
-        "die Teilnahme an der WhatsApp-Gruppe ist freiwillig – wichtige Informationen erhalten Sie auf Wunsch auch per E-Mail.\n\n" +
+        "## 📱 Kommunikation & WhatsApp-Gruppe\n" +
+        "Kurzfristige Änderungen gehören zum Spielbetrieb: verlegte Spiele, geänderte Hallenzeiten, Abfahrtszeiten zu Auswärtsspielen oder ein ausgefallenes Training. " +
+        "Solche Informationen erreichen Sie zuverlässig nur über unsere WhatsApp-Elterngruppe – die Aufnahme aller Familien ist deshalb für den reibungslosen Ablauf der Saison notwendig. " +
+        "Bitte stimmen Sie unten der Aufnahme zu und geben Sie Ihre E-Mail-Adresse und Mobilnummer an; die Daten werden ausschließlich für die Vereinskommunikation der Volleyball-Abteilung genutzt.\n\n" +
         "Wir freuen uns auf eine tolle Saison mit Ihren Kindern – und auf Sie am Spielfeldrand!",
         "", true, true),
     ];
@@ -290,7 +338,32 @@
     // personen- und terminbezogene Beispieldaten nur im Demo-Modus.
     return {
       club: CLUB, website: "https://www.skv-mueritz.de", season: SEASON,
-      departments, consentTemplates, clothing, holidays, letters, links,
+      departments, consentTemplates, clothing, holidays, letters, links, uebungen,
+      // Eigene Termin-Kategorien (zusätzlich zu Training/Heim/Auswärts/Termin);
+      // Events speichern die Kategorie-ID im Feld type.
+      eventCategories: [],
+      // Buffet-Ankündigungen je Heimspiel (aus dem Portal)
+      buffet: [],
+      // Abwesenheits-Meldungen der Familien (aus dem Portal)
+      abwesenheiten: [],
+      // Eigene Quizfragen des Trainerteams (ergänzen die eingebauten Kapitel)
+      quizFragen: [],
+      // WhatsApp-Gruppen (Portal zeigt je Rolle nur den passenden Link)
+      whatsapp: { spieler: "", eltern: "" },
+      // Sportstätten-Verzeichnis (Autovervollständigung bei Terminen)
+      sportstaetten: [],
+      // Frei definierbare Abzeichen: typ "rueckmeldung" (hat geantwortet) oder
+      // "teilnahme" (hat zugesagt), bereich "alle" | "training" | "spiel",
+      // schwelle in Prozent – bezogen auf die laufende Saison (mind. 3 Termine)
+      abzeichenDefs: [
+        { id: "ab-rm75", name: "Zuverlässig zurückgemeldet", emoji: "🔔", typ: "rueckmeldung", schwelle: 75, bereich: "alle" },
+        { id: "ab-tt75", name: "Trainingsteilnahme 75 %", emoji: "🥉", typ: "teilnahme", schwelle: 75, bereich: "training" },
+        { id: "ab-tt80", name: "Trainingsteilnahme 80 %", emoji: "🥈", typ: "teilnahme", schwelle: 80, bereich: "training" },
+        { id: "ab-tt85", name: "Trainingsteilnahme 85 %", emoji: "🥇", typ: "teilnahme", schwelle: 85, bereich: "training" },
+        { id: "ab-tt90", name: "Trainingsteilnahme 90 %", emoji: "🏅", typ: "teilnahme", schwelle: 90, bereich: "training" },
+        { id: "ab-tt95", name: "Trainingsteilnahme 95 %", emoji: "💎", typ: "teilnahme", schwelle: 95, bereich: "training" },
+        { id: "ab-tt100", name: "Trainingsteilnahme 100 %", emoji: "👑", typ: "teilnahme", schwelle: 100, bereich: "training" },
+      ],
       players: includeDemo ? players : [],
       events: includeDemo ? events : [],
       responses: includeDemo ? responses : [],
@@ -342,6 +415,10 @@
   }
   function consent(playerId, type, fileName, dataUrl, signedBy) {
     return { id: uid("co"), playerId, type, fileName, dataUrl: dataUrl || null, signedBy, uploadedAt: new Date().toISOString() };
+  }
+  function ueb(name, kategorie, dauer, minSp, maxSp, beschreibung, quelle, link) {
+    return { id: uid("ub"), name, kategorie, dauer, minSp: minSp || 0, maxSp: maxSp || 0,
+             beschreibung: beschreibung || "", quelle: quelle || "", link: link || "" };
   }
   function ctpl(name, text, required) {
     return { id: uid("ct"), name, text, required: !!required };

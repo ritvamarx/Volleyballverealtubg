@@ -1,0 +1,6 @@
+# /etc/cron.d/volleyball-rueckmeldung – stündliche Warnung an das Trainerteam,
+# wenn <24 h vor einem Termin weniger als 50 % der Spieler:innen zurückgemeldet haben.
+# Jeder Termin warnt nur EINMAL (Merker rueckmeldeAlarm im Termin).
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+15 * * * * root cd /opt/volleyball && docker compose exec -T volleyball ./manage.py rueckmelde-warnung >> /var/log/volleyball-rueckmeldung.log 2>&1

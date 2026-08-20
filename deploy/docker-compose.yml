@@ -5,7 +5,7 @@
 # Namen prüfen mit:  docker network ls   (unten ggf. "caddy" anpassen)
 
 services:
-  app:
+  volleyball:
     build:
       context: .
       dockerfile: deploy/Dockerfile

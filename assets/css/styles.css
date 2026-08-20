@@ -444,3 +444,102 @@ textarea { resize: vertical; min-height: 72px; }
   .chip-row { overflow-x: auto; flex-wrap: nowrap; padding-bottom: 4px; -webkit-overflow-scrolling: touch; }
   .chip { white-space: nowrap; flex: 0 0 auto; }
 }
+
+/* ---------- Spieler-/Eltern-Portal (Phase 3) ---------- */
+.portal { position: fixed; inset: 0; z-index: 500; display: flex; flex-direction: column;
+  background: var(--bg, #f1f5f9); overflow: hidden; }
+.portal-kopf { display: flex; align-items: center; gap: 12px; padding: 12px 16px;
+  background: linear-gradient(180deg, var(--primary) 0%, #0f2260 100%); color: #fff; }
+.portal-logo { font-weight: 800; font-size: 1.05rem; }
+.portal-nutzer { margin-left: auto; font-size: .85rem; opacity: .9; }
+.portal-inhalt { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column;
+  gap: 14px; max-width: 720px; width: 100%; margin: 0 auto; -webkit-overflow-scrolling: touch; }
+.portal-tabs { display: flex; background: #fff; border-top: 1px solid #e2e8f0;
+  padding-bottom: env(safe-area-inset-bottom, 0); }
+.portal-tabs button { flex: 1; border: 0; background: none; padding: 8px 2px 10px; font: inherit;
+  font-size: .68rem; color: #64748b; display: flex; flex-direction: column; align-items: center;
+  gap: 2px; cursor: pointer; }
+.portal-tabs button span { font-size: 1.25rem; }
+.portal-tabs button.aktiv { color: var(--primary); font-weight: 700; }
+.portal-lade { margin: auto; color: #64748b; font-size: 1rem; padding: 40px; text-align: center; }
+.portal-termin { border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; margin: 10px 0; }
+.portal-termin .title { font-weight: 600; font-size: .92rem; }
+.portal-termin .sub { color: #64748b; font-size: .8rem; margin-top: 2px; }
+.portal-rsvp { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.portal-rsvp .btn { flex: 1; min-width: 90px; }
+.portal-rsvp-zeile { margin-top: 6px; }
+.portal-fahrer { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
+.portal-fahrer select, .portal-fahrer input { padding: 8px 10px; border: 1px solid #cbd5e1;
+  border-radius: 8px; font: inherit; font-size: .85rem; flex: 1; min-width: 110px; }
+
+/* Portal: Verbandsliga-Tabelle */
+.portal-tabelle { overflow-x: auto; margin: 4px 0 10px; }
+.portal-tabelle table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.portal-tabelle th { text-align: left; color: #64748b; font-weight: 600; font-size: .72rem;
+  text-transform: uppercase; letter-spacing: .03em; padding: 6px 8px; border-bottom: 2px solid #e2e8f0; }
+.portal-tabelle td { padding: 7px 8px; border-bottom: 1px solid #eef2f7; white-space: nowrap; }
+.portal-tabelle tr.wir td { background: #fff7ed; font-weight: 700; }
+.portal-tabelle tr:last-child td { border-bottom: 0; }
+
+/* Portal: Wiki-Aufklapper */
+.portal-wiki { border: 1px solid #e2e8f0; border-radius: 12px; margin: 10px 0; overflow: hidden; }
+.portal-wiki summary { cursor: pointer; padding: 12px 14px; font-weight: 600; font-size: .92rem;
+  list-style: none; display: flex; align-items: center; gap: 6px; }
+.portal-wiki summary::-webkit-details-marker { display: none; }
+.portal-wiki summary::after { content: "›"; margin-left: auto; color: #94a3b8;
+  font-size: 1.1rem; transform: rotate(90deg); transition: transform .15s; }
+.portal-wiki[open] summary { color: var(--primary); border-bottom: 1px solid #eef2f7; }
+.portal-wiki[open] summary::after { transform: rotate(-90deg); }
+.portal-wiki-inhalt { padding: 4px 14px 12px; font-size: .88rem; line-height: 1.55; }
+.portal-wiki-inhalt ul { padding-left: 20px; margin: 8px 0; }
+.portal-wiki-inhalt li { margin: 4px 0; }
+.portal-wiki-inhalt dl.kv dt { font-weight: 700; margin-top: 8px; }
+.portal-wiki-inhalt dl.kv dd { margin: 0 0 4px; color: #475569; }
+
+/* Verlinkte Statistik-Kacheln (Dashboard) */
+a.card.stat-link { display: block; text-decoration: none; color: inherit; cursor: pointer;
+  transition: box-shadow .12s, transform .12s; }
+a.card.stat-link:hover { box-shadow: 0 4px 14px rgba(30,58,138,.14); transform: translateY(-1px); }
+
+/* Portal: Quiz-Kapitel-Chips */
+.portal-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.portal-chips .chip { font-size: .72rem; cursor: pointer; border: 1px solid #e2e8f0;
+  background: #fff; border-radius: 999px; padding: 5px 10px; }
+.portal-chips .chip.aktiv { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 700; }
+
+/* Portal: Quiz-Antworten als dezente Chips */
+.quiz-optionen { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.quiz-opt { border: 1px solid #cbd5e1; background: #f8fafc; color: #0f172a; border-radius: 999px;
+  padding: 7px 14px; font: inherit; font-size: .85rem; cursor: pointer; transition: border-color .12s, background .12s; }
+button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
+.quiz-opt.falsch { opacity: .45; text-decoration: line-through; cursor: default; }
+
+/* Portal: Profilbild */
+.profil-vorschau { width: 72px; height: 72px; border-radius: 50%; background: #eef2ff;
+  display: flex; align-items: center; justify-content: center; font-size: 2rem; overflow: hidden;
+  border: 2px solid #e2e8f0; flex: 0 0 72px; }
+.profil-vorschau img { width: 100%; height: 100%; object-fit: cover; }
+.portal-kopf-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover;
+  display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; margin-right: 8px; }
+.quiz-opt.gewaehlt { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+/* Portal: Daumen-Rückmeldung */
+.rsvp-daumen { border: 1.5px solid #e2e8f0; background: #f8fafc; border-radius: 999px;
+  width: 52px; height: 44px; font-size: 1.35rem; cursor: pointer; transition: all .12s;
+  display: inline-flex; align-items: center; justify-content: center; }
+.rsvp-daumen:hover { border-color: var(--primary); }
+.rsvp-daumen.aktiv { background: var(--primary); border-color: var(--primary);
+  transform: scale(1.08); box-shadow: 0 2px 8px rgba(30,58,138,.3); }
+.portal-rsvp { display: flex; gap: 10px; margin-top: 8px; }
+.rsvp-begruendung { margin-top: 8px; }
+
+/* Trainingsplan-Spicker (Handy, große Schrift) */
+.spicker { font-size: 1.05rem; }
+.spicker-kopf { font-weight: 800; color: var(--primary); margin-bottom: 10px; font-size: 1.1rem; }
+.spicker-zeile { display: flex; align-items: baseline; gap: 10px; padding: 9px 4px;
+  border-bottom: 1px dashed #cbd5e1; }
+.spicker-zeit { font-weight: 800; color: var(--accent-dark, #c2410c); min-width: 56px; font-size: 1.15rem; }
+.spicker-name { flex: 1; font-weight: 600; }
+.spicker-dauer { color: #64748b; font-size: .9rem; }
+.spicker-notiz { margin-top: 12px; background: #fff7ed; border-radius: 10px; padding: 10px 12px; font-size: .95rem; }
+.rsvp-daumen.sm { width: 40px; height: 34px; font-size: 1rem; }

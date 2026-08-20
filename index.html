@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SKV Müritz · Trainer- & Vereinsplattform</title>
+  <title>SKV Müritz Volleyball</title>
   <meta name="description" content="Verwaltungs- und Kommunikationsplattform für den Volleyballverein SKV: Spieler, Termine, Fahrer, Catering, Finanzen und mehr." />
   <script>
   // Sichtbares Fehler-Banner: zeigt echte JavaScript-Fehler an (z. B. auf
@@ -22,14 +22,20 @@
     } catch (x) { /* still */ }
   });
   </script>
+  <meta name="theme-color" content="#1e3a8a" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="assets/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="SKV Müritz Volleyball" />
   <link rel="stylesheet" href="assets/css/styles.css" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='46' fill='%23f97316'/%3E%3Cpath d='M50 4a46 46 0 0 1 0 92M14 25c22 6 40 24 46 46M22 78c8-24 30-42 56-44' stroke='%23fff' stroke-width='4' fill='none'/%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cg fill='%23F1662A'%3E%3Cpath d='M346 64A213 213 0 0 0 105 405A55 55 0 0 0 187 330A300 300 0 0 1 346 64Z'/%3E%3Cpath transform='rotate(180 256 256)' d='M346 64A213 213 0 0 0 105 405A55 55 0 0 0 187 330A300 300 0 0 1 346 64Z'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
 <body>
   <noscript>
     <div style="max-width:640px;margin:12vh auto;padding:28px;font-family:system-ui,sans-serif;border:1px solid #e2e8f0;border-radius:14px;text-align:center;color:#0f172a">
       <div style="font-size:2.4rem">🏐</div>
-      <h1 style="color:#1e3a8a">SKV Müritz – Trainer-Plattform</h1>
+      <h1 style="color:#1e3a8a">SKV Müritz Volleyball</h1>
       <p style="line-height:1.6;color:#475569">Diese Seite benötigt <strong>aktiviertes JavaScript</strong>.
       Du siehst diesen Hinweis meist, weil die Datei nur in einer <strong>Vorschau</strong> geöffnet wurde
       (z. B. macOS „Quick Look" mit der Leertaste oder eine In-App-Vorschau).</p>
@@ -43,13 +49,15 @@
     <aside class="sidebar" id="sidebar">
       <div class="brand">
         <div class="brand-logo" aria-hidden="true">
-          <svg viewBox="0 0 100 100" width="40" height="40">
-            <circle cx="50" cy="50" r="46" fill="var(--accent)"/>
-            <path d="M50 4a46 46 0 0 1 0 92M14 25c22 6 40 24 46 46M22 78c8-24 30-42 56-44" stroke="#fff" stroke-width="4" fill="none"/>
+          <svg viewBox="0 0 512 512" width="40" height="40">
+            <g fill="#F1662A">
+              <path d="M346 64A213 213 0 0 0 105 405A55 55 0 0 0 187 330A300 300 0 0 1 346 64Z"/>
+              <path transform="rotate(180 256 256)" d="M346 64A213 213 0 0 0 105 405A55 55 0 0 0 187 330A300 300 0 0 1 346 64Z"/>
+            </g>
           </svg>
         </div>
         <div class="brand-text">
-          <strong>SKV Müritz</strong>
+          <strong>SKV Müritz Volleyball</strong>
           <a class="brand-link" href="https://www.skv-mueritz.de" target="_blank" rel="noopener">skv-mueritz.de ↗</a>
         </div>
       </div>
@@ -89,11 +97,13 @@
   <div id="authGate" hidden>
     <div class="auth-card">
       <div class="auth-brand">
-        <svg viewBox="0 0 100 100" width="46" height="46" aria-hidden="true">
-          <circle cx="50" cy="50" r="46" fill="#f97316"/>
-          <path d="M50 4a46 46 0 0 1 0 92M14 25c22 6 40 24 46 46M22 78c8-24 30-42 56-44" stroke="#fff" stroke-width="4" fill="none"/>
+        <svg viewBox="0 0 512 512" width="46" height="46" aria-hidden="true">
+          <g fill="#F1662A">
+            <path d="M346 64A213 213 0 0 0 105 405A55 55 0 0 0 187 330A300 300 0 0 1 346 64Z"/>
+            <path transform="rotate(180 256 256)" d="M346 64A213 213 0 0 0 105 405A55 55 0 0 0 187 330A300 300 0 0 1 346 64Z"/>
+          </g>
         </svg>
-        <div><strong>SKV Müritz</strong><span>Volleyball · Vereinsplattform</span></div>
+        <div><strong>SKV Müritz Volleyball</strong><span>Vereinsplattform</span></div>
       </div>
       <div id="authMsg" class="auth-msg"></div>
 
@@ -103,7 +113,21 @@
         <div class="field"><label>Benutzername</label><input id="loginUser" autocomplete="username" required></div>
         <div class="field"><label>Passwort</label><input id="loginPass" type="password" autocomplete="current-password" required></div>
         <button class="btn auth-btn" type="submit">Anmelden</button>
-        <p class="auth-hint"><a href="#" id="gotoRegister">Mit Einladungscode registrieren</a></p>
+        <p class="auth-hint"><a href="#" id="gotoRegister">Mit Einladungscode registrieren</a> ·
+          <a href="#" id="gotoReset">Passwort vergessen?</a></p>
+      </form>
+
+      <form id="auth-reset" hidden>
+        <p class="auth-hint"><strong>Passwort vergessen?</strong> Kein Problem: Sag dem Trainerteam
+        Bescheid – du bekommst einen Wiederherstellungscode (z. B. per WhatsApp).</p>
+        <div class="field"><label>Dein Benutzername</label><input id="resetUser" autocomplete="username"></div>
+        <button class="btn auth-btn" type="submit">Trainerteam informieren</button>
+        <hr style="margin:16px 0;border:none;border-top:1px solid #e2e8f0">
+        <p class="auth-hint"><strong>Code schon erhalten?</strong> Dann hier direkt ein neues Passwort setzen:</p>
+        <div class="field"><label>Wiederherstellungscode</label><input id="resetCode" placeholder="XXXX-XXXX-XXXX" autocomplete="one-time-code"></div>
+        <div class="field"><label>Neues Passwort (mind. 8 Zeichen)</label><input id="resetPass" type="password" minlength="8" autocomplete="new-password"></div>
+        <button class="btn auth-btn" type="button" id="resetSetzen">Neues Passwort speichern</button>
+        <p class="auth-hint"><a href="#" id="gotoLogin2">Zurück zur Anmeldung</a></p>
       </form>
 
       <form id="auth-totp" hidden>
@@ -143,6 +167,9 @@
         Dein Konto ist bereits aktiv.</p>
         <button class="btn auth-btn" id="portalLogout" type="button">Abmelden</button>
       </div>
+      <p class="auth-hint" style="margin-top:16px;font-size:.75rem">
+        <a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a> ·
+        <a href="/impressum" target="_blank" rel="noopener">Impressum</a></p>
     </div>
   </div>
 
@@ -155,6 +182,41 @@
   <script src="assets/js/io.js"></script>
   <script src="assets/js/views.js"></script>
   <script src="assets/js/app.js"></script>
+  <script src="assets/js/portal.js"></script>
   <script src="assets/js/sync.js"></script>
+  <script>
+  // PWA: Service Worker nur im echten Web-Betrieb registrieren – die
+  // Offline-Einzeldatei (file://) und HTTP-Vorschauen bleiben unberührt.
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("/sw.js").then(function (reg) {
+        function updateHinweis(wartend) {
+          if (!wartend) return;
+          var b = document.createElement("div");
+          b.style.cssText = "position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:9998;background:#1e3a8a;color:#fff;font:14px/1.4 -apple-system,'Segoe UI',sans-serif;padding:10px 14px;border-radius:10px;box-shadow:0 4px 14px rgba(0,0,0,.3);display:flex;gap:12px;align-items:center";
+          b.innerHTML = "Neue Version verfügbar. <button style=\"background:#f97316;color:#fff;border:0;border-radius:8px;padding:6px 12px;font:inherit;cursor:pointer\">Jetzt aktualisieren</button>";
+          b.querySelector("button").onclick = function () {
+            wartend.postMessage({ typ: "SKIP_WAITING" });
+          };
+          document.body.appendChild(b);
+        }
+        updateHinweis(reg.waiting);
+        reg.addEventListener("updatefound", function () {
+          var neu = reg.installing;
+          if (!neu) return;
+          neu.addEventListener("statechange", function () {
+            if (neu.state === "installed" && navigator.serviceWorker.controller) updateHinweis(neu);
+          });
+        });
+        var neuGeladen = false;
+        navigator.serviceWorker.addEventListener("controllerchange", function () {
+          if (neuGeladen) return;
+          neuGeladen = true;
+          location.reload();
+        });
+      }).catch(function () { /* Registrierung fehlgeschlagen – App läuft normal weiter */ });
+    });
+  }
+  </script>
 </body>
 </html>

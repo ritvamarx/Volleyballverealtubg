@@ -30,7 +30,7 @@
   show("checking");
 
   function show(step) {
-    ["checking", "login", "totp", "setup", "backupcodes", "register", "portal"].forEach((s) => {
+    ["checking", "login", "totp", "setup", "backupcodes", "register", "portal", "reset"].forEach((s) => {
       const el = $("#auth-" + s);
       if (el) el.hidden = s !== step;
     });
@@ -158,6 +158,37 @@
   // ---------- Registrierung mit Einladungscode ----------
   $("#gotoRegister").addEventListener("click", (e) => { e.preventDefault(); show("register"); });
   $("#gotoLogin").addEventListener("click", (e) => { e.preventDefault(); show("login"); });
+
+  // ---------- Passwort vergessen ----------
+  $("#gotoReset").addEventListener("click", (e) => { e.preventDefault(); authMsg(""); show("reset"); });
+  $("#gotoLogin2").addEventListener("click", (e) => { e.preventDefault(); authMsg(""); show("login"); });
+  $("#auth-reset").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const username = $("#resetUser").value.trim();
+    if (!username) { authMsg("Bitte den Benutzernamen angeben", true); return; }
+    authMsg("Anfrage wird gesendet …");
+    const res = await api("/api/passwort-vergessen", {
+      method: "POST", body: JSON.stringify({ username }),
+    });
+    authMsg(res.ok ? "✅ " + (res.data.hint || "Das Trainerteam wurde informiert.")
+                   : (res.data.error || "Anfrage nicht möglich"), !res.ok);
+  });
+  $("#resetSetzen").addEventListener("click", async () => {
+    const code = $("#resetCode").value.trim();
+    const password = $("#resetPass").value;
+    if (!code || password.length < 8) {
+      authMsg("Bitte Code und neues Passwort (mind. 8 Zeichen) angeben", true); return;
+    }
+    authMsg("Passwort wird gesetzt …");
+    const res = await api("/api/passwort-reset", {
+      method: "POST", body: JSON.stringify({ code, password }),
+    });
+    if (!res.ok) { authMsg(res.data.error || "Code ungültig oder abgelaufen", true); return; }
+    show("login");
+    if (res.data.username) $("#loginUser").value = res.data.username;
+    $("#loginPass").value = "";
+    authMsg("✅ Passwort geändert – bitte neu anmelden.");
+  });
   $("#auth-register").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     authMsg("Registrierung läuft …");
@@ -179,7 +210,8 @@
   // ---------- App betreten (Trainer: Vollzugriff + Sync) ----------
   async function enterApp() {
     if (Sync.user && Sync.user.role !== "trainer") {
-      // Spieler/Eltern-Portal kommt in Phase 3 – ehrlich anzeigen
+      // Spieler-/Eltern-Portal (Phase 3)
+      if (window.Portal && Portal.start) { Portal.start(); return; }
       $("#portalName").textContent = Sync.user.name || Sync.user.username;
       show("portal");
       return;

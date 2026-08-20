@@ -1,3 +1,8 @@
-# /etc/cron.d/volleyball-backup – tägliche Sicherung der Volleyball-Datenbank
-# Ziel an das Muster der bestehenden vereins-backup-Jobs anpassen!
-30 3 * * * root cd /opt/volleyball && docker compose exec -T app ./manage.py backup /app/data/backups >> /var/log/volleyball-backup.log 2>&1
+# /etc/cron.d/volleyball-backup – bewusst ohne Eintrag.
+#
+# Die Volleyball-Datenbank wird seit 2026-08-19 ZENTRAL gesichert:
+# /opt/backup-server.sh (Cron /etc/cron.d/vereins-backup, täglich 03:30)
+# enthält einen eigenen Aufruf `sichern volleyball-app volleyball
+# /opt/volleyball/data /app/data` – konsistenter SQLite-Snapshot, Ablage in
+# /opt/backups (14 Stände) und Off-Site-Kopie in die WerkHaus-Nextcloud.
+# Quelle des Skripts: Vereinsverwaltung-Repo, deploy/backup-server.sh.

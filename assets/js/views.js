@@ -7,7 +7,7 @@
   "use strict";
   const { $, $$, esc, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtMoney,
     daysUntil, relDays, age, avatar, toast, modal, closeModal, confirmDialog,
-    formData, clothingSVG, sponsorSVG, DOW, MON } = U;
+    formData, clothingSVG, sponsorSVG, DOW, MON, volleyballFlug } = U;
 
   const S = () => Store.get();
   const reload = () => App.reload();
@@ -18,11 +18,13 @@
       <div><h2>${esc(title)}</h2>${subtitle ? `<p>${esc(subtitle)}</p>` : ""}</div>
       <div class="spacer"></div>${actionsHTML || ""}</div>`;
   }
-  function stat(icon, label, value, sub) {
-    return `<div class="card"><div class="flex" style="align-items:flex-start">
+  function stat(icon, label, value, sub, href) {
+    const inhalt = `<div class="flex" style="align-items:flex-start">
       <div class="icon">${icon}</div>
       <div class="stat"><span class="label">${esc(label)}</span>
-      <span class="value">${value}</span>${sub ? `<span class="sub">${sub}</span>` : ""}</div></div></div>`;
+      <span class="value">${value}</span>${sub ? `<span class="sub">${sub}</span>` : ""}</div></div>`;
+    return href ? `<a class="card stat-link" href="${href}">${inhalt}</a>`
+                : `<div class="card">${inhalt}</div>`;
   }
   function empty(icon, text) {
     return `<div class="empty"><span class="big">${icon}</span>${esc(text)}</div>`;
@@ -34,6 +36,18 @@
   function deptName(id) {
     const d = Store.byId("departments", id);
     return d ? d.name : "—";
+  }
+  // Mehrfach-Zugehörigkeit: Spieler:innen können in MEHREREN Mannschaften sein.
+  // departmentIds ist die Wahrheit; departmentId bleibt als erste Mannschaft
+  // gepflegt, damit ältere Datenstände und Exporte weiter funktionieren.
+  function playerDeptIds(p) {
+    if (Array.isArray(p.departmentIds) && p.departmentIds.length) return p.departmentIds;
+    return p.departmentId ? [p.departmentId] : [];
+  }
+  function inDept(p, id) { return playerDeptIds(p).includes(id); }
+  function playerDeptNames(p) {
+    const namen = playerDeptIds(p).map(deptName).filter((n) => n !== "—");
+    return namen.length ? namen.join(", ") : "—";
   }
 
   // ---- Bearbeitbare Link-Sammlung (Übersicht + Verbandsseite) ----
@@ -84,8 +98,31 @@
   function jahrgang(birthDate) { return birthDate ? new Date(birthDate).getFullYear() : "—"; }
   const genderLabel = { w: "weiblich", m: "männlich", mix: "gemischt" };
   const typeLabel = { training: "Training", home: "Heimspiel", away: "Auswärtsspiel", other: "Termin" };
+  // Eigene Termin-Kategorien: Events speichern die Kategorie-ID im type-Feld
+  const eventCats = () => S().eventCategories || [];
+  function labelForType(type) {
+    if (typeLabel[type]) return typeLabel[type];
+    const c = eventCats().find((k) => k.id === type);
+    return c ? `${c.emoji ? c.emoji + " " : ""}${c.name}` : "Termin";
+  }
   function eventPill(type) {
-    return `<span class="badge pill-type-${type}">${typeLabel[type] || "Termin"}</span>`;
+    const fest = !!typeLabel[type];
+    return `<span class="badge pill-type-${fest ? type : "other"}">${esc(labelForType(type))}</span>`;
+  }
+  // Rückmeldestand eines Termins (👍/❓/👎/offen) – für Dashboard & Co.
+  function rsvpStand(e) {
+    if (!["training", "home", "away"].includes(e.type)) return "";
+    if (e.abgesagt) return `<div class="sub"><span class="badge bad">🚫 abgesagt</span></div>`;
+    const aktive = S().players.filter((p) => p.membershipStatus !== "inaktiv").length;
+    const z = { yes: 0, no: 0, maybe: 0 };
+    S().responses.forEach((r) => { if (r.eventId === e.id && z[r.status] != null) z[r.status]++; });
+    const offen = Math.max(0, aktive - z.yes - z.no - z.maybe);
+    return `<div class="sub">👍 ${z.yes} · ❓ ${z.maybe} · 👎 ${z.no} · ⏳ ${offen} offen</div>`;
+  }
+  // Auswahl-Optionen (feste Arten + eigene Kategorien) für Termin-Formulare
+  function typeOptions(selected) {
+    return Object.entries(typeLabel).map(([k, v]) => `<option value="${k}" ${k === selected ? "selected" : ""}>${v}</option>`).join("") +
+      eventCats().map((c) => `<option value="${c.id}" ${c.id === selected ? "selected" : ""}>${esc((c.emoji ? c.emoji + " " : "") + c.name)}</option>`).join("");
   }
   function upcomingEvents(limit) {
     return S().events
@@ -109,10 +146,10 @@
     el.innerHTML = `
       ${head("Übersicht", `Willkommen zurück im Trainer-Cockpit des ${esc(s.club)}`)}
       <div class="grid grid-4 mb">
-        ${stat("🏐", "Aktive Spieler", s.players.filter((p) => p.membershipStatus !== "inaktiv").length, `${s.players.length} gesamt`)}
-        ${stat("📅", "Nächste Termine", next.length, next[0] ? `${typeLabel[next[0].type]} ${relDays(next[0].start)}` : "—")}
-        ${stat("📝", "Offene Einverständnis.", openConsents, openConsents ? "Bitte einholen" : "alles vollständig")}
-        ${stat("💶", "Offene Beiträge", fmtMoney(openFees.reduce((a, f) => a + f.amount, 0)), `${openFees.length} Positionen`)}
+        ${stat("🏐", "Aktive Spieler", s.players.filter((p) => p.membershipStatus !== "inaktiv").length, `${s.players.length} gesamt`, "#/players")}
+        ${stat("📅", "Nächste Termine", next.length, next[0] ? `${labelForType(next[0].type)} ${relDays(next[0].start)}` : "—", "#/calendar")}
+        ${stat("📝", "Offene Einverständnis.", openConsents, openConsents ? "Bitte einholen" : "alles vollständig", "#/consents")}
+        ${stat("💶", "Offene Beiträge", fmtMoney(openFees.reduce((a, f) => a + f.amount, 0)), `${openFees.length} Positionen`, "#/finances")}
       </div>
 
       <div class="grid grid-2">
@@ -124,6 +161,7 @@
               <div class="tl-item">
                 <div class="flex"><strong>${esc(e.title)}</strong> ${eventPill(e.type)}</div>
                 <div class="sub soft">${fmtDate(e.start)} · ${fmtTime(e.start)} Uhr · ${esc(e.location)}</div>
+                ${rsvpStand(e)}
               </div>`).join("") : empty("🗓️", "Keine anstehenden Termine")}
           </div>
         </div>
@@ -144,19 +182,21 @@
 
       <div class="grid grid-3 mt">
         <div class="card">
-          <div class="card-head"><h3>📣 Ankündigungen</h3></div>
+          <div class="card-head"><h3>📣 Ankündigungen</h3><span class="spacer"></span>
+            <a class="btn sm outline" href="#/announcements">Alle</a></div>
           <div class="list">
             ${s.announcements.slice(0, 3).map((a) => `
-              <div class="list-item"><div class="grow">
+              <a class="list-item" href="#/announcements"><div class="grow">
                 <div class="title">${esc(a.title)}</div>
-                <div class="sub">${fmtDateShort(a.date)}</div></div></div>`).join("")}
+                <div class="sub">${fmtDateShort(a.date)}</div></div><span class="arr">›</span></a>`).join("")}
           </div>
         </div>
         <div class="card">
-          <div class="card-head"><h3>🎂 Geburtstage (30 Tage)</h3></div>
+          <div class="card-head"><h3>🎂 Geburtstage (30 Tage)</h3><span class="spacer"></span>
+            <a class="btn sm outline" href="#/birthdays">Alle</a></div>
           <div class="list">
             ${bdays.length ? bdays.slice(0, 4).map((b) => `
-              <div class="list-item">${avatar(b.firstName, b.lastName)}
+              <div class="list-item">${avatar(b.firstName, b.lastName, b)}
                 <div class="grow"><div class="title">${esc(b.firstName)} ${esc(b.lastName)}</div>
                 <div class="sub">${fmtDateShort(b.next)} · wird ${b.turns}</div></div></div>`).join("")
               : empty("🎈", "Keine in den nächsten 30 Tagen")}
@@ -180,6 +220,7 @@
 
     $$("[data-task]", el).forEach((cb) => cb.addEventListener("change", () => {
       Store.update("tasks", cb.dataset.task, { done: true });
+      volleyballFlug();
       toast("Aufgabe erledigt", "good"); reload();
     }));
     bindLinkActions(el);
@@ -196,10 +237,10 @@
     const s = S();
     const filter = players._team || "alle";
     let list = s.players.slice().sort((a, b) => a.lastName.localeCompare(b.lastName));
-    if (filter !== "alle") list = list.filter((p) => p.departmentId === filter);
+    if (filter !== "alle") list = list.filter((p) => inDept(p, filter));
     const chips = [`<button class="chip ${filter === "alle" ? "active" : ""}" data-team="alle">alle (${s.players.length})</button>`]
       .concat(s.departments.map((d) => {
-        const n = s.players.filter((p) => p.departmentId === d.id).length;
+        const n = s.players.filter((p) => inDept(p, d.id)).length;
         return `<button class="chip ${filter === d.id ? "active" : ""}" data-team="${d.id}">${esc(d.name)} (${n})</button>`;
       }));
 
@@ -210,12 +251,12 @@
       <div class="chip-row mb">${chips.join("")}</div>
       <div class="card" style="padding:0">
         <div class="table-wrap"><table>
-          <thead><tr><th>Name</th><th>Nr.</th><th>Abteilung</th><th>Jg.</th><th>Pass-Nr.</th><th class="wrap">Kontakt (Erstkontakt ⭐)</th><th>Einverst.</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Name</th><th>Nr.</th><th>Mannschaften</th><th>Jg.</th><th>Pass-Nr.</th><th class="wrap">Kontakt (Erstkontakt ⭐)</th><th>Einverst.</th><th>Status</th><th></th></tr></thead>
           <tbody>${list.map((p) => `
             <tr>
-              <td><div class="flex">${avatar(p.firstName, p.lastName)}<div><strong>${esc(p.firstName)} ${esc(p.lastName)}</strong><div class="sub soft">${esc(p.position)}</div></div></div></td>
+              <td><div class="flex">${avatar(p.firstName, p.lastName, p)}<div><strong>${esc(p.firstName)} ${esc(p.lastName)}</strong><div class="sub soft">${esc(p.position)}</div></div></div></td>
               <td>#${esc(p.jerseyNumber)}</td>
-              <td><span class="badge info">${esc(deptName(p.departmentId))}</span></td>
+              <td>${playerDeptIds(p).map((id) => `<span class="badge info">${esc(deptName(id))}</span>`).join(" ") || '<span class="badge">—</span>'}</td>
               <td>${jahrgang(p.birthDate)}</td>
               <td class="soft">${esc(p.passNumber || "—")}</td>
               <td class="wrap">${contactCell(p)}</td>
@@ -306,7 +347,7 @@
         const stamp = new Date().toISOString().slice(0, 10);
         m.querySelectorAll("[data-ex]").forEach((b) => b.onclick = () => {
           const ps = S().players;
-          if (b.dataset.ex === "csv") IO.download(`skv-spieler-${stamp}.csv`, IO.toCSV(PLAYER_CSV_FIELDS, ps.map((p) => ({ ...p, departmentId: deptName(p.departmentId) }))), "text/csv");
+          if (b.dataset.ex === "csv") IO.download(`skv-spieler-${stamp}.csv`, IO.toCSV(PLAYER_CSV_FIELDS, ps.map((p) => ({ ...p, departmentId: playerDeptNames(p) }))), "text/csv");
           if (b.dataset.ex === "json") IO.download(`skv-spieler-${stamp}.json`, JSON.stringify(ps, null, 2), "application/json");
           if (b.dataset.ex === "vcf") IO.download(`skv-spieler-${stamp}.vcf`, IO.toVCard(ps, deptName), "text/vcard");
           toast("Export erstellt", "good");
@@ -411,8 +452,11 @@
         <div class="field"><label>Geburtsdatum</label><input type="date" name="birthDate" value="${esc(p.birthDate)}" required></div>
         <div class="field"><label>Trikotnummer</label><input type="number" name="jerseyNumber" value="${esc(p.jerseyNumber)}"></div>
         <div class="field"><label>Position</label><select name="position">${positions.map((x) => `<option ${x === p.position ? "selected" : ""}>${x}</option>`).join("")}</select></div>
-        <div class="field"><label>Abteilung / Mannschaft</label><select name="departmentId">
-          ${deps.map((d) => `<option value="${d.id}" ${d.id === p.departmentId ? "selected" : ""}>${esc(d.name)}</option>`).join("")}</select></div>
+        <div class="field"><label>Mannschaften <span class="soft" style="font-weight:400">(Mehrfachauswahl möglich)</span></label>
+          <div style="display:flex;flex-wrap:wrap;gap:10px 14px;padding:8px 2px">
+          ${deps.map((d) => `<label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:.88rem">
+            <input type="checkbox" name="dp_${d.id}" ${playerDeptIds(p).includes(d.id) ? "checked" : ""} style="width:auto"> ${esc(d.name)}</label>`).join("")}
+          </div></div>
         <div class="field"><label>Geschlecht</label><select name="gender">
           ${Object.entries(genderLabel).map(([k, v]) => `<option value="${k}" ${k === p.gender ? "selected" : ""}>${v}</option>`).join("")}</select></div>
         <div class="field"><label>Passnummer (Verband)</label><input name="passNumber" value="${esc(p.passNumber || "")}" placeholder="z. B. MV202512345"></div>
@@ -443,6 +487,10 @@
           if (!f.reportValidity()) return;
           const data = formData(f);
           data.jerseyNumber = Number(data.jerseyNumber) || "";
+          // Mannschafts-Mehrfachauswahl einsammeln (dp_<id>-Checkboxen)
+          data.departmentIds = Object.keys(data).filter((k) => k.startsWith("dp_") && data[k]).map((k) => k.slice(3));
+          Object.keys(data).forEach((k) => { if (k.startsWith("dp_")) delete data[k]; });
+          data.departmentId = data.departmentIds[0] || null;
           if (isEdit) Store.update("players", p.id, data);
           else Store.add("players", data);
           closeModal(); toast(isEdit ? "Gespeichert" : "Spieler angelegt", "good"); reload();
@@ -545,6 +593,7 @@
           <span class="chip pill-type-home">Heimspiel</span>
           <span class="chip pill-type-away">Auswärts</span>
           <span class="chip pill-type-other">Sonstiges</span>
+          ${eventCats().map((c) => `<span class="chip pill-type-other">${esc((c.emoji ? c.emoji + " " : "") + c.name)}</span>`).join("")}
           <span class="chip" style="background:color-mix(in srgb,#f59e0b 18%,transparent)">🏖 schulfrei (MV)</span>
         </div>`;
     }
@@ -599,10 +648,12 @@
         return `${headRow}
           <div class="list-item">
             <div class="cal-list-date" data-ev="${e.id}" style="cursor:pointer"><strong>${d.getDate()}.</strong><span>${DOW[d.getDay()]}</span></div>
-            <div class="grow" data-ev="${e.id}" style="cursor:pointer"><div class="title">${esc(e.title)} ${e.seriesId ? '<span class="badge">🔁 Serie</span>' : ""}${hol ? ' <span class="badge warn">🏖 schulfrei</span>' : ""}</div>
-            <div class="sub">${fmtTime(e.start)} Uhr · ${esc(e.location || "—")}</div></div>
+            <div class="grow" data-ev="${e.id}" style="cursor:pointer"><div class="title">${esc(e.title)} ${e.abgesagt ? '<span class="badge bad">🚫 abgesagt</span>' : ""}${e.seriesId ? '<span class="badge">🔁 Serie</span>' : ""}${hol ? ' <span class="badge warn">🏖 schulfrei</span>' : ""}</div>
+            <div class="sub">${fmtTime(e.start)} Uhr · ${sportstaetteZuOrt(e.location)
+              ? `<a href="#" data-stort="${sportstaetteZuOrt(e.location).id}" title="Sportstätte anzeigen">🏟️ ${esc(e.location)}</a>`
+              : esc(e.location || "—")}${e.trainerName ? ` · 👤 ${esc(e.trainerName)}` : ""}</div></div>
             <select class="ev-type" data-evtype="${e.id}" title="Art des Termins ändern" style="width:auto;font-size:.78rem;padding:5px 6px">
-              ${Object.entries(typeLabel).map(([k, v]) => `<option value="${k}" ${k === e.type ? "selected" : ""}>${v}</option>`).join("")}
+              ${typeOptions(e.type)}
             </select></div>`;
       }).join("");
       return `
@@ -622,7 +673,7 @@
 
     el.innerHTML = `
       ${head("Kalender", "Alle Trainings und Spieltage auf einen Blick",
-        `<button class="btn outline" data-import>⬇️ Termine importieren</button><button class="btn" data-add>＋ Termin</button>`)}
+        `<button class="btn outline" data-orte>🏟️ Sportstätten</button><button class="btn outline" data-cats>🏷️ Kategorien</button><button class="btn outline" data-import>⬇️ Termine importieren</button><button class="btn" data-add>＋ Termin</button>`)}
       <div class="tabs">
         ${[["month", "📅 Monat"], ["year", "🗓️ Jahr"], ["list", "📋 Liste"]].map(([k, l]) =>
           `<button class="tab ${mode === k ? "active" : ""}" data-mode="${k}">${l}</button>`).join("")}
@@ -667,7 +718,7 @@
             </div>
             <p class="muted" style="font-size:.74rem;margin:8px 0 0">📡 <strong>Ferien-Abo:</strong> aktualisiert sich automatisch beim App-Start
             über die OpenHolidays-API (offizielle Ferientermine MV) – oder per ↻. Eigene Einträge bleiben erhalten.
-            Offizielle Quelle: <a href="https://www.bildung-mv.de/schueler/ferien/" target="_blank" rel="noopener">Bildungsserver MV ↗</a></p>
+            Offizielle Quelle: <a href="https://www.regierung-mv.de/Landesregierung/bm/Schule/Schulorganisation/Ferientermine/" target="_blank" rel="noopener">Ferientermine MV (Bildungsministerium) ↗</a></p>
           </div>
         </div>
       </div>`;
@@ -698,6 +749,8 @@
     }));
     $("[data-add]", el).onclick = () => eventForm();
     $("[data-import]", el).onclick = () => calendarImport();
+    $("[data-cats]", el).onclick = () => eventCategoriesModal();
+    $("[data-orte]", el).onclick = () => sportstaettenModal();
     $("[data-sync]", el).onclick = async () => {
       toast("Abos werden abgerufen …");
       const r = await IO.syncAllFeeds();
@@ -713,6 +766,11 @@
       Store.remove("calendarFeeds", b.dataset.fdel); toast("Abo entfernt"); reload();
     }));
     $$("[data-ev]", el).forEach((n) => n.onclick = () => eventDetail(n.dataset.ev));
+    $$("[data-stort]", el).forEach((a) => a.onclick = (ev2) => {
+      ev2.preventDefault(); ev2.stopPropagation();
+      const st2 = Store.byId("sportstaetten", a.dataset.stort);
+      if (st2) sportstaetteInfoModal(st2);
+    });
     $$("[data-evtype]", el).forEach((sel) => sel.onchange = () => {
       Store.update("events", sel.dataset.evtype, { type: sel.value, reGuessed: true });
       toast("Termin-Art geändert", "good"); reload();
@@ -807,8 +865,11 @@
       wide: true,
       body: `
         <div class="flex flex-wrap mb">${eventPill(e.type)}<span class="badge">${fmtDateTime(e.start)}</span><span class="badge">bis ${fmtTime(e.end)} Uhr</span></div>
+        ${(() => { const st2 = sportstaetteZuOrt(e.location); return st2 && st2.bild
+          ? `<img src="${st2.bild}" alt="${esc(st2.name)}" style="width:100%;max-height:180px;object-fit:cover;border-radius:12px;margin-bottom:10px">` : ""; })()}
         <dl class="kv mb">
-          <dt>Ort</dt><dd>${esc(e.location)}</dd>
+          <dt>Ort</dt><dd>${(() => { const st2 = sportstaetteZuOrt(e.location);
+            return st2 ? `<a href="#" data-stlink="${st2.id}">🏟️ ${esc(e.location)}</a>${st2.ansprechpartner ? `<br><span class="soft">👤 ${esc(st2.ansprechpartner)}</span>` : ""}${st2.heimmannschaft ? `<br><span class="soft">Heim: ${esc(st2.heimmannschaft)}</span>` : ""}` : esc(e.location); })()}</dd>
           ${e.opponent ? `<dt>Gegner</dt><dd>${esc(e.opponent)}</dd>` : ""}
           ${e.description ? `<dt>Info</dt><dd>${esc(e.description)}</dd>` : ""}
         </dl>
@@ -818,6 +879,8 @@
       footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn danger" data-del>Löschen</button><button class="btn" data-edit>Bearbeiten</button>`,
       onOpen(m) {
         m.querySelector("[data-x]").onclick = closeModal;
+        const stLink = m.querySelector("[data-stlink]");
+        if (stLink) stLink.onclick = (ev2) => { ev2.preventDefault(); closeModal(); sportstaetteInfoModal(Store.byId("sportstaetten", stLink.dataset.stlink)); };
         m.querySelector("[data-edit]").onclick = () => { closeModal(); eventForm(e); };
         m.querySelector("[data-del]").onclick = () => {
           if (e.seriesId) {
@@ -846,6 +909,28 @@
     });
   }
 
+  // ---- Trainer:innen-Konten für die Trainings-Zuordnung ----
+  let _trainerNamen = null;
+  function eingeloggterTrainer() {
+    return (window.Sync && Sync.user && (Sync.user.name || Sync.user.username)) || "";
+  }
+  async function trainerNamen() {
+    if (_trainerNamen) return _trainerNamen;
+    let namen = [];
+    try {
+      const res = await apiZugang("/api/accounts");
+      namen = (res.ok && res.data.accounts ? res.data.accounts : [])
+        .filter((k) => k.role === "trainer" && k.active)
+        .map((k) => k.name || k.username);
+    } catch (e) { /* offline – unten Fallback */ }
+    // Bereits verwendete Namen und die eingeloggte Person ergänzen
+    S().events.forEach((e) => { const n = (e.trainerName || "").trim(); if (n && !namen.includes(n)) namen.push(n); });
+    const ich = eingeloggterTrainer();
+    if (ich && !namen.includes(ich)) namen.unshift(ich);
+    _trainerNamen = [...new Set(namen)];
+    return _trainerNamen;
+  }
+
   function eventForm(e) {
     const isEdit = !!e;
     e = e || { type: "training", title: "", start: "", end: "", location: "Sporthalle SKV, Halle 1", opponent: "", description: "" };
@@ -854,12 +939,21 @@
       title: isEdit ? "Termin bearbeiten" : "Neuer Termin",
       body: `<form id="ef"><div class="form-grid">
         <div class="field"><label>Art</label><select name="type">
-          ${Object.entries(typeLabel).map(([k, v]) => `<option value="${k}" ${k === e.type ? "selected" : ""}>${v}</option>`).join("")}</select></div>
+          ${typeOptions(e.type)}</select></div>
         <div class="field"><label>Titel</label><input name="title" value="${esc(e.title)}" required></div>
         <div class="field"><label>Beginn</label><input type="datetime-local" name="start" value="${toLocal(e.start)}" required></div>
         <div class="field"><label>Ende</label><input type="datetime-local" name="end" value="${toLocal(e.end)}"></div>
-        <div class="field full"><label>Ort</label><input name="location" value="${esc(e.location)}"></div>
+        <div class="field full"><label>Ort <span class="soft" style="font-weight:400">(Sportstätten werden beim Tippen vorgeschlagen)</span></label>
+          <input name="location" value="${esc(e.location)}" list="ortListe" autocomplete="off">
+          <datalist id="ortListe">
+            ${(S().sportstaetten || []).map((st2) => `<option value="${esc(st2.name)}${st2.adresse ? ", " + esc(st2.adresse) : ""}">${esc(st2.heimmannschaft ? "Heim: " + st2.heimmannschaft : st2.name)}</option>`).join("")}
+          </datalist></div>
         <div class="field full"><label>Gegner (bei Spielen)</label><input name="opponent" value="${esc(e.opponent)}"></div>
+        <div class="field full"><label>👤 Trainer:in / Leitung <span class="soft" style="font-weight:400">(wer übernimmt diesen Termin?)</span></label>
+          <select name="trainerName" id="evTrainer">
+            <option value="">– keine Zuordnung –</option>
+            ${e.trainerName ? `<option value="${esc(e.trainerName)}" selected>${esc(e.trainerName)}</option>` : ""}
+          </select></div>
         <div class="field full"><label>Beschreibung</label><textarea name="description">${esc(e.description)}</textarea></div>
         ${!isEdit ? `
         <div class="field"><label>🔁 Wiederholung (z. B. Training)</label><select name="repeat">
@@ -874,6 +968,20 @@
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
       onOpen(m) {
         m.querySelector("[data-x]").onclick = closeModal;
+        // Registrierte Trainer:innen laden; neue Termine standardmäßig der
+        // eingeloggten Person zuordnen
+        trainerNamen().then((namen) => {
+          const sel = m.querySelector("#evTrainer");
+          if (!sel) return;
+          const vorhanden = new Set(Array.from(sel.options).map((o) => o.value));
+          namen.forEach((n) => {
+            if (vorhanden.has(n)) return;
+            const o = document.createElement("option");
+            o.value = o.textContent = n;
+            sel.appendChild(o);
+          });
+          if (!isEdit && !sel.value && eingeloggterTrainer()) sel.value = eingeloggterTrainer();
+        });
         m.querySelector("[data-s]").onclick = () => {
           const f = m.querySelector("#ef");
           if (!f.reportValidity()) return;
@@ -911,6 +1019,176 @@
     });
   }
 
+  /* ---------- Sportstätten: Verzeichnis mit Bild, verlinkt aus Terminen ---------- */
+  function sportstaetteZuOrt(location) {
+    const ort = String(location || "").toLowerCase();
+    if (!ort) return null;
+    return (S().sportstaetten || []).find((st2) =>
+      st2.name && ort.startsWith(st2.name.toLowerCase())) || null;
+  }
+
+  function sportstaetteInfoModal(st2) {
+    modal({
+      title: `🏟️ ${esc(st2.name)}`,
+      body: `
+        ${st2.bild ? `<img src="${st2.bild}" alt="${esc(st2.name)}" style="width:100%;border-radius:12px;margin-bottom:12px">` : ""}
+        <div class="list">
+          ${st2.adresse ? `<div class="list-item"><div class="grow"><div class="sub">Adresse</div><div class="title" style="font-size:.92rem">${esc(st2.adresse)}</div></div>
+            <a class="btn sm ghost" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(st2.name + ", " + st2.adresse)}" target="_blank" rel="noopener">🗺️</a></div>` : ""}
+          ${st2.heimmannschaft ? `<div class="list-item"><div class="grow"><div class="sub">Heimmannschaft</div><div class="title" style="font-size:.92rem">${esc(st2.heimmannschaft)}</div></div></div>` : ""}
+          ${st2.ansprechpartner ? `<div class="list-item"><div class="grow"><div class="sub">Ansprechpartner:in</div><div class="title" style="font-size:.92rem">${esc(st2.ansprechpartner)}</div></div></div>` : ""}
+          ${st2.notizen ? `<div class="list-item"><div class="grow"><div class="sub">Notizen</div><div class="title" style="font-size:.9rem;font-weight:400">${esc(st2.notizen)}</div></div></div>` : ""}
+        </div>`,
+      footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn outline" data-edit>✏️ Bearbeiten</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-edit]").onclick = () => { closeModal(); sportstaetteForm(st2); };
+      },
+    });
+  }
+
+  function sportstaetteForm(st2) {
+    const isEdit = !!st2;
+    st2 = st2 || { name: "", adresse: "", ansprechpartner: "", heimmannschaft: "", notizen: "", bild: "" };
+    modal({
+      title: isEdit ? "Sportstätte bearbeiten" : "Neue Sportstätte",
+      body: `<form id="stf2"><div class="form-grid">
+        <div class="field full"><label>Bezeichnung</label><input name="name" value="${esc(st2.name)}" required placeholder="z. B. Sporthalle Regionale Schule Waren-West"></div>
+        <div class="field full"><label>Adresse</label><input name="adresse" value="${esc(st2.adresse)}" placeholder="Straße Nr., PLZ Ort"></div>
+        <div class="field"><label>Ansprechpartner:in</label><input name="ansprechpartner" value="${esc(st2.ansprechpartner)}"></div>
+        <div class="field"><label>Heimmannschaft</label><input name="heimmannschaft" value="${esc(st2.heimmannschaft)}"></div>
+        <div class="field full"><label>Notizen (Schlüssel, Parken, Besonderheiten)</label><textarea name="notizen" rows="2">${esc(st2.notizen || "")}</textarea></div>
+        <div class="field full"><label>🖼️ Bild ${st2.bild ? '<span class="badge good">vorhanden</span>' : ""}</label>
+          <input type="file" id="stBild" accept="image/*"></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button>${isEdit && st2.bild ? '<button class="btn outline" data-bildweg>🗑️ Bild entfernen</button>' : ""}<button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        const bildweg = m.querySelector("[data-bildweg]");
+        if (bildweg) bildweg.onclick = () => { Store.update("sportstaetten", st2.id, { bild: "" }); toast("Bild entfernt"); closeModal(); reload(); };
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#stf2"); if (!f.reportValidity()) return;
+          const d = formData(f);
+          delete d.stBild;
+          const speichern = (bild) => {
+            const werte = { name: d.name, adresse: d.adresse, ansprechpartner: d.ansprechpartner,
+                            heimmannschaft: d.heimmannschaft, notizen: d.notizen };
+            if (bild !== undefined) werte.bild = bild;
+            if (isEdit) Store.update("sportstaetten", st2.id, werte);
+            else Store.add("sportstaetten", Object.assign({ id: Store.uid("sp"), bild: bild || "" }, werte));
+            closeModal(); toast("Sportstätte gespeichert", "good"); reload();
+          };
+          const datei = m.querySelector("#stBild").files[0];
+          if (!datei) { speichern(undefined); return; }
+          const bild = new Image();
+          const url = URL.createObjectURL(datei);
+          bild.onload = () => {
+            const faktor = Math.min(1, 900 / Math.max(bild.width, bild.height));
+            const c = document.createElement("canvas");
+            c.width = Math.round(bild.width * faktor); c.height = Math.round(bild.height * faktor);
+            c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
+            URL.revokeObjectURL(url);
+            speichern(c.toDataURL("image/jpeg", 0.8));
+          };
+          bild.onerror = () => toast("Bild konnte nicht gelesen werden", "bad");
+          bild.src = url;
+        };
+      },
+    });
+  }
+
+  function sportstaettenModal() {
+    modal({
+      title: "🏟️ Sportstätten",
+      wide: true,
+      body: `<p class="soft" style="margin-top:0;font-size:.85rem">Gespeicherte Hallen werden beim Anlegen von
+        Terminen automatisch vervollständigt; in Terminlisten ist der Ort anklickbar.</p>
+        <div class="list" style="max-height:420px;overflow-y:auto">
+        ${(S().sportstaetten || []).slice().sort((a, b) => (a.name || "").localeCompare(b.name || "")).map((st2) => `
+          <div class="list-item" style="padding:8px 10px">
+            ${st2.bild ? `<img src="${st2.bild}" alt="" style="width:56px;height:42px;object-fit:cover;border-radius:8px">` : `<span style="font-size:1.4rem">🏟️</span>`}
+            <div class="grow"><div class="title" style="font-size:.9rem">${esc(st2.name)}</div>
+            <div class="sub">${esc(st2.adresse || "ohne Adresse")}${st2.heimmannschaft ? ` · Heim: ${esc(st2.heimmannschaft)}` : ""}${st2.ansprechpartner ? ` · 👤 ${esc(st2.ansprechpartner)}` : ""}</div></div>
+            <button class="btn sm ghost" data-stinfo="${st2.id}">👁️</button>
+            <button class="btn sm ghost" data-stedit2="${st2.id}">✏️</button>
+            <button class="btn sm ghost" data-stdel2="${st2.id}">🗑️</button>
+          </div>`).join("") || `<p class="soft">Noch keine Sportstätten gespeichert.</p>`}
+        </div>`,
+      footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn" data-neu>＋ Sportstätte</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-neu]").onclick = () => { closeModal(); sportstaetteForm(); };
+        $$("[data-stinfo]", m).forEach((b) => b.onclick = () => { closeModal(); sportstaetteInfoModal(Store.byId("sportstaetten", b.dataset.stinfo)); });
+        $$("[data-stedit2]", m).forEach((b) => b.onclick = () => { closeModal(); sportstaetteForm(Store.byId("sportstaetten", b.dataset.stedit2)); });
+        $$("[data-stdel2]", m).forEach((b) => b.onclick = () => {
+          const s2 = Store.byId("sportstaetten", b.dataset.stdel2);
+          confirmDialog(`Sportstätte „${esc(s2.name)}“ löschen?`, () => {
+            Store.remove("sportstaetten", s2.id); toast("Gelöscht"); closeModal(); sportstaettenModal();
+          });
+        });
+      },
+    });
+  }
+
+  // Eigene Termin-Kategorien verwalten (zusätzlich zu Training/Heim/Auswärts/Termin)
+  function eventCategoriesModal() {
+    const liste = () => eventCats().map((c) => `
+      <div class="list-item" style="padding:8px 10px">
+        <div class="grow"><div class="title" style="font-size:.9rem">${esc((c.emoji ? c.emoji + " " : "") + c.name)}</div>
+        <div class="sub">${S().events.filter((e) => e.type === c.id).length} Termine</div></div>
+        <button class="btn sm ghost" data-cedit="${c.id}">✏️</button>
+        <button class="btn sm ghost" data-cdel="${c.id}">🗑️</button>
+      </div>`).join("") || `<p class="soft">Noch keine eigenen Kategorien – z. B. 🏆 Turnier, 🎓 Lehrgang, 🎉 Vereinsfeier.</p>`;
+    modal({
+      title: "🏷️ Eigene Termin-Kategorien",
+      body: `
+        <p class="soft" style="margin-top:0;font-size:.85rem">Eigene Kategorien stehen überall zur Auswahl, wo die
+        Termin-Art gewählt wird (Kalender, Terminliste), erscheinen im Portal und können beim Elternbrief
+        für die Pinnwand-Seite ausgewählt werden. Training, Heim- und Auswärtsspiel bleiben fest.</p>
+        <div class="list" id="ecListe">${liste()}</div>
+        <form id="ecForm" class="portal-fahrer" style="margin-top:14px">
+          <input name="emoji" placeholder="🏆" maxlength="4" style="flex:0 0 64px;min-width:64px;text-align:center">
+          <input name="name" placeholder="Name der Kategorie, z. B. Turnier" required>
+          <button class="btn sm">＋ Anlegen</button>
+        </form>`,
+      footer: `<button class="btn ghost" data-x>Schließen</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = () => { closeModal(); reload(); };
+        const neuZeichnen = () => {
+          m.querySelector("#ecListe").innerHTML = liste();
+          verdrahten();
+        };
+        function verdrahten() {
+          $$("[data-cedit]", m).forEach((b) => b.onclick = () => {
+            const c = Store.byId("eventCategories", b.dataset.cedit);
+            const name = prompt("Name der Kategorie:", c.name);
+            if (!name) return;
+            const emoji = prompt("Emoji (leer = keins):", c.emoji || "") || "";
+            Store.update("eventCategories", c.id, { name: name.trim(), emoji: emoji.trim() });
+            toast("Kategorie gespeichert", "good"); neuZeichnen();
+          });
+          $$("[data-cdel]", m).forEach((b) => b.onclick = () => {
+            const c = Store.byId("eventCategories", b.dataset.cdel);
+            const n = S().events.filter((e) => e.type === c.id).length;
+            confirmDialog(`Kategorie „${esc(c.name)}“ löschen?${n ? ` ${n} Termin(e) werden zu „Termin“ (Sonstiges).` : ""}`, () => {
+              S().events.forEach((e) => { if (e.type === c.id) Store.update("events", e.id, { type: "other" }); });
+              Store.remove("eventCategories", c.id);
+              toast("Kategorie gelöscht"); neuZeichnen();
+            });
+          });
+        }
+        m.querySelector("#ecForm").onsubmit = (ev) => {
+          ev.preventDefault();
+          const f = ev.target;
+          Store.add("eventCategories", { id: Store.uid("ec"), name: f.name.value.trim(), emoji: f.emoji.value.trim() });
+          f.name.value = ""; f.emoji.value = "";
+          toast("Kategorie angelegt", "good"); neuZeichnen();
+        };
+        verdrahten();
+      },
+    });
+  }
+
   function holidayForm(h) {
     const isEdit = !!h;
     h = h || { name: "", start: "", end: "" };
@@ -939,19 +1217,44 @@
      TRAININGSRÜCKMELDUNG
      ====================================================================== */
   function training(el) {
-    const trainings = S().events.filter((e) => e.type === "training")
+    // Rückmeldungen gibt es für Trainings UND Spiele (Portal: „bitte rückmelden")
+    const trainings = S().events.filter((e) => e.type === "training" || e.type === "home" || e.type === "away")
       .sort((a, b) => new Date(a.start) - new Date(b.start));
     const upcoming = trainings.filter((e) => daysUntil(e.start) >= -1);
     const sel = training._sel && trainings.find((t) => t.id === training._sel) ? training._sel : (upcoming[0] || trainings[0] || {}).id;
     const evt = Store.byId("events", sel);
 
+    // Zähler: bereits durchgeführte Trainings (gesamt + laufende Saison ab 1. Juli),
+    // aufgeschlüsselt nach Trainer:in, damit bei mehreren klar ist, wer was übernimmt
+    const jetzt = new Date();
+    const saisonStart = new Date(jetzt.getFullYear() - (jetzt.getMonth() < 6 ? 1 : 0), 6, 1);
+    const vergangene = S().events.filter((e) => e.type === "training" && !e.abgesagt && new Date(e.start) < jetzt);
+    const inSaison = vergangene.filter((e) => new Date(e.start) >= saisonStart);
+    const proTrainer = {};
+    vergangene.forEach((e) => {
+      const n = (e.trainerName || "").trim() || "ohne Zuordnung";
+      proTrainer[n] = proTrainer[n] || { gesamt: 0, saison: 0 };
+      proTrainer[n].gesamt++;
+      if (new Date(e.start) >= saisonStart) proTrainer[n].saison++;
+    });
+    const trainerZeilen = Object.keys(proTrainer).sort()
+      .map((n) => `<span class="badge ${n === "ohne Zuordnung" ? "" : "info"}" title="Saison / gesamt">👤 ${esc(n)}: <strong>${proTrainer[n].saison}</strong> / ${proTrainer[n].gesamt}</span>`).join(" ");
+
     el.innerHTML = `
-      ${head("Trainingsrückmeldung", "Spieler melden sich verbindlich zu, ab oder unsicher")}
-      <div class="field" style="max-width:520px">
-        <label>Trainingstermin</label>
-        <select id="tsel">${trainings.map((t) => `<option value="${t.id}" ${t.id === sel ? "selected" : ""}>${fmtDateShort(t.start)} · ${fmtTime(t.start)} · ${esc(t.title)}</option>`).join("")}</select>
+      ${head("Trainingsrückmeldung und Planung", "Rückmeldungen für Trainings und Spiele im Blick – und das Training passend zur Gruppengröße planen")}
+      <div class="field" style="max-width:560px">
+        <label>Termin (Training oder Spiel)</label>
+        <select id="tsel">${trainings.map((t) => `<option value="${t.id}" ${t.id === sel ? "selected" : ""}>${t.abgesagt ? "🚫 " : ""}${fmtDateShort(t.start)} · ${fmtTime(t.start)} · ${esc(labelForType(t.type))}: ${esc(t.title)}${t.trainerName ? ` · 👤 ${esc(t.trainerName)}` : ""}</option>`).join("")}</select>
       </div>
-      <div id="tbody" class="mt-lg"></div>`;
+      <div id="tbody" class="mt-lg"></div>
+      <div class="card mt" style="padding:10px 14px">
+        <div class="flex" style="flex-wrap:wrap;gap:8px;align-items:center">
+          <strong>🏐 Trainings durchgeführt:</strong>
+          <span class="badge good" title="in der laufenden Saison (ab 1. Juli)">Saison: ${inSaison.length}</span>
+          <span class="badge" title="seit Beginn der Aufzeichnung">gesamt: ${vergangene.length}</span>
+          ${trainerZeilen ? `<span class="soft" style="font-size:.82rem">·</span> ${trainerZeilen}` : ""}
+        </div>
+      </div>`;
 
     $("#tsel", el).onchange = (ev) => { training._sel = ev.target.value; reload(); };
     renderTrainingBody($("#tbody", el), evt);
@@ -962,45 +1265,404 @@
     const roster = S().players.filter((p) => p.membershipStatus !== "inaktiv")
       .sort((a, b) => a.lastName.localeCompare(b.lastName));
     const resp = {};
-    S().responses.filter((r) => r.eventId === evt.id).forEach((r) => resp[r.playerId] = r.status);
+    const gruende = {};
+    S().responses.filter((r) => r.eventId === evt.id).forEach((r) => {
+      resp[r.playerId] = r.status;
+      if (r.grund) gruende[r.playerId] = r.grund;
+    });
+    // Vom Portal gemeldete Abwesenheiten am Termin-Tag (krank, Klassenfahrt …)
+    const tag = String(evt.start || "").slice(0, 10);
+    const abwesend = {};
+    (S().abwesenheiten || []).forEach((a) => { if (a.von <= tag && tag <= a.bis) abwesend[a.playerId] = a.grund || "abwesend"; });
     const count = { yes: 0, no: 0, maybe: 0, open: 0 };
     roster.forEach((p) => { const st = resp[p.id]; if (st) count[st]++; else count.open++; });
 
     box.innerHTML = `
+      ${evt.abgesagt ? `<div class="card mb" style="padding:10px 14px;border:1.5px solid #d05050">
+        <div class="flex" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <div>🚫 <strong>Abgesagt</strong> am ${fmtDateShort(evt.abgesagt.am)}${evt.abgesagt.notiz ? ` · <span class="soft">${esc(evt.abgesagt.notiz)}</span>` : ""}</div>
+          <button class="btn sm ghost" data-absagezurueck>↩️ Absage zurücknehmen</button>
+        </div>
+      </div>` : ""}
+      <div class="card mb" style="padding:10px 14px">
+        <div class="flex" style="justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <div>👤 <strong>Leitung:</strong> ${evt.trainerName ? esc(evt.trainerName) : '<span class="soft">noch nicht zugeordnet</span>'}</div>
+          <div class="flex" style="gap:6px">
+            ${!evt.trainerName ? '<button class="btn sm outline" data-leitungich>✓ Ich übernehme</button>' : ""}
+            <button class="btn sm ghost" data-leitung>✏️ ${evt.trainerName ? "ändern" : "zuordnen"}</button>
+            ${!evt.abgesagt && daysUntil(evt.start) >= 0 ? `<button class="btn sm ghost" data-absagen title="Termin absagen und alle Rückgemeldeten benachrichtigen">🚫 Absagen</button>` : ""}
+          </div>
+        </div>
+      </div>
       <div class="grid grid-4 mb">
         ${stat("✅", "Zusagen", count.yes)}
         ${stat("❌", "Absagen", count.no)}
         ${stat("❔", "Unsicher", count.maybe)}
         ${stat("⏳", "Keine Rückmeldung", count.open)}
       </div>
+      ${Object.keys(gruende).length ? `<div class="card mb">
+        <div class="card-head"><h3>💬 Bemerkungen der Spieler:innen</h3><span class="badge">${Object.keys(gruende).length}</span></div>
+        <div class="list">
+          ${roster.filter((p) => gruende[p.id]).map((p) => `<div class="list-item" style="padding:8px 10px">
+            ${avatar(p.firstName, p.lastName, p)}<div class="grow">
+            <div class="title" style="font-size:.88rem">${esc(p.firstName)} ${esc(p.lastName)} ${rmBadge(resp[p.id] || "open")}</div>
+            <div class="sub">💬 ${esc(gruende[p.id])}</div></div></div>`).join("")}
+        </div>
+      </div>` : ""}
       <div class="card" style="padding:0"><div class="table-wrap"><table>
         <thead><tr><th>Spieler</th><th>Team</th><th>Rückmeldung</th><th class="right">Aktion</th></tr></thead>
         <tbody>${roster.map((p) => {
           const st = resp[p.id] || "open";
           return `<tr>
-            <td><div class="flex">${avatar(p.firstName, p.lastName)}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong></div></td>
+            <td><div class="flex">${avatar(p.firstName, p.lastName, p)}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong>
+              ${abwesend[p.id] ? `<span class="badge warn" title="Über das Portal gemeldet">🏖 ${esc(abwesend[p.id])}</span>` : ""}</div></td>
             <td><span class="badge info">${esc(p.team)}</span></td>
-            <td>${rmBadge(st)}</td>
+            <td>${rmBadge(st)}${gruende[p.id] ? `<div class="sub" title="Begründung aus dem Portal">💬 ${esc(gruende[p.id])}</div>` : ""}</td>
             <td class="right nowrap">
-              <button class="btn sm ${st === "yes" ? "" : "outline"}" data-set="yes" data-pl="${p.id}">Zusagen</button>
-              <button class="btn sm ${st === "maybe" ? "secondary" : "outline"}" data-set="maybe" data-pl="${p.id}">Unsicher</button>
-              <button class="btn sm ${st === "no" ? "danger" : "outline"}" data-set="no" data-pl="${p.id}">Absagen</button>
+              <button class="rsvp-daumen sm ${st === "yes" ? "aktiv" : ""}" data-set="yes" data-pl="${p.id}" title="Zusagen">👍</button>
+              <button class="rsvp-daumen sm ${st === "maybe" ? "aktiv" : ""}" data-set="maybe" data-pl="${p.id}" title="Unsicher">❓</button>
+              <button class="rsvp-daumen sm ${st === "no" ? "aktiv" : ""}" data-set="no" data-pl="${p.id}" title="Absagen">👎</button>
             </td></tr>`;
         }).join("")}</tbody>
-      </table></div></div>`;
+      </table></div></div>
+      ${evt.type === "training" ? trainingsplanHTML(evt, count.yes) : ""}`;
 
     $$("[data-set]", box).forEach((b) => b.onclick = () => {
-      setResponse(evt.id, b.dataset.pl, b.dataset.set); reload();
+      const status = b.dataset.set;
+      const aktuell = resp[b.dataset.pl];
+      // Erneuter Klick auf den aktiven Daumen nimmt die Rückmeldung zurück
+      if (aktuell === status) {
+        const ex = S().responses.find((r) => r.eventId === evt.id && r.playerId === b.dataset.pl);
+        if (ex) Store.remove("responses", ex.id);
+        reload();
+        return;
+      }
+      let grund = "";
+      if (status === "no" || status === "maybe") {
+        // Auch beim Eintragen durch das Trainerteam wird die Begründung erfasst
+        const bisher = gruende[b.dataset.pl] || "";
+        const eingabe = prompt(status === "no"
+          ? "Begründung für die Absage (z. B. krank, Klassenfahrt):"
+          : "Begründung für „Unsicher“ (z. B. Mitfahrt offen):", bisher);
+        if (eingabe === null) return; // abgebrochen – nichts ändern
+        grund = eingabe.trim();
+      }
+      setResponse(evt.id, b.dataset.pl, status, grund); reload();
+    });
+    const leitungBtn = box.querySelector("[data-leitung]");
+    if (leitungBtn) leitungBtn.onclick = async () => {
+      const namen = await trainerNamen();
+      const vorbelegt = evt.trainerName || eingeloggterTrainer();
+      modal({
+        title: "Leitung zuordnen",
+        body: `<div class="field"><label>Wer übernimmt diesen Termin?</label>
+          <select id="ltgSel">
+            <option value="">– keine Zuordnung –</option>
+            ${namen.map((n) => `<option value="${esc(n)}" ${n === vorbelegt ? "selected" : ""}>${esc(n)}</option>`).join("")}
+          </select></div>
+          <p class="soft" style="font-size:.82rem">Zur Auswahl stehen alle als Trainer:in registrierten Konten.</p>`,
+        footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+        onOpen(m) {
+          m.querySelector("[data-x]").onclick = closeModal;
+          m.querySelector("[data-s]").onclick = () => {
+            const wert = m.querySelector("#ltgSel").value;
+            Store.update("events", evt.id, { trainerName: wert });
+            closeModal(); toast(wert ? `Leitung: ${wert}` : "Zuordnung entfernt", "good"); reload();
+          };
+        },
+      });
+    };
+    const absagenBtn = box.querySelector("[data-absagen]");
+    if (absagenBtn) absagenBtn.onclick = () => {
+      const istTraining = evt.type === "training";
+      modal({
+        title: istTraining ? "Training absagen" : "Termin absagen",
+        body: `<p class="soft" style="margin-top:0;font-size:.88rem">Alle Spieler:innen und Eltern, die sich zu diesem Termin
+            bereits zurückgemeldet haben, werden automatisch per Push-Mitteilung informiert.</p>
+          <div class="field"><label>Notiz zur Absage (frei)</label>
+            <textarea id="absNotiz" rows="2" placeholder="z. B. Halle gesperrt, Trainer:in krank …"></textarea></div>`,
+        footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>🚫 Jetzt absagen</button>`,
+        onOpen(m) {
+          m.querySelector("[data-x]").onclick = closeModal;
+          m.querySelector("[data-s]").onclick = async () => {
+            const notiz = m.querySelector("#absNotiz").value.trim();
+            Store.update("events", evt.id, { abgesagt: { am: new Date().toISOString(), notiz } });
+            closeModal(); reload();
+            // Push an alle bereits Rückgemeldeten (Server kennt die Zuordnung Konto → Spieler:in)
+            const r = await apiZugang("/api/termin-absage", {
+              eventId: evt.id, titel: evt.title || "", start: evt.start || "", notiz });
+            if (r.ok) toast(`Termin abgesagt – ${r.data.benachrichtigt || 0} Mitteilung(en) verschickt`, "good");
+            else toast("Termin abgesagt – Mitteilungen konnten nicht verschickt werden", "bad");
+          };
+        },
+      });
+    };
+    const absageZurueckBtn = box.querySelector("[data-absagezurueck]");
+    if (absageZurueckBtn) absageZurueckBtn.onclick = () => {
+      Store.update("events", evt.id, { abgesagt: null });
+      toast("Absage zurückgenommen – bitte das Team selbst informieren", "good"); reload();
+    };
+    const leitungIchBtn = box.querySelector("[data-leitungich]");
+    if (leitungIchBtn) leitungIchBtn.onclick = () => {
+      const ich = eingeloggterTrainer();
+      if (!ich) { toast("Kein Trainer:innen-Konto angemeldet", "bad"); return; }
+      Store.update("events", evt.id, { trainerName: ich });
+      toast(`Leitung: ${ich}`, "good"); reload();
+    };
+    bindTrainingsplan(box, evt, count.yes);
+  }
+
+  /* ----------------------------------------------------------------------
+     TRAININGSPLANUNG – Aufbau nach klassischer Trainingslehre:
+     Erwärmung → Technik → Spielform → Abschlussspiel → Cool-down.
+     Bausteine tragen sinnvolle Teilnehmerzahlen und werden nach der Zahl
+     der ZUSAGEN gefiltert; das Trainerteam stellt per Klick zusammen und
+     kann die Baustein-Bibliothek beliebig erweitern.
+     ---------------------------------------------------------------------- */
+  const PLAN_PHASEN = [
+    ["aufwaermen", "🔥 Erwärmung"], ["technik", "🎯 Technik"], ["spielform", "🧩 Spielform"],
+    ["abschluss", "🏁 Abschlussspiel"], ["cooldown", "🧘 Cool-down"],
+  ];
+  const phasenName = (k) => (PLAN_PHASEN.find(([key]) => key === k) || [k, k])[1];
+  const uebungPasst = (u, n) => !n || (((u.minSp || 0) <= n) && (!u.maxSp || n <= u.maxSp));
+
+  function trainingsplanHTML(evt, zusagen) {
+    const plan = evt.plan || { notiz: "", bausteine: [] };
+    const alle = S().uebungen || [];
+    const dauerMin = Math.max(0, Math.round((new Date(evt.end) - new Date(evt.start)) / 60000)) || 90;
+    const gewaehlt = plan.bausteine.map((id) => Store.byId("uebungen", id)).filter(Boolean)
+      .sort((a, b) => PLAN_PHASEN.findIndex(([k]) => k === a.kategorie) - PLAN_PHASEN.findIndex(([k]) => k === b.kategorie));
+    const summe = gewaehlt.reduce((s, u) => s + (u.dauer || 0), 0);
+    return `
+      <div class="card mt">
+        <div class="card-head"><h3>📋 Trainingsplanung</h3><span class="spacer"></span>
+          <span class="badge ${summe > dauerMin ? "warn" : summe ? "good" : ""}">${summe} / ${dauerMin} Min.</span>
+          <button class="btn sm outline" data-planauto title="Passenden Plan für ${zusagen || "alle"} Zusagen würfeln">🎲 Vorschlag</button>
+          <button class="btn sm outline" data-planpdf title="Plan als PDF zum Ausdrucken">🖨️ PDF</button>
+          <button class="btn sm outline" data-planspicker title="Kompakter Spicker fürs Handy">📱 Spicker</button>
+          <button class="btn sm outline" data-uebadd>＋ Baustein</button></div>
+        <p class="soft" style="font-size:.82rem;margin-top:0">Bausteine sind auf <strong>${zusagen ? zusagen + " Zusagen" : "noch offene Rückmeldungen"}</strong> gefiltert –
+        Übungen, die zur Gruppengröße nicht passen, erscheinen ausgegraut.</p>
+        ${gewaehlt.length ? `<div class="list" style="margin-bottom:12px">
+          ${gewaehlt.map((u) => `<div class="list-item" style="padding:8px 10px"><div class="grow">
+            <div class="title" style="font-size:.88rem">${phasenName(u.kategorie)} · ${esc(u.name)} <span class="soft">(${u.dauer}′)</span></div>
+            ${u.beschreibung ? `<div class="sub">${esc(u.beschreibung)}</div>` : ""}
+            ${u.quelle || u.link ? `<div class="sub">📚 ${esc(u.quelle || "Quelle")}${u.link ? ` · <a href="${esc(u.link)}" target="_blank" rel="noopener">${/youtu/.test(u.link) ? "▶️ Video" : "📄 Anleitung"} öffnen</a>` : ""}</div>` : ""}</div>
+            <button class="btn sm ghost" data-planweg="${u.id}" title="Aus dem Plan entfernen">✕</button>
+          </div>`).join("")}</div>` : `<p class="soft">Noch kein Plan – unten Bausteine antippen oder 🎲 Vorschlag nutzen.</p>`}
+        ${PLAN_PHASEN.map(([kat, label]) => {
+          const der = alle.filter((u) => u.kategorie === kat);
+          if (!der.length) return "";
+          return `<div style="margin:8px 0"><strong style="font-size:.82rem;color:var(--primary)">${label}</strong>
+            <div class="chip-row" style="margin-top:4px">
+            ${der.map((u) => {
+              const drin = plan.bausteine.includes(u.id);
+              const passt = uebungPasst(u, zusagen);
+              return `<button class="chip" data-planplus="${u.id}" ${drin ? "disabled" : ""}
+                style="${drin ? "opacity:.4" : !passt ? "opacity:.45;border-style:dashed" : "cursor:pointer"}"
+                title="${esc(u.beschreibung || "")}${!passt ? ` – passt eher für ${u.minSp}${u.maxSp ? "–" + u.maxSp : "+"} Teilnehmende` : ""}">
+                ${esc(u.name)} ${u.dauer}′${!passt ? " ⚠" : ""}</button>`;
+            }).join("")}
+            </div></div>`;
+        }).join("")}
+        <div class="field" style="margin-top:10px"><label>🗒️ Notizen zur Trainingsplanung</label>
+          <textarea id="planNotiz" rows="3" placeholder="Schwerpunkt, Material, Besonderheiten …">${esc(plan.notiz || "")}</textarea></div>
+        <button class="btn sm" data-plansave>Notiz speichern</button>
+        <button class="btn sm ghost" data-uebverwalten style="float:right">🧰 Bausteine verwalten</button>
+      </div>`;
+  }
+
+  function planSpeichern(evt, patch) {
+    const plan = Object.assign({ notiz: "", bausteine: [] }, evt.plan || {}, patch);
+    Store.update("events", evt.id, { plan });
+  }
+
+  function bindTrainingsplan(box, evt, zusagen) {
+    if (!evt || evt.type !== "training") return;
+    $$("[data-planplus]", box).forEach((b) => b.onclick = () => {
+      const plan = evt.plan || { notiz: "", bausteine: [] };
+      if (!plan.bausteine.includes(b.dataset.planplus)) {
+        planSpeichern(evt, { bausteine: [...plan.bausteine, b.dataset.planplus] });
+        reload();
+      }
+    });
+    $$("[data-planweg]", box).forEach((b) => b.onclick = () => {
+      const plan = evt.plan || { notiz: "", bausteine: [] };
+      planSpeichern(evt, { bausteine: plan.bausteine.filter((id) => id !== b.dataset.planweg) });
+      reload();
+    });
+    const auto = $("[data-planauto]", box);
+    if (auto) auto.onclick = () => {
+      // Ein-Klick-Plan: je Phase passende Bausteine würfeln, bis die
+      // Trainingszeit gut gefüllt ist (Technik doppelt gewichtet).
+      const dauerMin = Math.max(0, Math.round((new Date(evt.end) - new Date(evt.start)) / 60000)) || 90;
+      const alle = S().uebungen || [];
+      const zufall = (liste) => liste[Math.floor(Math.random() * liste.length)];
+      const bausteine = [];
+      let summe = 0;
+      PLAN_PHASEN.forEach(([kat]) => {
+        const anzahl = kat === "technik" ? 2 : 1;
+        const passende = alle.filter((u) => u.kategorie === kat && uebungPasst(u, zusagen));
+        for (let i = 0; i < anzahl && passende.length; i++) {
+          const u = zufall(passende.filter((x) => !bausteine.includes(x.id)));
+          if (!u || summe + u.dauer > dauerMin + 5) break;
+          bausteine.push(u.id);
+          summe += u.dauer;
+        }
+      });
+      planSpeichern(evt, { bausteine });
+      toast(`🎲 Vorschlag für ${zusagen || "alle"} Zusagen erstellt (${summe} Min.)`, "good");
+      reload();
+    };
+    const save = $("[data-plansave]", box);
+    if (save) save.onclick = () => {
+      planSpeichern(evt, { notiz: $("#planNotiz", box).value });
+      toast("Planung gespeichert", "good");
+    };
+    const add = $("[data-uebadd]", box);
+    if (add) add.onclick = () => uebungForm();
+    const verwalten = $("[data-uebverwalten]", box);
+    if (verwalten) verwalten.onclick = () => uebungenModal();
+    const pdfKnopf = $("[data-planpdf]", box);
+    if (pdfKnopf) pdfKnopf.onclick = () => planPdf(evt, zusagen);
+    const spicker = $("[data-planspicker]", box);
+    if (spicker) spicker.onclick = () => planSpicker(evt, zusagen);
+  }
+
+  // Plan-Bausteine mit kumulierten Uhrzeiten (16:30–16:40 …) in Phasen-Reihenfolge
+  function planZeitplan(evt) {
+    const plan = evt.plan || { bausteine: [] };
+    const gewaehlt = plan.bausteine.map((id) => Store.byId("uebungen", id)).filter(Boolean)
+      .sort((a, b) => PLAN_PHASEN.findIndex(([k]) => k === a.kategorie) - PLAN_PHASEN.findIndex(([k]) => k === b.kategorie));
+    let t = new Date(evt.start);
+    return gewaehlt.map((u) => {
+      const von = fmtTime(t.toISOString());
+      t = new Date(t.getTime() + (u.dauer || 0) * 60000);
+      return { u, von, bis: fmtTime(t.toISOString()) };
+    });
+  }
+
+  // Sauber formatiertes PDF des Trainingsplans (über die Server-PDF-Erzeugung)
+  function planPdf(evt, zusagen) {
+    const zeitplan = planZeitplan(evt);
+    if (!zeitplan.length) { toast("Erst Bausteine in den Plan legen", "bad"); return; }
+    const B = [];
+    const p = (runs) => B.push({ art: "p", runs: Array.isArray(runs) ? runs : [{ t: runs }] });
+    B.push({ art: "h1", runs: [{ t: "Trainingsplan" }] });
+    B.push({ art: "sub", runs: [{ t: `${fmtDate(evt.start)} · ${fmtTime(evt.start)}–${fmtTime(evt.end)} Uhr · ${evt.location || ""} · ${zusagen || "?"} Zusagen` }] });
+    zeitplan.forEach(({ u, von, bis }) => {
+      B.push({ art: "h2", runs: [{ t: `${von}–${bis}  ${phasenName(u.kategorie).replace(/^\S+\s/, "")}: ${u.name} (${u.dauer}′)` }] });
+      if (u.beschreibung) p(u.beschreibung);
+      if (u.quelle || u.link) B.push({ art: "sub", runs: [{ t: `Quelle: ${u.quelle || ""}${u.link ? " · " + u.link : ""}` }] });
+    });
+    if ((evt.plan || {}).notiz) {
+      B.push({ art: "h2", runs: [{ t: "Notizen" }] });
+      p(evt.plan.notiz);
+    }
+    B.push({ art: "linie", runs: [{ t: "SKV Müritz Volleyball · Trainingsplanung" }] });
+    pdfVomServer(`Trainingsplan – ${fmtDateShort(evt.start)}`, B, false, `Training ${fmtDateShort(evt.start)}`);
+  }
+
+  // Kompakter Handy-Spicker: große Schrift, nur das Nötigste für die Halle
+  function planSpicker(evt, zusagen) {
+    const zeitplan = planZeitplan(evt);
+    if (!zeitplan.length) { toast("Erst Bausteine in den Plan legen", "bad"); return; }
+    modal({
+      title: `📱 Spicker – ${fmtDateShort(evt.start)}`,
+      body: `
+        <div class="spicker">
+          <div class="spicker-kopf">${fmtTime(evt.start)}–${fmtTime(evt.end)} Uhr · ${zusagen || "?"} Zusagen</div>
+          ${zeitplan.map(({ u, von }) => `
+            <div class="spicker-zeile">
+              <span class="spicker-zeit">${von}</span>
+              <span class="spicker-name">${phasenName(u.kategorie).split(" ")[0]} ${esc(u.name)}</span>
+              <span class="spicker-dauer">${u.dauer}′</span>
+            </div>`).join("")}
+          ${(evt.plan || {}).notiz ? `<div class="spicker-notiz">🗒️ ${esc(evt.plan.notiz)}</div>` : ""}
+        </div>`,
+      footer: `<button class="btn" data-x>Schließen</button>`,
+      onOpen(m) { m.querySelector("[data-x]").onclick = closeModal; },
+    });
+  }
+
+  function uebungForm(u) {
+    const isEdit = !!u;
+    u = u || { name: "", kategorie: "technik", dauer: 10, minSp: 0, maxSp: 0, beschreibung: "" };
+    modal({
+      title: isEdit ? "Baustein bearbeiten" : "Neuer Trainings-Baustein",
+      body: `<form id="uf"><div class="form-grid">
+        <div class="field full"><label>Name</label><input name="name" value="${esc(u.name)}" required placeholder="z. B. Annahme unter Druck"></div>
+        <div class="field"><label>Phase</label><select name="kategorie">
+          ${PLAN_PHASEN.map(([k, l]) => `<option value="${k}" ${k === u.kategorie ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+        <div class="field"><label>Dauer (Minuten)</label><input type="number" name="dauer" value="${u.dauer}" min="1" max="90" required></div>
+        <div class="field"><label>Mindest-Teilnehmende (0 = egal)</label><input type="number" name="minSp" value="${u.minSp || 0}" min="0" max="30"></div>
+        <div class="field"><label>Maximal sinnvoll (0 = egal)</label><input type="number" name="maxSp" value="${u.maxSp || 0}" min="0" max="30"></div>
+        <div class="field full"><label>Beschreibung / Aufbau</label><textarea name="beschreibung" rows="3">${esc(u.beschreibung || "")}</textarea></div>
+        <div class="field"><label>Quelle <span class="soft" style="font-weight:400">(z. B. volleyballkompass.de)</span></label>
+          <input name="quelle" value="${esc(u.quelle || "")}"></div>
+        <div class="field"><label>Link (Video/PDF)</label><input type="url" name="link" value="${esc(u.link || "")}" placeholder="https://…"></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#uf"); if (!f.reportValidity()) return;
+          const d = formData(f);
+          const werte = { name: d.name, kategorie: d.kategorie, dauer: +d.dauer || 10,
+                          minSp: +d.minSp || 0, maxSp: +d.maxSp || 0, beschreibung: d.beschreibung,
+                          quelle: d.quelle || "", link: d.link || "" };
+          if (isEdit) Store.update("uebungen", u.id, werte);
+          else Store.add("uebungen", Object.assign({ id: Store.uid("ub") }, werte));
+          closeModal(); toast("Baustein gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
+
+  function uebungenModal() {
+    modal({
+      title: "🧰 Trainings-Bausteine verwalten",
+      wide: true,
+      body: `<p class="soft" style="margin-top:0;font-size:.85rem">Die Bibliothek wächst mit jedem Training –
+        bewährte Übungen anlegen, anpassen und wiederverwenden.</p>
+        <div class="list" style="max-height:420px;overflow-y:auto">
+        ${PLAN_PHASEN.map(([kat, label]) => {
+          const der = (S().uebungen || []).filter((u) => u.kategorie === kat);
+          return `<div class="list-month">${label}</div>` + der.map((u) => `
+            <div class="list-item" style="padding:8px 10px"><div class="grow">
+              <div class="title" style="font-size:.88rem">${esc(u.name)} <span class="soft">(${u.dauer}′ · ${u.minSp || "egal"}${u.maxSp ? "–" + u.maxSp : u.minSp ? "+" : ""} Teiln.)</span></div>
+              ${u.beschreibung ? `<div class="sub">${esc(u.beschreibung)}</div>` : ""}
+              ${u.quelle || u.link ? `<div class="sub">📚 ${esc(u.quelle || "Quelle")}${u.link ? ` · <a href="${esc(u.link)}" target="_blank" rel="noopener">${/youtu/.test(u.link) ? "▶️ Video" : "📄 Anleitung"}</a>` : ""}</div>` : ""}</div>
+              <button class="btn sm ghost" data-uedit="${u.id}">✏️</button>
+              <button class="btn sm ghost" data-udel="${u.id}">🗑️</button>
+            </div>`).join("");
+        }).join("")}
+        </div>`,
+      footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn" data-neu>＋ Neuer Baustein</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-neu]").onclick = () => { closeModal(); uebungForm(); };
+        $$("[data-uedit]", m).forEach((b) => b.onclick = () => { closeModal(); uebungForm(Store.byId("uebungen", b.dataset.uedit)); });
+        $$("[data-udel]", m).forEach((b) => b.onclick = () => {
+          const u = Store.byId("uebungen", b.dataset.udel);
+          confirmDialog(`Baustein „${esc(u.name)}“ löschen?`, () => {
+            Store.remove("uebungen", u.id); toast("Baustein gelöscht"); closeModal(); reload();
+          });
+        });
+      },
     });
   }
   function rmBadge(st) {
     return ({ yes: '<span class="badge good">Zugesagt</span>', no: '<span class="badge bad">Abgesagt</span>',
       maybe: '<span class="badge warn">Unsicher</span>', open: '<span class="badge">offen</span>' })[st] || "";
   }
-  function setResponse(eventId, playerId, status) {
+  function setResponse(eventId, playerId, status, grund) {
+    // Begründung gehört zu Unsicher/Absage; bei Zusage wird sie gelöscht
+    const werte = { status, grund: (status === "no" || status === "maybe") ? (grund || "") : "",
+                    at: new Date().toISOString() };
     const ex = S().responses.find((r) => r.eventId === eventId && r.playerId === playerId);
-    if (ex) Store.update("responses", ex.id, { status, at: new Date().toISOString() });
-    else Store.add("responses", { eventId, playerId, status, at: new Date().toISOString() });
+    if (ex) Store.update("responses", ex.id, werte);
+    else Store.add("responses", Object.assign({ eventId, playerId }, werte));
   }
 
   /* ======================================================================
@@ -1108,7 +1770,7 @@
     modal({
       title: `Mitfahrer → ${esc(d.name)}`,
       body: `<div class="list">${avail.map((p) => `
-        <label class="list-item" style="cursor:pointer">${avatar(p.firstName, p.lastName)}
+        <label class="list-item" style="cursor:pointer">${avatar(p.firstName, p.lastName, p)}
           <div class="grow title">${esc(p.firstName)} ${esc(p.lastName)}</div>
           <input type="checkbox" data-pl="${p.id}" style="width:auto"></label>`).join("")}</div>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Zuordnen</button>`,
@@ -1178,9 +1840,26 @@
             <button class="btn sm outline mt" data-jadd="${cat}">＋ ${jobCat[cat].label}-Job</button>
           </div>`;
         }).join("")}
-      </div>`;
+      </div>
+      ${(() => {
+        // Buffet-Ankündigungen aus dem Portal (Familien tragen je Heimspiel ein, was sie mitbringen)
+        const buffet = (S().buffet || []).filter((b) => b.eventId === evt.id);
+        return `<div class="card mt">
+          <div class="card-head"><h3>🥗 Angekündigte Buffet-Beiträge (Portal)</h3><span class="badge">${buffet.length}</span></div>
+          ${buffet.length ? `<div class="list">${buffet.map((b) => `
+            <div class="list-item" style="padding:9px 10px"><div class="grow">
+              <div class="title" style="font-size:.9rem">${esc(b.beitrag)}</div>
+              <div class="sub">👤 ${esc(b.name || "unbekannt")}</div></div></div>`).join("")}</div>`
+          : `<p class="soft" style="margin:0">Noch keine Ankündigungen – Familien tragen im Portal unter „Termine" ein, was sie mitbringen.</p>`}
+        </div>`;
+      })()}`;
 
-    $$("[data-jdone]", box).forEach((b) => b.onclick = () => { const j = Store.byId("jobs", b.dataset.jdone); Store.update("jobs", j.id, { done: !j.done }); reload(); });
+    $$("[data-jdone]", box).forEach((b) => b.onclick = () => {
+      const j = Store.byId("jobs", b.dataset.jdone);
+      Store.update("jobs", j.id, { done: !j.done });
+      if (!j.done) volleyballFlug();
+      reload();
+    });
     $$("[data-jedit]", box).forEach((b) => b.onclick = () => jobForm(evt.id, Store.byId("jobs", b.dataset.jedit)));
     $$("[data-jdel]", box).forEach((b) => b.onclick = () => confirmDialog("Job löschen?", () => { Store.remove("jobs", b.dataset.jdel); toast("Job gelöscht"); reload(); }));
     $$("[data-jadd]", box).forEach((b) => b.onclick = () => jobForm(evt.id, null, b.dataset.jadd));
@@ -1332,7 +2011,7 @@
 
   function letterForm(l) {
     const isEdit = !!l;
-    l = l || { title: "", body: "Liebe Eltern,\n\n", deadline: "", includeHomeGames: true, includeSlip: true };
+    l = l || { title: "", body: "Liebe Eltern,\n\n", deadline: "", trainingTime: "", includeHomeGames: true, includeSlip: true, includeConsents: true };
     modal({
       title: isEdit ? "Elternbrief bearbeiten" : "Neuer Elternbrief",
       wide: true,
@@ -1341,8 +2020,20 @@
         <div class="field"><label>⏰ Rückmeldefrist</label><input type="date" name="deadline" value="${esc(l.deadline)}"></div>
         <div class="field full"><label>Brieftext <span class="soft" style="font-weight:400">(Absätze mit Leerzeile trennen; „## " = Überschrift; Platzhalter für Serienbrief: {vorname}, {nachname}, {eltern})</span></label>
           <textarea name="body" rows="14" required>${esc(l.body)}</textarea></div>
-        <div class="field"><label><input type="checkbox" name="includeHomeGames" ${l.includeHomeGames ? "checked" : ""} style="width:auto"> Termine einfügen (Heim- & Auswärtsspiele je Datum zusammengefasst, Trainings-Hinweis donnerstags)</label></div>
+        <div class="field full"><label>🏐 Regelmäßige Trainingszeit <span class="soft" style="font-weight:400">(von Hand eintragen – erscheint im Termine-Block; leer = Linie zum Ausfüllen)</span></label>
+          <input name="trainingTime" value="${esc(l.trainingTime || "")}" placeholder="z. B. donnerstags 14:30–16:30 Uhr, Sporthalle Am Bürgersee"></div>
+        <div class="field full"><label><input type="checkbox" name="includeHomeGames" ${l.includeHomeGames ? "checked" : ""} style="width:auto"> 📅 Termine-Seite („für die Pinnwand") einfügen – mit diesen Kategorien:</label>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;margin:8px 0 0 24px">
+            ${(() => {
+              const gewaehlt = Array.isArray(l.terminArten) ? l.terminArten : ["home", "away"];
+              const kat = [["home", "🏟️ Heimspiele"], ["away", "🚌 Auswärtsspiele"], ["other", "📌 Sonstige Termine"],
+                           ...eventCats().map((c) => [c.id, (c.emoji ? c.emoji + " " : "") + c.name])];
+              return kat.map(([k, label]) => `<label style="font-weight:400;display:flex;align-items:center;gap:6px">
+                <input type="checkbox" name="ta_${k}" ${gewaehlt.includes(k) ? "checked" : ""} style="width:auto"> ${esc(label)}</label>`).join("");
+            })()}
+          </div></div>
         <div class="field"><label><input type="checkbox" name="includeSlip" ${l.includeSlip ? "checked" : ""} style="width:auto"> Rückmeldeabschnitt (E-Mail, Mobil, WhatsApp, Fahrer, Buffet) anhängen</label></div>
+        <div class="field"><label><input type="checkbox" name="includeConsents" ${l.includeConsents !== false ? "checked" : ""} style="width:auto"> Pflicht-Erklärungen als vorausgefüllte Zusatzseite anhängen (Serienbrief)</label></div>
       </div></form>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button>
         <button class="btn outline" data-p>🖨️ Vorschau/Druck</button>
@@ -1351,7 +2042,10 @@
         m.querySelector("[data-x]").onclick = closeModal;
         const collect = () => {
           const d = formData(m.querySelector("#lf"));
-          return { title: d.title, body: d.body, deadline: d.deadline, includeHomeGames: !!d.includeHomeGames, includeSlip: !!d.includeSlip };
+          const terminArten = Object.keys(d).filter((k) => k.startsWith("ta_") && d[k]).map((k) => k.slice(3));
+          return { title: d.title, body: d.body, deadline: d.deadline, trainingTime: d.trainingTime || "",
+            includeHomeGames: !!d.includeHomeGames, includeSlip: !!d.includeSlip, includeConsents: !!d.includeConsents,
+            terminArten };
         };
         m.querySelector("[data-p]").onclick = () => printParentLetter(collect());
         m.querySelector("[data-s]").onclick = () => {
@@ -1449,35 +2143,79 @@
         `${fmtTime(g.start)} Uhr ${esc(stripDateTime(g.title))}${g.opponent ? " gegen " + esc(g.opponent) : ""}${g.location ? " (" + esc(g.location) + ")" : ""}`
       ).join(" · ")}</li>`).join("");
     const blanks = `<ul><li>______________________________</li><li>______________________________</li><li>______________________________</li></ul>`;
-    const homeGames = futureOf("home");
-    const awayGames = futureOf("away");
-    // Trainingszeiten mit Uhrzeit: aus den Kalender-Trainings abgeleitete Muster
-    // (Wochentag + Zeitfenster); Fallback: Trainingszeiten der Abteilung bzw. donnerstags
-    const DOW_ADV = ["sonntags", "montags", "dienstags", "mittwochs", "donnerstags", "freitags", "samstags"];
-    const trainingLine = (pl2) => {
-      const pats = new Map();
-      S().events.filter((e) => e.type === "training" && daysUntil(e.start) >= 0).forEach((e) => {
-        const d = new Date(e.start);
-        const k = `${d.getDay()}|${fmtTime(e.start)}|${fmtTime(e.end)}`;
-        if (!pats.has(k)) pats.set(k, { day: d.getDay(), from: fmtTime(e.start), to: fmtTime(e.end) });
-      });
-      if (pats.size) {
-        const list = Array.from(pats.values())
-          .sort((a, b) => ((a.day + 6) % 7) - ((b.day + 6) % 7) || a.from.localeCompare(b.from))
-          .map((p2) => `${DOW_ADV[p2.day]} ${p2.from}–${p2.to} Uhr`);
-        return `Unser regelmäßiges Training: <strong>${list.join(", ")}</strong>.`;
-      }
-      const dep = pl2 && pl2.departmentId ? Store.byId("departments", pl2.departmentId) : null;
-      if (dep && dep.times) return `Unser regelmäßiges Training: <strong>${esc(dep.times)}</strong>${dep.venue ? ` (${esc(dep.venue)})` : ""}.`;
-      return `Unser regelmäßiges Training findet <strong>immer donnerstags</strong> statt.`;
+    // Gewählte Termin-Kategorien für die Pinnwand-Seite (Brief-Editor);
+    // Standard wie früher: Heim- und Auswärtsspiele.
+    const terminArten = Array.isArray(l.terminArten) && l.terminArten.length ? l.terminArten : ["home", "away"];
+    const artInfo = (k) => {
+      if (k === "home") return { titel: "🏟️ Heimspiele", blanks: true };
+      if (k === "away") return { titel: "🚌 Auswärtsspiele", blanks: true };
+      if (k === "other") return { titel: "📌 Weitere Termine", blanks: false };
+      const c = (S().eventCategories || []).find((x) => x.id === k);
+      return c ? { titel: `${c.emoji || "📌"} ${c.name}`, blanks: false } : null;
     };
-    const gamesHTMLFor = (pl2) => !l.includeHomeGames ? "" : `
-      <h2>📅 Unsere Termine</h2>
-      <p><strong>🏐 Training:</strong> ${trainingLine(pl2)}</p>
-      <p style="margin-bottom:4px"><strong>Heimspiele:</strong></p>
-      ${homeGames.length ? `<ul>${dateList(homeGames)}</ul>` : `<p><em>Die Heimspieltermine werden rechtzeitig bekannt gegeben bzw. hier ergänzt:</em></p>${blanks}`}
-      <p style="margin-bottom:4px"><strong>Auswärtsspiele:</strong></p>
-      ${awayGames.length ? `<ul>${dateList(awayGames)}</ul>` : `<p><em>Die Auswärtstermine werden rechtzeitig bekannt gegeben bzw. hier ergänzt:</em></p>${blanks}`}`;
+    // Trainingszeit: kommt bewusst NICHT aus dem Kalender, sondern wird im
+    // Brief-Editor von Hand eingetragen (Feld „Regelmäßige Trainingszeit").
+    const trainingText = () => String(l.trainingTime || "").trim();
+    const trainingLine = () => trainingText() ? esc(trainingText()) : "_______________________________";
+    // Termine als eigene, ganze Seite – gestaltet für die Pinnwand.
+    // Ziel: ALLE gewählten Termin-Blöcke passen zusammen auf EINE Seite –
+    // bei vielen Terminen schaltet die Seite automatisch auf die Kompaktstufe.
+    const pinZeilen = () => terminArten.reduce((summe, k) => {
+      const info = artInfo(k);
+      if (!info) return summe;
+      const evs = futureOf(k);
+      return summe + (evs.length ? groupByDate(evs).length : (info.blanks ? 3 : 0)) + 2;
+    }, 0);
+    const gamesHTMLFor = () => !l.includeHomeGames ? "" : `
+      <div class="pin ${pinZeilen() > 22 ? "pin-eng" : ""}">
+        <div class="pin-titel">📅 Unsere Termine</div>
+        <div class="pin-unter">SKV Müritz · Abteilung Volleyball · für die Pinnwand</div>
+        <div class="pin-training">🏐 Regelmäßiges Training<span>${trainingLine()}</span></div>
+        ${terminArten.map((k) => {
+          const info = artInfo(k);
+          if (!info) return "";
+          const evs = futureOf(k);
+          if (!evs.length && !info.blanks) return "";
+          return `<div class="pin-block">
+            <div class="pin-block-titel">${esc(info.titel)}</div>
+            ${evs.length ? `<ul>${dateList(evs)}</ul>` : `<p class="pin-leer">Die Termine werden rechtzeitig bekannt gegeben bzw. hier ergänzt:</p>${blanks}`}
+          </div>`;
+        }).join("")}
+      </div>`;
+    // Pflicht-Erklärungen (Einverständnis-Vorlagen mit „Pflicht") als eigene,
+    // je Spieler VORAUSGEFÜLLTE Seite hinter dem Brief (Serienbrief).
+    const reqTpls = S().consentTemplates.filter((t) => t.required);
+    const consentHTMLFor = (pl2) => {
+      if (l.includeConsents === false || !reqTpls.length) return "";
+      const parents = pl2 ? [pl2.parentName, pl2.parent2Name].filter(Boolean).join(" und ") : "";
+      const line = (label, val) => `<div class="line">${label}${val ? ` <strong>${esc(val)}</strong>` : ""}</div>`;
+      const secs = reqTpls.map((t, i) => `
+        <div class="sec">
+          <div class="sec-head"><span class="num">${i + 1}</span> ${esc(t.name)}</div>
+          <div class="sec-body">${esc(t.text).replace(/\n/g, "<br>")}</div>
+          <div class="agree">☐ <strong>Ich stimme zu</strong>&nbsp;&nbsp;&nbsp;☐ Ich stimme nicht zu</div>
+        </div>`).join("");
+      return `
+      <h1>🏐 SKV Müritz – Sammel-Einverständniserklärung</h1>
+      <div class="sub">www.skv-mueritz.de · Abteilung Volleyball · ${reqTpls.length} Pflicht-Erklärungen</div>
+      <div class="box">
+        <strong>Angaben zum Spieler und zu den Erziehungsberechtigten</strong>
+        <div class="cols">
+          <div>${line("Name, Vorname des Spielers:", pl2 ? `${pl2.lastName}, ${pl2.firstName}` : "")}</div>
+          <div>${line("Geburtsdatum:", pl2 && pl2.birthDate ? fmtDateShort(pl2.birthDate) : "")}</div>
+        </div>
+        ${line("Name der/des Erziehungsberechtigten:", parents)}
+        <div class="cols">
+          <div>${line("E-Mail-Adresse:", pl2 ? (pl2.parentEmail || pl2.playerEmail || "") : "")}</div>
+          <div>${line("Mobilnummer:", pl2 ? (pl2.parentPhone || pl2.playerPhone || "") : "")}</div>
+        </div>
+      </div>
+      <p><strong>Hiermit erkläre ich mich mit den nachfolgend angekreuzten Punkten einverstanden:</strong></p>
+      ${secs}
+      <p class="note">Alle Einwilligungen sind freiwillig und können jederzeit mit Wirkung für die Zukunft schriftlich
+      widerrufen werden. Die Daten werden ausschließlich für die Vereinsarbeit des SKV Müritz genutzt.</p>
+      <div class="sign"><div>Ort, Datum</div><div>Unterschrift Erziehungsberechtigte/r</div></div>`;
+    };
     // Platzhalter {vorname} {nachname} {eltern} ersetzen (Serienbrief: je Spieler)
     const fill = (text, pl2) => String(text || "")
       .replace(/\{vorname\}/gi, pl2 ? pl2.firstName : "…")
@@ -1495,56 +2233,352 @@
     // Ein Brief (ggf. personalisiert für einen Spieler)
     const oneLetter = (pl2) => {
       const parents = pl2 ? [pl2.parentName, pl2.parent2Name].filter(Boolean).join(" und ") : "";
-      const bestEmail = pl2 ? (pl2.parentEmail || pl2.playerEmail || "") : "";
-      const bestPhone = pl2 ? (pl2.parentPhone || pl2.playerPhone || "") : "";
       const pref = (val, filled) => filled ? `<div class="line">${val} <strong>${esc(filled)}</strong></div>` : `<div class="line">${val}</div>`;
-      return `
+      // Der Brief wird in explizite Seiten zerlegt: so kann jede Seite eine
+      // Fußzeile (Spielername · Seite X von Y) tragen, sobald es mehr als
+      // eine Seite gibt.
+      const seiten = [];
+      seiten.push(`
       <h1>🏐 SKV Müritz – Abteilung Volleyball</h1>
       <div class="sub">www.skv-mueritz.de · ${esc(l.title || "Elternbrief zur Saison")}${l.deadline ? ` · Rückmeldung bis ${fmtDateShort(l.deadline)}` : ""}</div>
-      ${pl2 ? `<div class="addr">An die Eltern von <strong>${esc(pl2.firstName)} ${esc(pl2.lastName)}</strong>${parents ? ` – ${esc(parents)}` : ""}${pl2.departmentId ? ` · ${esc(deptName(pl2.departmentId))}` : ""}</div>` : ""}
-      <div style="margin-top:22px">${toBodyHTML(pl2)}</div>
-      ${gamesHTMLFor(pl2)}
-      <p>Mit sportlichen Grüßen<br><br>_______________________________<br>Das Trainerteam · SKV Müritz Volleyball</p>
-      ${l.includeSlip ? `
+      ${pl2 ? `<div class="addr">An die Eltern von</div>
+      <div class="addr-name">${esc(pl2.firstName)} ${esc(pl2.lastName)}</div>
+      ${parents || playerDeptIds(pl2).length ? `<div class="addr">${[parents ? esc(parents) : "", playerDeptIds(pl2).length ? esc(playerDeptNames(pl2)) : ""].filter(Boolean).join(" · ")}</div>` : ""}` : ""}
+      <div style="margin-top:22px">${toBodyHTML(pl2)}</div>`);
+      const pinSeite = gamesHTMLFor(pl2);
+      if (pinSeite) seiten.push(pinSeite);
+      if (l.includeSlip) seiten.push(`
       <div class="cut"></div>
       <div class="slip">
-        <strong>Rückmeldung an das Trainerteam</strong> (${deadlineTxt})
+        <strong>Rückmeldung an das Trainerteam</strong>
+        <div class="frist">⏰ ${deadlineTxt.charAt(0).toUpperCase() + deadlineTxt.slice(1)}!</div>
         ${pref("Name des Kindes:", pl2 ? `${pl2.firstName} ${pl2.lastName}` : "")}
-        ${pref("Name Erziehungsberechtigte/r:", parents)}
-        ${pref("E-Mail-Adresse:", bestEmail)}
-        ${pref("Mobilnummer:", bestPhone)}
+        <div class="slip-gruppe">👤 Kontaktdaten – bitte je Person eintragen</div>
+        <div class="slip-zeile">
+          <div class="line lz-name">Erziehungsberechtigte/r 1:${pl2 && pl2.parentName ? ` <strong>${esc(pl2.parentName)}</strong>` : ""}</div>
+          <div class="line lz-mobil">Mobil:${pl2 && pl2.parentPhone ? ` <strong>${esc(pl2.parentPhone)}</strong>` : ""}</div>
+          <div class="line lz-mail">E-Mail:${pl2 && pl2.parentEmail ? ` <strong>${esc(pl2.parentEmail)}</strong>` : ""}</div>
+        </div>
+        <div class="slip-zeile">
+          <div class="line lz-name">Erziehungsberechtigte/r 2 <span class="lz-hinweis">(bei geteiltem Sorgerecht)</span>:${pl2 && pl2.parent2Name ? ` <strong>${esc(pl2.parent2Name)}</strong>` : ""}</div>
+          <div class="line lz-mobil">Mobil:${pl2 && pl2.parent2Phone ? ` <strong>${esc(pl2.parent2Phone)}</strong>` : ""}</div>
+          <div class="line lz-mail">E-Mail:${pl2 && pl2.parent2Email ? ` <strong>${esc(pl2.parent2Email)}</strong>` : ""}</div>
+        </div>
+        <div class="slip-zeile">
+          <div class="line lz-name">Spieler:in <span class="lz-hinweis">(eigenes Handy, freiwillig)</span></div>
+          <div class="line lz-mobil">Mobil:${pl2 && pl2.playerPhone ? ` <strong>${esc(pl2.playerPhone)}</strong>` : ""}</div>
+          <div class="line lz-mail">E-Mail:${pl2 && pl2.playerEmail ? ` <strong>${esc(pl2.playerEmail)}</strong>` : ""}</div>
+        </div>
         <div class="chk">☐ Ich stimme zu, dass das Trainerteam mich über E-Mail/Telefon kontaktiert.</div>
-        <div class="chk">☐ Ich möchte in die WhatsApp-Elterngruppe aufgenommen werden.</div>
-        <div class="chk">☐ Ich stehe grundsätzlich als Fahrer/in für Auswärtsspiele zur Verfügung (Plätze: ____ )</div>
-        <div class="chk">☐ Ich helfe beim Heimspiel-Buffet (Salat / Brötchen / Kuchen / Getränke – Zutreffendes bitte einkreisen)</div>
+        <div class="chk">☐ Ich stimme der Aufnahme in die <strong>WhatsApp-Elterngruppe</strong> zu – unser zentraler
+          Informationsweg und für den reibungslosen Ablauf der Saison notwendig.</div>
+        <div class="slip-gruppe">🚗 Fahrbereitschaft zu Auswärtsspielen</div>
+        <div class="chk">☐ Ich fahre <strong>regelmäßig</strong> (freie Plätze: ____ )</div>
+        <div class="chk">☐ Ich fahre <strong>gelegentlich nach Absprache</strong> (freie Plätze: ____ )</div>
+        <div class="chk">☐ Ich kann leider nicht fahren</div>
+        <div class="slip-gruppe">🥗 Beteiligung am Heimspiel-Buffet</div>
+        <div class="chk">☐ Ich steuere etwas bei:&nbsp;&nbsp;☐ Salat&nbsp;&nbsp;☐ belegte Brötchen&nbsp;&nbsp;☐ Kuchen&nbsp;&nbsp;☐ Getränke</div>
+        <div class="chk">☐ Ich übernehme <strong>Standdienst</strong> an einem Heimspieltag</div>
+        <div class="chk">☐ Ich kann mich diesmal nicht beteiligen</div>
         <div class="sign"><div>Ort, Datum</div><div>Unterschrift Erziehungsberechtigte/r</div></div>
-      </div>` : ""}`;
+      </div>`);
+      const consentSeite = consentHTMLFor(pl2);
+      if (consentSeite) seiten.push(consentSeite);
+      const gesamt = seiten.length;
+      const fussName = pl2 ? `${pl2.firstName} ${pl2.lastName}` : "";
+      return seiten.map((inhalt, i) => `<div class="brief-seite">${inhalt}
+        ${gesamt > 1 ? `<div class="fuss">${fussName ? esc(fussName) + " · " : ""}Seite ${i + 1} von ${gesamt}</div>` : ""}
+      </div>`).join("");
     };
 
     const list = Array.isArray(playersList) && playersList.length ? playersList : [null];
     const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>${esc(docTitle || l.title || "Elternbrief SKV Müritz")}</title>
       <style>
-        body{font-family:Georgia,'Times New Roman',serif;color:#111;margin:44px auto;max-width:720px;line-height:1.55;font-size:14.5px}
-        h1{font-size:21px;font-family:Arial,sans-serif;color:#1e3a8a;margin-bottom:0}
-        .sub{color:#666;font-family:Arial,sans-serif;font-size:12px;margin-top:2px}
-        .addr{font-family:Arial,sans-serif;font-size:11px;color:#888;margin-top:14px}
-        h2{font-size:15px;font-family:Arial,sans-serif;color:#1e3a8a;margin:22px 0 6px}
+        /* Durchgängig Arial, platzsparend, Vereinsfarben Blau/Orange */
+        body{font-family:Arial,'Helvetica Neue',sans-serif;color:#111;margin:38px auto;max-width:700px;line-height:1.5;font-size:13.5px}
+        p{margin:9px 0}
+        h1{font-size:21px;color:#1e3a8a;margin:0;letter-spacing:.2px}
+        .sub{color:#64748b;font-size:11.5px;margin:3px 0 0;padding-bottom:9px;border-bottom:2.5px solid #1e3a8a}
+        .addr{font-size:11px;color:#64748b;margin-top:16px}
+        .addr-name{font-size:17px;font-weight:700;color:#1e3a8a;margin:2px 0}
+        .addr + .addr, .addr-name + .addr{margin-top:0}
+        h2{font-size:14.5px;font-weight:800;color:#1e3a8a;margin:20px 0 6px}
         ul{margin:6px 0;padding-left:22px}
-        .cut{border-top:2px dashed #666;margin:30px 0 14px;position:relative}
-        .cut::before{content:"✂";position:absolute;top:-11px;left:12px;background:#fff;padding:0 6px;color:#666}
-        .slip{font-family:Arial,sans-serif;font-size:13px;border:1px solid #999;border-radius:8px;padding:16px}
-        .slip .line{border-bottom:1px solid #333;margin:16px 0 4px;padding-bottom:2px}
+        li{margin:3px 0}
+        /* Rückmeldeabschnitt: eigene Seite, Schnittlinie, nie umbrechen */
+        .cut{border-top:2px dashed #94a3b8;margin:26px 0 16px;position:relative}
+        .cut::before{content:"✂  hier abschneiden";position:absolute;top:-10px;left:12px;background:#fff;padding:0 8px;color:#64748b;font-size:11px}
+        .slip{font-size:12.5px;border:1.5px solid #1e3a8a;border-radius:12px;padding:16px 18px;page-break-inside:avoid;break-inside:avoid}
+        .slip>strong{font-size:14px;color:#1e3a8a}
+        .slip .line{border-bottom:1px solid #334155;margin:15px 0 3px;padding-bottom:2px}
+        .slip .frist{font-weight:800;font-size:14px;margin-top:7px;color:#9a3412;background:#fff7ed;border-radius:8px;padding:6px 10px;display:inline-block}
         .chk{margin:8px 0}
-        .sign{margin-top:34px;display:flex;gap:50px}.sign div{border-top:1px solid #333;padding-top:4px;font-size:11.5px;flex:1;font-family:Arial,sans-serif}
+        .slip-gruppe{margin:14px 0 4px;font-weight:800;color:#1e3a8a;border-top:1px solid #e2e8f0;padding-top:10px}
+        .slip-zeile{display:flex;gap:16px}
+        .slip-zeile .lz-name{flex:2.2}.slip-zeile .lz-mobil{flex:1.2}.slip-zeile .lz-mail{flex:1.8}
+        .lz-hinweis{font-weight:400;font-size:10.5px;color:#64748b}
+        .sign{margin-top:32px;display:flex;gap:50px}.sign div{border-top:1px solid #334155;padding-top:4px;font-size:11px;flex:1;color:#334155}
+        /* Pinnwand-Seite – kompakt, damit alle Termin-Blöcke auf EINE Seite passen */
+        .pin{text-align:center}
+        .pin-titel{font-size:24px;font-weight:800;color:#1e3a8a;margin-top:0}
+        .pin-unter{font-size:11px;color:#64748b;margin:2px 0 10px}
+        .pin-training{background:#fff7ed;border:2px solid #f97316;border-radius:10px;padding:7px 14px;
+          font-size:12.5px;font-weight:700;color:#9a3412;margin:0 auto 10px;max-width:620px}
+        .pin-training span{display:block;font-size:15px;color:#111;margin-top:2px}
+        .pin-block{border:1.5px solid #1e3a8a;border-radius:10px;padding:7px 14px 8px;margin:0 auto 9px;
+          max-width:620px;text-align:left;page-break-inside:avoid}
+        .pin-block-titel{font-size:13.5px;font-weight:800;color:#1e3a8a;text-align:center;margin-bottom:2px}
+        .pin-block ul{list-style:none;padding:0;margin:0}
+        .pin-block li{font-size:12px;padding:2.5px 0;margin:0;border-bottom:1px dashed #cbd5e1;line-height:1.35}
+        .pin-block li:last-child{border-bottom:0}
+        .pin-leer{font-size:11.5px;color:#555;font-style:italic;margin:3px 0}
+        /* Kompaktstufe bei vielen Terminen (schaltet automatisch) */
+        .pin-eng .pin-titel{font-size:20px}
+        .pin-eng .pin-unter{margin-bottom:6px}
+        .pin-eng .pin-training{padding:5px 12px;margin-bottom:7px;font-size:11.5px}
+        .pin-eng .pin-training span{font-size:13.5px}
+        .pin-eng .pin-block{padding:5px 12px 6px;margin-bottom:6px}
+        .pin-eng .pin-block-titel{font-size:12.5px}
+        .pin-eng .pin-block li{font-size:10.8px;padding:1.6px 0;line-height:1.3}
+        /* Einverständnis-Seite */
+        .box{font-size:12.5px;border:1.5px solid #1e3a8a;border-radius:12px;padding:14px 18px;margin:14px 0 16px}
+        .box .line{border-bottom:1px solid #334155;margin:14px 0 3px;padding-bottom:2px}
+        .box .cols{display:flex;gap:24px}.box .cols>div{flex:1}
+        .sec{border:1px solid #cbd5e1;border-radius:10px;padding:11px 14px;margin:9px 0;page-break-inside:avoid}
+        .sec-head{font-weight:700;color:#1e3a8a;margin-bottom:5px;font-size:13px}
+        .num{display:inline-block;background:#1e3a8a;color:#fff;border-radius:50%;width:20px;height:20px;text-align:center;line-height:20px;font-size:11px;margin-right:6px}
+        .sec-body{font-size:12px;color:#1e293b}
+        .agree{margin-top:7px;font-size:12.5px}
+        .note{font-size:10.5px;color:#555;margin-top:12px}
         .pagebreak{page-break-after:always}
-        @media print { body{margin:12mm} }
+        /* Explizite Brief-Seiten: Fußzeile (Name · Seite X von Y) sitzt unten */
+        .brief-seite{page-break-after:always;display:flex;flex-direction:column}
+        .brief-seite:last-child{page-break-after:auto}
+        .fuss{margin-top:auto;padding-top:8px;font-size:10px;color:#94a3b8;text-align:center;border-top:1px solid #eef2f7}
+        /* @page margin:0 verhindert, dass sich Browser-Druckränder und body-Rand
+           addieren – sonst überläuft jede Briefseite und erzeugt Leerseiten */
+        @media print { @page{size:A4;margin:0} body{margin:11mm} .brief-seite{min-height:269mm} }
       </style></head><body>
-      ${list.map((pl2, i) => oneLetter(pl2) + (i < list.length - 1 ? '<div class="pagebreak"></div>' : "")).join("")}
+      ${list.map((pl2) => oneLetter(pl2)).join("")}
       </body></html>`;
     const w = window.open("", "_blank");
     if (!w) { toast("Bitte Pop-ups erlauben, um zu drucken", "bad"); return; }
     w.document.write(html); w.document.close(); w.focus();
     setTimeout(() => w.print(), 300);
+  }
+
+  // ---- Elternbrief als echte PDF-Datei (Server-Endpunkt /api/brief-pdf) ----
+  // Baut den Brief als einfache Blockliste (statt HTML) für die PDF-Setzung.
+  function letterPdfBlocks(l, pl2) {
+    const s = S();
+    const futureOf = (type) => s.events.filter((e) => e.type === type && daysUntil(e.start) >= 0)
+      .sort((a, b) => new Date(a.start) - new Date(b.start));
+    const groupByDate = (evs) => {
+      const map = new Map();
+      evs.forEach((e) => { const k = String(e.start).slice(0, 10); if (!map.has(k)) map.set(k, []); map.get(k).push(e); });
+      return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    };
+    const stripDateTime = (t) => String(t || "")
+      .replace(/\b(?:mo|di|mi|do|fr|sa|so)\.?,?\s+\d{1,2}\.\d{1,2}\.(?:\d{2,4})?\b/gi, "")
+      .replace(/\b\d{1,2}\.\d{1,2}\.(?:\d{2,4})?\b/g, "")
+      .replace(/\b\d{4}-\d{2}-\d{2}\b/g, "")
+      .replace(/\b\d{1,2}:\d{2}(?:\s*Uhr)?\b/gi, "")
+      .replace(/\s{2,}/g, " ")
+      .replace(/^[\s\-–:,·]+|[\s\-–:,·]+$/g, "").trim();
+    const fill = (text) => String(text || "")
+      .replace(/\{vorname\}/gi, pl2 ? pl2.firstName : "…")
+      .replace(/\{nachname\}/gi, pl2 ? pl2.lastName : "…")
+      .replace(/\{eltern\}/gi, pl2 ? ([pl2.parentName, pl2.parent2Name].filter(Boolean).join(" und ") || "Eltern") : "Eltern");
+    const parents = pl2 ? [pl2.parentName, pl2.parent2Name].filter(Boolean).join(" und ") : "";
+    const bestEmail = pl2 ? (pl2.parentEmail || pl2.playerEmail || "") : "";
+    const bestPhone = pl2 ? (pl2.parentPhone || pl2.playerPhone || "") : "";
+    const B = [];
+    const p = (runs) => B.push({ art: "p", runs: Array.isArray(runs) ? runs : [{ t: runs }] });
+    const KASTEN = "[  ] ";
+
+    B.push({ art: "h1", runs: [{ t: "SKV Müritz – Abteilung Volleyball" }] });
+    B.push({ art: "sub", runs: [{ t: `www.skv-mueritz.de · ${l.title || "Elternbrief zur Saison"}${l.deadline ? ` · Rückmeldung bis ${fmtDateShort(l.deadline)}` : ""}` }] });
+    if (pl2) {
+      B.push({ art: "sub", runs: [{ t: "An die Eltern von" }] });
+      B.push({ art: "h2", runs: [{ t: `${pl2.firstName} ${pl2.lastName}` }] });
+      const zeile = [parents, playerDeptIds(pl2).length ? playerDeptNames(pl2) : ""].filter(Boolean).join(" · ");
+      if (zeile) B.push({ art: "sub", runs: [{ t: zeile }] });
+    }
+    B.push({ art: "trenn" });
+    fill(l.body).split(/\n{2,}/).forEach((block) => {
+      const lines = block.split("\n");
+      if (lines[0].startsWith("## ")) {
+        B.push({ art: "h2", runs: [{ t: lines[0].slice(3) }] });
+        const rest = lines.slice(1).join(" ").trim();
+        if (rest) p(rest);
+      } else p(lines.join(" ").trim());
+    });
+    if (l.includeHomeGames) {
+      // Termine als eigene Seite (Pinnwand); Rückmeldung folgt direkt darunter
+      B.push({ art: "seite" });
+      B.push({ art: "h1c", runs: [{ t: "Unsere Termine" }] });
+      B.push({ art: "subc", runs: [{ t: "SKV Müritz · Abteilung Volleyball · für die Pinnwand" }] });
+      const tt = String(l.trainingTime || "").trim();
+      B.push({ art: "kasten", runs: [{ t: "Regelmäßiges Training: ", b: true }, tt ? { t: tt, b: true } : { t: "_______________________________" }] });
+      const terminArten = Array.isArray(l.terminArten) && l.terminArten.length ? l.terminArten : ["home", "away"];
+      const artInfo = (k) => {
+        if (k === "home") return { titel: "Heimspiele", blanks: true };
+        if (k === "away") return { titel: "Auswärtsspiele", blanks: true };
+        if (k === "other") return { titel: "Weitere Termine", blanks: false };
+        const c = (s.eventCategories || []).find((x) => x.id === k);
+        return c ? { titel: c.name, blanks: false } : null;
+      };
+      // Alle Termin-Blöcke sollen zusammen auf EINE PDF-Seite passen –
+      // bei vielen Terminen kompakte Listenzeilen (li2) verwenden.
+      const zeilenGesamt = terminArten.reduce((summe, k) => {
+        const info = artInfo(k);
+        if (!info) return summe;
+        const evs = futureOf(k);
+        return summe + (evs.length ? groupByDate(evs).length : 1) + 2;
+      }, 0);
+      const liArt = zeilenGesamt > 22 ? "li2" : "li";
+      terminArten.forEach((k) => {
+        const info = artInfo(k);
+        if (!info) return;
+        const evs = futureOf(k);
+        if (!evs.length && !info.blanks) return;
+        B.push({ art: "h2box", runs: [{ t: info.titel }] });
+        if (!evs.length) { p("Die Termine werden rechtzeitig bekannt gegeben."); return; }
+        groupByDate(evs).forEach(([day, items]) => B.push({ art: liArt, runs: [
+          { t: fmtDate(items[0].start), b: true },
+          { t: " – " + items.map((g) => `${fmtTime(g.start)} Uhr ${stripDateTime(g.title)}${g.opponent ? " gegen " + g.opponent : ""}${g.location ? " (" + g.location + ")" : ""}`).join(" · ") },
+        ] }));
+      });
+      B.push({ art: "leer" });
+    }
+    if (l.includeSlip) {
+      const deadlineTxt = l.deadline ? `bitte bis zum ${fmtDate(l.deadline)} zurückgeben` : "bitte bis zum nächsten Training zurückgeben";
+      B.push({ art: "seite" });
+      B.push({ art: "schnitt" });
+      B.push({ art: "h2box", runs: [{ t: "Rückmeldung an das Trainerteam" }] });
+      p([{ t: deadlineTxt.charAt(0).toUpperCase() + deadlineTxt.slice(1) + "!", b: true }]);
+      const zeile = (label, val) => p(val ? [{ t: label + " " }, { t: val, b: true }] : [{ t: label + " ______________________________" }]);
+      zeile("Name des Kindes:", pl2 ? `${pl2.firstName} ${pl2.lastName}` : "");
+      p([{ t: "Kontaktdaten – bitte je Person eintragen", b: true }]);
+      const kontakt = (label, name, mobil, mail) => p([
+        { t: label + " " }, name ? { t: name, b: true } : { t: "__________________" },
+        { t: "   Mobil: " }, mobil ? { t: mobil, b: true } : { t: "______________" },
+        { t: "   E-Mail: " }, mail ? { t: mail, b: true } : { t: "____________________" },
+      ]);
+      kontakt("Erziehungsberechtigte/r 1:", pl2 ? pl2.parentName : "", pl2 ? pl2.parentPhone : "", pl2 ? pl2.parentEmail : "");
+      kontakt("Erziehungsberechtigte/r 2 (bei geteiltem Sorgerecht):", pl2 ? pl2.parent2Name : "",
+              pl2 ? pl2.parent2Phone : "", pl2 ? pl2.parent2Email : "");
+      p([
+        { t: "Spieler:in (eigenes Handy, freiwillig):   Mobil: " },
+        pl2 && pl2.playerPhone ? { t: pl2.playerPhone, b: true } : { t: "______________" },
+        { t: "   E-Mail: " },
+        pl2 && pl2.playerEmail ? { t: pl2.playerEmail, b: true } : { t: "____________________" },
+      ]);
+      p(KASTEN + "Ich stimme zu, dass das Trainerteam mich über E-Mail/Telefon kontaktiert.");
+      p([{ t: KASTEN + "Ich stimme der Aufnahme in die " }, { t: "WhatsApp-Elterngruppe", b: true },
+         { t: " zu – unser zentraler Informationsweg und für den reibungslosen Ablauf der Saison notwendig." }]);
+      p([{ t: "Fahrbereitschaft zu Auswärtsspielen", b: true }]);
+      p(KASTEN + "Ich fahre regelmäßig (freie Plätze: ____ )");
+      p(KASTEN + "Ich fahre gelegentlich nach Absprache (freie Plätze: ____ )");
+      p(KASTEN + "Ich kann leider nicht fahren");
+      p([{ t: "Beteiligung am Heimspiel-Buffet", b: true }]);
+      p(KASTEN + "Ich steuere etwas bei:   " + KASTEN + "Salat  " + KASTEN + "belegte Brötchen  " + KASTEN + "Kuchen  " + KASTEN + "Getränke");
+      p(KASTEN + "Ich übernehme Standdienst an einem Heimspieltag");
+      p(KASTEN + "Ich kann mich diesmal nicht beteiligen");
+      B.push({ art: "linie", runs: [{ t: "Ort, Datum, Unterschrift Erziehungsberechtigte/r" }] });
+    }
+    const reqTpls = s.consentTemplates.filter((t) => t.required);
+    if (l.includeConsents !== false && reqTpls.length) {
+      B.push({ art: "seite" });
+      B.push({ art: "h1c", runs: [{ t: "Sammel-Einverständniserklärung" }] });
+      B.push({ art: "subc", runs: [{ t: `www.skv-mueritz.de · Abteilung Volleyball · ${reqTpls.length} Pflicht-Erklärungen` }] });
+      B.push({ art: "h2box", runs: [{ t: "Angaben zu Spieler:in und Erziehungsberechtigten" }] });
+      const zeile = (label, val) => p(val ? [{ t: label + " " }, { t: val, b: true }] : [{ t: label + " ______________________________" }]);
+      zeile("Name, Vorname des Spielers:", pl2 ? `${pl2.lastName}, ${pl2.firstName}` : "");
+      zeile("Geburtsdatum:", pl2 && pl2.birthDate ? fmtDateShort(pl2.birthDate) : "");
+      zeile("Name der/des Erziehungsberechtigten:", parents);
+      zeile("E-Mail-Adresse:", bestEmail);
+      zeile("Mobilnummer:", bestPhone);
+      B.push({ art: "leer" });
+      p([{ t: "Hiermit erkläre ich mich mit den nachfolgend angekreuzten Punkten einverstanden:", b: true }]);
+      reqTpls.forEach((t, i) => {
+        B.push({ art: "sec", titel: `${i + 1}. ${t.name}`, text: t.text, ankreuz: true, runs: [] });
+      });
+      B.push({ art: "leer" });
+      p("Alle Einwilligungen sind freiwillig und können jederzeit mit Wirkung für die Zukunft schriftlich widerrufen werden. Die Daten werden ausschließlich für die Vereinsarbeit des SKV Müritz genutzt.");
+      B.push({ art: "linie", runs: [{ t: "Ort, Datum, Unterschrift Erziehungsberechtigte/r" }] });
+    }
+    return B;
+  }
+
+  // PDF vom Server holen und herunterladen bzw. übers Teilen-Menü (WhatsApp) weitergeben.
+  // waZiel (optional): {nummer, text} – Fallback ohne natives Teilen: PDF herunterladen
+  // und den WhatsApp-Chat mit der richtigen Nummer direkt öffnen.
+  async function pdfVomServer(name, blocks, teilen, fusszeile, waZiel) {
+    if (!window.Sync || !Sync.csrf) { toast("PDF-Erzeugung braucht den Server-Modus (Anmeldung)", "bad"); return; }
+    toast("PDF wird erstellt …");
+    let res;
+    try {
+      res = await fetch("/api/brief-pdf", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": Sync.csrf },
+        body: JSON.stringify({ filename: name, blocks, fusszeile: fusszeile || "" }),
+      });
+    } catch (e) { toast("Keine Verbindung zum Server", "bad"); return; }
+    if (res.status === 401) {
+      toast("Anmeldung abgelaufen – bitte Seite neu laden und anmelden, dann klappt das PDF wieder", "bad");
+      return;
+    }
+    if (!res.ok) { toast("PDF-Erzeugung fehlgeschlagen", "bad"); return; }
+    const blob = await res.blob();
+    // WhatsApp (iOS) scheitert beim Direktversand an Sonderzeichen im Dateinamen
+    // (Gedankenstrich, Umlaute, Leerzeichen) – daher ein technisch sicherer Name
+    const sicher = name
+      .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue")
+      .replace(/Ä/g, "Ae").replace(/Ö/g, "Oe").replace(/Ü/g, "Ue").replace(/ß/g, "ss")
+      .replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "dokument";
+    const datei = new File([blob], sicher + ".pdf", { type: "application/pdf" });
+    if (teilen && navigator.canShare && navigator.canShare({ files: [datei] })) {
+      try { await navigator.share({ files: [datei], title: name }); return; }
+      catch (e) { if (e && e.name === "AbortError") return; /* sonst: herunterladen */ }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name + ".pdf";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    if (teilen && waZiel && waZiel.nummer) {
+      window.open(`https://wa.me/${waZiel.nummer}?text=${encodeURIComponent(waZiel.text || "")}`, "_blank", "noopener");
+      toast("PDF heruntergeladen – WhatsApp-Chat ist geöffnet, bitte die Datei dort anhängen", "good");
+    } else if (teilen) {
+      toast("Teilen nicht verfügbar – PDF wurde heruntergeladen (in WhatsApp anhängen)", "good");
+    }
+  }
+
+  // WhatsApp-Zielnummer: wer zuerst kontaktiert werden soll und eine Nummer hat
+  // (Erziehungsberechtigte:r 1 → 2 → Spieler:in); Format für wa.me (49…)
+  function waNummerFuer(pl2) {
+    if (!pl2) return "";
+    const roh = [pl2.parentPhone, pl2.parent2Phone, pl2.playerPhone]
+      .map((n) => String(n || "").trim()).find(Boolean) || "";
+    let ziffern = roh.replace(/[^\d+]/g, "");
+    if (ziffern.startsWith("+")) ziffern = ziffern.slice(1);
+    else if (ziffern.startsWith("00")) ziffern = ziffern.slice(2);
+    else if (ziffern.startsWith("0")) ziffern = "49" + ziffern.slice(1);
+    // Schreibweise „+49 (0) 171 …": die eingeklammerte 0 nach dem Ländercode entfernen
+    if (ziffern.startsWith("490")) ziffern = "49" + ziffern.slice(3);
+    return ziffern;
+  }
+
+  function letterPdf(l, pl2, teilen) {
+    const name = pl2 ? `Elternbrief – ${pl2.firstName} ${pl2.lastName}` : `Elternbrief – ${l.title || "SKV Müritz"}`;
+    const waZiel = teilen && pl2 ? {
+      nummer: waNummerFuer(pl2),
+      text: `Hallo! Anbei der Elternbrief für ${pl2.firstName} vom SKV Müritz Volleyball – ` +
+        `die PDF-Datei hänge ich gleich hier an.${l.deadline ? ` Rückmeldung bitte bis ${fmtDateShort(l.deadline)}.` : ""}`,
+    } : null;
+    return pdfVomServer(name, letterPdfBlocks(l, pl2), teilen,
+      pl2 ? `${pl2.firstName} ${pl2.lastName}` : "", waZiel);
   }
 
   // Serienbrief: Spieler auswählen, ein personalisierter Brief pro Spieler
@@ -1559,19 +2593,21 @@
         <p class="soft" style="margin-top:0;font-size:.85rem">Ein personalisierter Brief pro Spieler: Anschrift,
         Rückmeldeabschnitt mit Name, Eltern, E-Mail und Mobilnummer werden automatisch ausgefüllt.
         Im Brieftext funktionieren die Platzhalter <code>{vorname}</code>, <code>{nachname}</code>, <code>{eltern}</code>.</p>
-        <p class="soft" style="font-size:.85rem">📄 <strong>Als PDF speichern:</strong> Der 📄-Knopf neben einem Spieler
-        öffnet dessen Einzelbrief – im Druckdialog „Als PDF sichern" wählen; der Dateiname ist dann automatisch
-        „Elternbrief – Name". Der große Knopf unten druckt alle ausgewählten Briefe in einem Dokument.</p>
+        <p class="soft" style="font-size:.85rem">Je Spieler: <strong>⬇️ PDF herunterladen</strong> (fertige Datei inkl.
+        vorausgefüllter Pflicht-Erklärungen), <strong>📤 Teilen</strong> (z. B. per WhatsApp an die Eltern schicken)
+        oder <strong>📄 Drucken</strong>. Der große Knopf unten druckt alle ausgewählten Briefe in einem Dokument.</p>
         <div class="field mb"><label>Abteilung</label><select id="slDept">
           <option value="">alle Abteilungen</option>
           ${s.departments.map((d) => `<option value="${d.id}">${esc(d.name)}</option>`).join("")}</select></div>
         <div class="list" id="slList" style="max-height:300px;overflow-y:auto">
           ${active.map((p) => `
-            <label class="list-item" data-dept="${esc(p.departmentId || "")}" style="cursor:pointer;padding:8px 10px">
+            <label class="list-item" data-dept="${esc(playerDeptIds(p).join(","))}" style="cursor:pointer;padding:8px 10px">
               <input type="checkbox" data-slp="${p.id}" checked style="width:auto">
               <div class="grow"><div class="title" style="font-size:.88rem">${esc(p.firstName)} ${esc(p.lastName)}</div>
-              <div class="sub">${esc(deptName(p.departmentId))} · ${esc(p.parentName || "ohne Elternkontakt")}</div></div>
-              <button type="button" class="btn sm ghost" data-slone="${p.id}" title="Einzelbrief drucken / als PDF sichern">📄</button>
+              <div class="sub">${esc(playerDeptNames(p))} · ${esc(p.parentName || "ohne Elternkontakt")}</div></div>
+              <button type="button" class="btn sm ghost" data-slpdf="${p.id}" title="PDF herunterladen">⬇️</button>
+              <button type="button" class="btn sm ghost" data-slshare="${p.id}" title="PDF teilen (z. B. WhatsApp)">📤</button>
+              <button type="button" class="btn sm ghost" data-slone="${p.id}" title="Einzelbrief drucken">📄</button>
             </label>`).join("")}
         </div>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>🖨️ Serienbrief drucken</button>`,
@@ -1582,10 +2618,18 @@
           const p = Store.byId("players", b.dataset.slone);
           printParentLetter(l, [p], `Elternbrief – ${p.firstName} ${p.lastName}`);
         });
+        m.querySelectorAll("[data-slpdf]").forEach((b) => b.onclick = (ev2) => {
+          ev2.preventDefault(); ev2.stopPropagation();
+          letterPdf(l, Store.byId("players", b.dataset.slpdf), false);
+        });
+        m.querySelectorAll("[data-slshare]").forEach((b) => b.onclick = (ev2) => {
+          ev2.preventDefault(); ev2.stopPropagation();
+          letterPdf(l, Store.byId("players", b.dataset.slshare), true);
+        });
         m.querySelector("#slDept").onchange = (ev) => {
           const dep = ev.target.value;
           m.querySelectorAll("#slList label").forEach((row) => {
-            const match = !dep || row.dataset.dept === dep;
+            const match = !dep || row.dataset.dept.split(",").includes(dep);
             row.style.display = match ? "" : "none";
             row.querySelector("input").checked = match;
           });
@@ -1667,6 +2711,7 @@
           ${s.consentTemplates.map((t) => `<option>${esc(t.name)}</option>`).join("")}
           <option>Sonstige</option></select></div>
         <div class="field"><label>Unterschrieben von</label><input name="signedBy" placeholder="Name Elternteil"></div>
+        <div class="field"><label>Datum der Erklärung</label><input type="date" name="datum" value="${new Date().toISOString().slice(0, 10)}" required></div>
         <div class="field full"><label>Datei (PDF/Bild)</label>
           <label class="file-drop" id="fd">📎 Klicken zum Auswählen<div class="sub" id="fdname"></div>
           <input type="file" name="file" accept="application/pdf,image/*" hidden></label></div>
@@ -1687,7 +2732,8 @@
           const d = formData(m.querySelector("#cf"));
           if (!fileName && !d.signedBy) { toast("Bitte Datei oder Unterschrift angeben", "bad"); return; }
           Store.add("consents", { playerId: d.playerId, type: d.type, signedBy: d.signedBy || "—",
-            fileName: fileName || "manuell_erfasst.txt", dataUrl, uploadedAt: new Date().toISOString() });
+            fileName: fileName || "manuell_erfasst.txt", dataUrl,
+            uploadedAt: d.datum ? d.datum + "T12:00:00" : new Date().toISOString() });
           Store.update("players", d.playerId, { consentOnFile: true });
           closeModal(); toast("Einverständnis abgelegt", "good"); reload();
         };
@@ -1729,13 +2775,13 @@
       ${head("Geburtstagsliste", "Damit kein Geburtstag im Team vergessen wird")}
       ${soon.length ? `<div class="card mb"><div class="card-head"><h3>🎉 Die nächsten 30 Tage</h3></div>
         <div class="grid grid-4">${soon.map((p) => `
-          <div class="list-item">${avatar(p.firstName, p.lastName)}
+          <div class="list-item">${avatar(p.firstName, p.lastName, p)}
             <div class="grow"><div class="title">${esc(p.firstName)} ${esc(p.lastName)}</div>
             <div class="sub">${p.inDays === 0 ? "🎂 heute!" : fmtDateShort(p.next)} · wird ${p.turns}</div></div></div>`).join("")}</div></div>` : ""}
       <div class="card" style="padding:0"><div class="table-wrap"><table>
         <thead><tr><th>Spieler</th><th>Geburtstag</th><th>Alter</th><th>Nächster</th><th>In Tagen</th></tr></thead>
         <tbody>${all.map((p) => `<tr>
-          <td><div class="flex">${avatar(p.firstName, p.lastName)}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong></div></td>
+          <td><div class="flex">${avatar(p.firstName, p.lastName, p)}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong></div></td>
           <td>${fmtDateShort(p.birthDate)}</td>
           <td>${age(p.birthDate)} Jahre</td>
           <td>${DOW[new Date(p.next).getDay()]}, ${fmtDateShort(p.next)}</td>
@@ -1838,14 +2884,22 @@
       <div class="grid grid-3 mb">
         ${s.clothing.map((c) => `
           <div class="card product">
-            <div class="img">${clothingSVG(c.kind, c.color)}</div>
+            <div class="img">${c.bild ? `<img src="${c.bild}" alt="${esc(c.name)}" style="width:100%;height:100%;object-fit:cover;border-radius:10px">` : clothingSVG(c.kind, c.color)}</div>
             <div class="body">
               <div class="flex"><strong>${esc(c.name)}</strong><span class="spacer"></span><span class="price">${fmtMoney(c.price)}</span></div>
               <p class="soft" style="font-size:.85rem;margin:0">${esc(c.description)}</p>
               <div class="chip-row" style="gap:5px">${c.sizes.map((sz) => `<span class="badge">${esc(sz)}</span>`).join("")}</div>
-              <button class="btn sm mt" data-req="${c.id}">🛒 Anfordern</button>
+              <div class="flex mt" style="gap:6px">
+                <button class="btn sm" data-req="${c.id}">🛒 Anfordern</button>
+                <button class="btn sm ghost" data-bildup="${c.id}" title="Produktfoto hochladen (nur Trainerteam)">📷 ${c.bild ? "Bild ändern" : "Bild"}</button>
+                ${c.bild ? `<button class="btn sm ghost" data-bildweg="${c.id}" title="Bild entfernen">🗑️</button>` : ""}
+              </div>
             </div></div>`).join("")}
       </div>
+      <input type="file" id="clothBildDatei" accept="image/*" hidden>
+      <p class="muted" style="font-size:.78rem;margin:0 0 14px">ℹ️ Vereinskleidung – insbesondere Trikots – bleibt Eigentum
+      des Vereins: Ein Trikot darf nur so lange behalten werden, wie aktiv gespielt wird; danach bitte ans Trainerteam zurückgeben.
+      Dieser Hinweis steht auch im Portal.</p>
 
       <div class="card"><div class="card-head"><h3>📦 Bestellungen & Anforderungen</h3></div>
         <div class="table-wrap"><table>
@@ -1864,6 +2918,34 @@
 
     $$("[data-req]", el).forEach((b) => b.onclick = () => clothingRequestForm(b.dataset.req));
     $("[data-add]", el).onclick = () => clothingItemForm();
+    // Produktfotos: nur hier in der Trainer-Ansicht hochladbar (Portal zeigt sie nur an)
+    const bildDatei = $("#clothBildDatei", el);
+    $$("[data-bildup]", el).forEach((b) => b.onclick = () => {
+      bildDatei.dataset.ziel = b.dataset.bildup;
+      bildDatei.click();
+    });
+    bildDatei.onchange = () => {
+      const datei = bildDatei.files && bildDatei.files[0];
+      if (!datei || !datei.type.startsWith("image/")) return;
+      const bild = new Image();
+      const url = URL.createObjectURL(datei);
+      bild.onload = () => {
+        const faktor = Math.min(1, 800 / Math.max(bild.width, bild.height));
+        const c = document.createElement("canvas");
+        c.width = Math.round(bild.width * faktor); c.height = Math.round(bild.height * faktor);
+        c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        const dataUrl = c.toDataURL("image/jpeg", 0.8);
+        if (dataUrl.length > 400000) { toast("Bild ist auch verkleinert noch zu groß", "bad"); return; }
+        Store.update("clothing", bildDatei.dataset.ziel, { bild: dataUrl });
+        toast("Produktfoto gespeichert", "good"); reload();
+      };
+      bild.onerror = () => toast("Bild konnte nicht gelesen werden", "bad");
+      bild.src = url;
+    };
+    $$("[data-bildweg]", el).forEach((b) => b.onclick = () => confirmDialog("Produktfoto entfernen?", () => {
+      Store.update("clothing", b.dataset.bildweg, { bild: "" }); toast("Bild entfernt"); reload();
+    }));
     $$(".rstat", el).forEach((s2) => s2.onchange = () => { Store.update("clothingRequests", s2.dataset.r, { status: s2.value }); toast("Status aktualisiert"); reload(); });
     $$("[data-rdel]", el).forEach((b) => b.onclick = () => confirmDialog("Anforderung löschen?", () => { Store.remove("clothingRequests", b.dataset.rdel); toast("Gelöscht"); reload(); }));
   }
@@ -2000,17 +3082,27 @@
 
       <div class="grid cols-wide">
         <div class="card" style="padding:0">
-          <div class="card-head" style="padding:18px 18px 0"><h3>📊 Tabelle Verbandsliga MV</h3></div>
+          <div class="card-head" style="padding:18px 18px 0"><h3>📊 Tabelle Verbandsliga MV</h3><span class="spacer"></span>
+            <button class="btn sm" data-stadd>＋ Team</button></div>
           <div class="table-wrap"><table>
-            <thead><tr><th>#</th><th>Team</th><th>Sp.</th><th>S</th><th>N</th><th>Sätze</th><th class="right">Pkt.</th></tr></thead>
+            <thead><tr><th>#</th><th>Team</th><th>Sp.</th><th>S</th><th>N</th><th>Sätze</th><th class="right">Pkt.</th><th></th></tr></thead>
             <tbody>${rows.map((r, i) => `<tr style="${/skv/i.test(r.team) ? "background:color-mix(in srgb,var(--accent) 10%,transparent)" : ""}">
               <td><strong>${i + 1}</strong></td>
               <td>${/skv/i.test(r.team) ? "🏐 " : ""}<strong>${esc(r.team)}</strong></td>
               <td>${r.games}</td><td>${r.win}</td><td>${r.loss}</td>
               <td class="soft">${r.setsW}:${r.setsL}</td>
-              <td class="right"><strong>${r.points}</strong></td></tr>`).join("")}</tbody>
+              <td class="right"><strong>${r.points}</strong></td>
+              <td class="right" style="white-space:nowrap">
+                <button class="btn sm ghost" data-stedit="${r.id}" title="Bearbeiten">✏️</button>
+                <button class="btn sm ghost" data-stdel="${r.id}" title="Löschen">🗑️</button></td></tr>`).join("") ||
+              `<tr><td colspan="8" class="soft" style="padding:16px 18px">Noch keine Tabelle erfasst – über „＋ Team" die Mannschaften anlegen und nach jedem Spieltag kurz aktualisieren. Die Tabelle erscheint auch im Spieler-/Eltern-Portal.</td></tr>`}</tbody>
           </table></div>
-          <p class="muted" style="padding:12px 18px;font-size:.78rem">Beispieldaten – für Live-Stände bitte den offiziellen SAMS-Spielbetrieb des VVMV verlinken.</p>
+          <p class="muted" style="padding:12px 18px;font-size:.78rem">Die Tabelle wird auch im Spieler-/Eltern-Portal angezeigt.
+          ${(S().standingsMeta && S().standingsMeta.stand)
+            ? `🔄 Automatischer Abgleich mit dem VMV-Spielbetrieb: <strong>${esc(S().standingsMeta.liga || "")}</strong>,
+               Saison ${esc(S().standingsMeta.saison || "")}, Stand ${fmtDateShort(S().standingsMeta.stand)}.
+               Handänderungen werden beim nächsten Abgleich (täglich 6:05) überschrieben.`
+            : `Offizielle Tabellen: <a href="https://www.vmv24.de/" target="_blank" rel="noopener">VMV-Spielbetrieb (vmv24.de) ↗</a>`}</p>
         </div>
 
         <div class="card">
@@ -2020,70 +3112,243 @@
         </div>
       </div>`;
     bindLinkActions(el);
+    $("[data-stadd]", el).onclick = () => standingForm();
+    $$("[data-stedit]", el).forEach((b) => b.onclick = () => standingForm(Store.byId("standings", b.dataset.stedit)));
+    $$("[data-stdel]", el).forEach((b) => b.onclick = () => {
+      const r = Store.byId("standings", b.dataset.stdel);
+      confirmDialog(`Team „${esc(r.team)}“ aus der Tabelle löschen?`, () => {
+        Store.remove("standings", r.id); toast("Team gelöscht"); reload();
+      });
+    });
+  }
+
+  // Tabellenzeile anlegen/bearbeiten (Pflege nach jedem Spieltag)
+  function standingForm(r) {
+    const isEdit = !!r;
+    r = r || { team: "", games: 0, win: 0, loss: 0, setsW: 0, setsL: 0, points: 0 };
+    const zahl = (name, label, val) => `<div class="field"><label>${label}</label>
+      <input type="number" name="${name}" value="${val}" min="0" max="999" required></div>`;
+    modal({
+      title: isEdit ? `Team bearbeiten – ${esc(r.team)}` : "Team in die Tabelle aufnehmen",
+      body: `<form id="stf"><div class="form-grid">
+        <div class="field full"><label>Team</label><input name="team" value="${esc(r.team)}" required placeholder="z. B. SKV Müritz"></div>
+        ${zahl("games", "Spiele", r.games)}${zahl("points", "Punkte", r.points)}
+        ${zahl("win", "Siege", r.win)}${zahl("loss", "Niederlagen", r.loss)}
+        ${zahl("setsW", "Sätze gewonnen", r.setsW)}${zahl("setsL", "Sätze verloren", r.setsL)}
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#stf"); if (!f.reportValidity()) return;
+          const d = formData(f);
+          const werte = { team: d.team, games: +d.games || 0, win: +d.win || 0, loss: +d.loss || 0,
+                          setsW: +d.setsW || 0, setsL: +d.setsL || 0, points: +d.points || 0 };
+          if (isEdit) Store.update("standings", r.id, werte);
+          else Store.add("standings", werte);
+          closeModal(); toast("Tabelle gespeichert", "good"); reload();
+        };
+      },
+    });
   }
 
   /* ======================================================================
      WIKI (Volleyball erklärt)
      ====================================================================== */
-  function wiki(el) {
-    const articles = [
+  // Wiki-Artikel: werden auch im Spieler-/Eltern-Portal gezeigt (portal.js,
+  // ohne den Trainer-Artikel) – daher außerhalb der View definiert.
+  const WIKI_ARTIKEL = [
       { id: "grundlagen", h: "🏐 Grundlagen & Ziel des Spiels", html: `
-        <p>Volleyball wird von zwei Teams zu je sechs Spieler über ein Netz gespielt. Ziel ist es, den Ball so über das Netz ins gegnerische Feld zu spielen, dass ihn die Gegnerinnen nicht regelkonform zurückspielen können. Ein Team darf den Ball maximal <strong>dreimal</strong> berühren (plus möglicher Block), bevor er über das Netz muss.</p>
-        <ul><li>Feldgröße: 18 × 9 Meter, geteilt durch das Netz.</li>
-        <li>Netzhöhe: 2,24 m (Damen) bzw. 2,43 m (Herren).</li>
+        <p>Volleyball wird von zwei Teams zu je sechs Spieler:innen über ein Netz gespielt. Ziel ist es, den Ball so über das Netz ins gegnerische Feld zu spielen, dass ihn das andere Team nicht regelkonform zurückspielen kann. Ein Team darf den Ball maximal <strong>dreimal</strong> berühren (plus möglicher Block), bevor er über das Netz muss.</p>
+        <ul><li>Feldgröße: 18 × 9 Meter, geteilt durch das Netz. Die <strong>Angriffslinie</strong> (3-m-Linie) trennt Vorder- und Hinterzone.</li>
+        <li>Netzhöhe: 2,24 m (Frauen) bzw. 2,43 m (Männer); in der Jugend niedriger.</li>
         <li>Ein Satz wird bis <strong>25 Punkte</strong> gespielt (mind. 2 Punkte Vorsprung).</li>
-        <li>Gewonnen hat, wer zuerst <strong>3 Sätze</strong> gewinnt (Tie-Break bis 15).</li></ul>` },
-      { id: "zaehlweise", h: "🔢 Zählweise (Rally-Point-System)", html: `
-        <p>Es gilt das Rally-Point-System: <strong>Jeder Ballwechsel</strong> bringt einen Punkt – egal welches Team aufgeschlagen hat. Gewinnt das annehmende Team den Ballwechsel, erhält es den Punkt <em>und</em> das Aufschlagrecht (Seitenwechsel der Aufschlagreihe → „Rotation").</p>` },
-      { id: "positionen", h: "📍 Positionen & Rotation", html: `
-        <p>Auf dem Feld stehen sechs Positionen. Nach Gewinn des Aufschlagrechts rotieren alle im Uhrzeigersinn um eine Position.</p>
+        <li>Gewonnen hat, wer zuerst <strong>3 Sätze</strong> gewinnt (Tie-Break bis 15).</li>
+        <li>Der Ball darf mit <strong>jedem Körperteil</strong> gespielt werden – auch mit dem Fuß!</li></ul>` },
+      { id: "geschichte", h: "📜 Geschichte des Volleyballs", html: `
+        <p>Volleyball wurde <strong>1895</strong> vom US-Amerikaner William G. Morgan erfunden – als sanftere Alternative zum Basketball. Der ursprüngliche Name war „Mintonette“. Weil der Ball ständig hin- und herfliegt („to volley“), setzte sich schnell der Name Volleyball durch.</p>
         <ul>
-        <li><strong>Zuspiel (Steller):</strong> organisiert den Angriff, spielt den zweiten Ball.</li>
-        <li><strong>Außenangriff (Annahme/Außen):</strong> Hauptangriff über Position 4, stark in der Annahme.</li>
-        <li><strong>Mittelblocker (Mitte):</strong> blockt in der Mitte, schnelle Angriffe.</li>
-        <li><strong>Diagonal:</strong> Hauptangreiferin gegenüber dem Zuspiel.</li>
-        <li><strong>Libero:</strong> Abwehrspezialistin (anderes Trikot), darf nicht angreifen/aufschlagen im Vorderfeld.</li></ul>` },
+        <li><strong>1947:</strong> Gründung des Weltverbands FIVB.</li>
+        <li><strong>1964:</strong> Volleyball wird olympisch (Tokio).</li>
+        <li><strong>1996:</strong> Beachvolleyball wird olympisch (Atlanta).</li>
+        <li><strong>1998:</strong> Einführung des Rally-Point-Systems und des Liberos – das Spiel wird schneller und spannender.</li>
+        <li>Heute ist Volleyball mit über <strong>800 Millionen</strong> Aktiven eine der größten Sportarten der Welt.</li></ul>` },
+      { id: "zaehlweise", h: "🔢 Zählweise (Rally-Point-System)", html: `
+        <p>Es gilt das Rally-Point-System: <strong>Jeder Ballwechsel</strong> bringt einen Punkt – egal welches Team aufgeschlagen hat. Gewinnt das annehmende Team den Ballwechsel, erhält es den Punkt <em>und</em> das Aufschlagrecht – alle Spieler:innen rotieren dann im Uhrzeigersinn eine Position weiter.</p>
+        <ul>
+        <li>Sätze 1–4 gehen bis <strong>25 Punkte</strong>, der Entscheidungssatz (Tie-Break) bis <strong>15</strong>.</li>
+        <li>Immer mit <strong>2 Punkten Vorsprung</strong> – ein Satz kann also auch 31:29 enden.</li>
+        <li>Im Tie-Break werden bei 8 Punkten die Seiten gewechselt.</li>
+        <li>Je Satz hat jedes Team <strong>2 Auszeiten</strong> (30 Sekunden).</li></ul>` },
+      { id: "positionen", h: "📍 Positionen & Rotation", html: `
+        <p>Auf dem Feld stehen sechs Positionen, nummeriert 1 (hinten rechts) bis 6 (hinten Mitte) – gegen den Uhrzeigersinn. Nach Gewinn des Aufschlagrechts rotieren alle im Uhrzeigersinn um eine Position.</p>
+        <ul>
+        <li><strong>Zuspieler:in (Steller:in):</strong> das „Gehirn“ des Teams – organisiert den Angriff und spielt fast immer den zweiten Ball.</li>
+        <li><strong>Außenangreifer:in (Annahme/Außen):</strong> greift über Position 4 an und trägt die Annahme mit.</li>
+        <li><strong>Mittelblocker:in:</strong> blockt in der Mitte und schlägt schnelle Bälle („Quick“).</li>
+        <li><strong>Diagonalangreifer:in:</strong> Hauptangreifer:in gegenüber dem Zuspiel, meist ohne Annahmeaufgaben.</li>
+        <li><strong>Libero / Libera:</strong> Abwehrspezialist:in im andersfarbigen Trikot – darf nicht aufschlagen, blocken oder vorne angreifen.</li></ul>
+        <p>Wichtig: Die Aufstellung muss nur <strong>im Moment des Aufschlags</strong> stimmen – danach dürfen alle frei laufen.</p>` },
+      { id: "spielsysteme", h: "🧩 Spielsysteme: 5-1, 4-2 & 6-2", html: `
+        <p>Das Spielsystem beschreibt, wie viele Angreifer:innen und Zuspieler:innen ein Team einsetzt:</p>
+        <ul>
+        <li><strong>4-2 (Einsteiger:innen):</strong> vier Angreifer:innen, zwei Zuspieler:innen – es stellt immer die Person, die gerade vorne steht. Einfach zu lernen, ideal für Jugendteams.</li>
+        <li><strong>6-2:</strong> zwei Zuspieler:innen, die aber nur aus dem Hinterfeld stellen – so stehen vorne immer drei Angreifer:innen. Braucht viel Laufarbeit.</li>
+        <li><strong>5-1 (Standard im Leistungsbereich):</strong> genau ein:e Zuspieler:in stellt jeden Ball – maximale Abstimmung, aber in drei Rotationen nur zwei Angreifer:innen vorne.</li></ul>
+        <p>Der „Läufer“ beschreibt dabei, wie sich der:die Zuspieler:in nach dem Aufschlag aus der Annahme-Position zum Netz bewegt (z. B. „Läufer 1“ von Position 1).</p>` },
       { id: "techniken", h: "🖐️ Grundtechniken", html: `
         <ul>
-        <li><strong>Pritschen (oberes Zuspiel):</strong> Ball wird mit den Fingerspitzen über dem Kopf gespielt – Basis des Zuspiels.</li>
-        <li><strong>Baggern (unteres Zuspiel):</strong> Ball wird mit den gestreckten Unterarmen angenommen – für Aufschlagannahme und Abwehr.</li>
-        <li><strong>Aufschlag (Service):</strong> von unten (Kinder/Anfänger) oder von oben (Tennisaufschlag, Sprungaufschlag).</li>
-        <li><strong>Angriff (Schmetterschlag):</strong> Anlauf, Absprung, Schlag über das Netz.</li>
-        <li><strong>Block:</strong> Sprung an der Netzkante, um den Angriff abzuwehren.</li></ul>` },
+        <li><strong>Pritschen (oberes Zuspiel):</strong> Ball wird mit den Fingerspitzen über der Stirn gespielt – Körbchenstellung, Beine mitarbeiten lassen. Basis des Zuspiels.</li>
+        <li><strong>Baggern (unteres Zuspiel):</strong> Ball auf den gestreckten Unterarmen („Spielbrett“) annehmen – für Aufschlagannahme und Feldabwehr. Tiefe Position, Schultern vor.</li>
+        <li><strong>Aufschlag (Service):</strong> von unten (Einstieg) oder von oben (Tennis-, Flatter- oder Sprungaufschlag).</li>
+        <li><strong>Angriff (Schmetterschlag):</strong> Stemmschritt-Anlauf (links-rechts-links für Rechtshänder:innen), beidbeiniger Absprung, Schlag mit gestrecktem Arm über dem Kopf.</li>
+        <li><strong>Block:</strong> Sprung dicht an der Netzkante, Hände aktiv über das Netz schieben, Finger gespreizt.</li>
+        <li><strong>Hechtbagger / Rolle:</strong> Abwehrtechniken für weite Bälle – kontrolliert fallen lernen gehört zum Training.</li></ul>` },
+      { id: "aufschlag", h: "🎾 Aufschlagarten im Detail", html: `
+        <ul>
+        <li><strong>Aufschlag von unten:</strong> sicher und einfach – der Einstieg für alle. Ball auf der flachen Hand, mit der Faust oder Handfläche treffen.</li>
+        <li><strong>Tennisaufschlag:</strong> von oben mit Effet (Topspin) – der Ball fällt hinter dem Netz nach unten.</li>
+        <li><strong>Flatteraufschlag (Float):</strong> ohne Rotation getroffen – der Ball „flattert“ unberechenbar. Sehr effektiv, weil die Annahme die Flugbahn schwer lesen kann.</li>
+        <li><strong>Sprungaufschlag (Jump Serve):</strong> Anwurf + Angriffsanlauf – der härteste Aufschlag, aber auch der riskanteste.</li>
+        <li><strong>Sprungflatterer (Jump Float):</strong> Kompromiss aus Druck und Sicherheit – im modernen Volleyball am weitesten verbreitet.</li></ul>
+        <p>Taktik-Tipp: Gezielt auf die schwächste Annahme oder in die „Naht“ zwischen zwei Spieler:innen aufschlagen!</p>` },
+      { id: "angriff", h: "💥 Angriffsvarianten", html: `
+        <ul>
+        <li><strong>Hoher Ball außen („Vier“):</strong> der Klassiker über die Außenposition.</li>
+        <li><strong>Quick / Schnellangriff („Eins“):</strong> der:die Mittelblocker:in springt, bevor der Ball gestellt ist – kaum zu blocken, braucht perfektes Timing.</li>
+        <li><strong>Pipe:</strong> Hinterfeldangriff durch die Mitte – Absprung hinter der 3-m-Linie.</li>
+        <li><strong>Diagonal-Angriff („Fünf“):</strong> hoher Ball auf Position 2 für den:die Diagonalangreifer:in.</li>
+        <li><strong>Lob / Finte:</strong> angetäuschter Schlag, der Ball wird kurz hinter den Block gelegt – oft der klügste Punkt.</li>
+        <li><strong>Wischer (Tool):</strong> bewusst gegen die Blockhände schlagen, sodass der Ball ins Aus abprallt – Punkt fürs angreifende Team.</li></ul>` },
+      { id: "blockabwehr", h: "🧱 Block & Feldabwehr", html: `
+        <p>Verteidigung beginnt am Netz: Der Block nimmt dem Angriff Raum weg, die Feldabwehr sichert den Rest.</p>
+        <ul>
+        <li><strong>Einerblock / Doppelblock / Dreierblock:</strong> je mehr Hände am Netz, desto kleiner das Angriffsfenster – ein Doppelblock ist das Standardziel.</li>
+        <li><strong>Blockschatten:</strong> der Bereich hinter dem Block, in den kein harter Ball kommen kann – die Feldabwehr stellt sich <em>daneben</em> auf.</li>
+        <li><strong>Abwehrsysteme:</strong> „6 vorne“ (Position 6 sichert kurze Bälle hinter dem Block) oder „6 hinten“ (Standard: Position 6 sichert die Grundlinie).</li>
+        <li><strong>Der Block zählt nicht</strong> als eine der drei Berührungen – nach Blockkontakt darf dieselbe Person sofort weiterspielen.</li></ul>` },
+      { id: "libero", h: "🦺 Libero: Sonderregeln", html: `
+        <p>Der:die Libero:Libera ist Spezialist:in für Annahme und Feldabwehr – erkennbar am andersfarbigen Trikot.</p>
+        <ul>
+        <li>Darf <strong>nicht aufschlagen</strong>, <strong>nicht blocken</strong> und keinen Angriffsschlag oberhalb der Netzkante ausführen.</li>
+        <li>Wechselt <strong>ohne offizielle Auswechslung</strong> für eine:n Hinterfeldspieler:in ein und aus (meist für die Mitte).</li>
+        <li>Stellt der:die Libero:Libera den Ball in der Vorderzone <em>im oberen Zuspiel</em>, darf der folgende Angriff nicht oberhalb der Netzkante geschlagen werden.</li>
+        <li>Ein Team darf pro Spiel bis zu <strong>zwei Liberos</strong> benennen.</li></ul>` },
       { id: "regeln", h: "⚖️ Wichtige Regeln & typische Fehler", html: `
         <ul>
         <li><strong>Vierschlag:</strong> Ball mehr als dreimal berührt (Block zählt nicht mit).</li>
-        <li><strong>Doppelberührung:</strong> zweimal hintereinander durch dieselbe Spieler (außer beim Block).</li>
-        <li><strong>Netzberührung</strong> im Spielgeschehen ist ein Fehler.</li>
-        <li><strong>Übertreten der Mittellinie</strong> mit dem ganzen Fuß.</li>
-        <li><strong>Rotationsfehler:</strong> falsche Position beim Aufschlag.</li>
-        <li><strong>Fußfehler</strong> beim Aufschlag (Übertreten der Grundlinie).</li></ul>` },
-      { id: "training", h: "🎯 Trainingsaufbau (für Trainer)", html: `
+        <li><strong>Doppelberührung:</strong> zweimal hintereinander durch dieselbe Person (außer nach Block und beim ersten Schlag in einer Aktion).</li>
+        <li><strong>Netzberührung</strong> zwischen den Antennen während der Spielaktion ist ein Fehler – Haare zählen nicht.</li>
+        <li><strong>Übertreten der Mittellinie</strong> mit dem ganzen Fuß (Teilberührung der Linie ist ok, solange niemand behindert wird).</li>
+        <li><strong>Rotations-/Positionsfehler:</strong> falsche Aufstellung im Moment des Aufschlags.</li>
+        <li><strong>Fußfehler</strong> beim Aufschlag (Grundlinie berührt) – dafür gibt es <strong>8 Sekunden</strong> Zeit nach dem Pfiff.</li>
+        <li><strong>Gegnerischen Aufschlag</strong> blocken oder direkt oberhalb der Netzkante angreifen ist verboten.</li>
+        <li>Der Ball ist erst „aus“, wenn er den Boden, die Antenne oder ein Objekt außerhalb berührt – <strong>die Linie zählt zum Feld</strong>.</li></ul>` },
+      { id: "schiedsrichter", h: "🧑‍⚖️ Schiedsrichter:innen & Handzeichen", html: `
+        <p>Ein Spiel leiten der:die 1. Schiedsrichter:in (auf dem Stuhl am Netz), der:die 2. Schiedsrichter:in (gegenüber), das Schreiberteam und die Linienrichter:innen.</p>
+        <ul>
+        <li><strong>Aufschlagfreigabe:</strong> Pfiff + Arm zeigt zur aufschlagenden Seite.</li>
+        <li><strong>Ball „in“:</strong> Arm zeigt flach auf das Feld. <strong>Ball „aus“:</strong> Unterarme senkrecht hoch, Handflächen zum Körper.</li>
+        <li><strong>Vier Berührungen:</strong> vier gespreizte Finger. <strong>Doppelberührung:</strong> zwei Finger.</li>
+        <li><strong>Netzberührung:</strong> Hand tippt auf die Netzoberkante der fehlbaren Seite.</li>
+        <li><strong>Auszeit:</strong> Hände formen ein T.</li></ul>
+        <p>Respekt gehört dazu: Nur der:die Spielkapitän:in darf Entscheidungen (höflich!) hinterfragen.</p>` },
+      { id: "beach", h: "🏖️ Beachvolleyball: die Unterschiede", html: `
+        <ul>
+        <li><strong>2 gegen 2</strong> auf 16 × 8 m Sand – ohne Positionswechsel-Zwang und ohne Libero.</li>
+        <li>Sätze bis <strong>21</strong> (Tie-Break bis 15), gespielt wird auf zwei Gewinnsätze; Seitenwechsel alle 7 Punkte.</li>
+        <li>Der Block <strong>zählt als erste Berührung</strong> – danach sind nur noch zwei Kontakte erlaubt.</li>
+        <li>Pritschen wird deutlich strenger bewertet, ein angepritschter Ball über das Netz muss senkrecht zur Schulterachse fliegen.</li>
+        <li>Kein festes Zuspiel: Beide müssen alles können – deshalb ist Beach im Sommer das perfekte Ergänzungstraining!</li></ul>` },
+      { id: "ausruestung", h: "🎽 Ausrüstung & Kleidung", html: `
+        <ul>
+        <li><strong>Hallenschuhe</strong> mit heller Sohle und gutem Seitenhalt – Laufschuhe sind ungeeignet und in vielen Hallen verboten.</li>
+        <li><strong>Knieschoner:</strong> Pflicht fürs Abwehrtraining – schützen beim Hechten und Rutschen.</li>
+        <li><strong>Ball:</strong> Größe 5, 260–280 g; für die Jugend gibt es leichtere Bälle.</li>
+        <li>Schmuck und Uhren bleiben in der Tasche – Verletzungsgefahr für alle.</li>
+        <li>Trikot: Bitte behandelt eure Vereinstrikots gut – sie gehören dem Verein und werden nur an aktive Spieler:innen ausgegeben.</li></ul>` },
+      { id: "fitness", h: "💪 Fitness & Ernährung", html: `
+        <p>Volleyball verlangt Sprungkraft, Schnelligkeit und Rumpfstabilität. Wer regelmäßig ein paar Basics macht, spielt besser und verletzt sich seltener:</p>
+        <ul>
+        <li><strong>Sprungkraft:</strong> Ausfallschritte, Kniebeugen, Seilspringen – 2 × pro Woche 10 Minuten wirken schon.</li>
+        <li><strong>Rumpf:</strong> Planks und Seitstütz stabilisieren Schlag und Landung.</li>
+        <li><strong>Schultern:</strong> vor dem Training mit Theraband aufwärmen – die Schlagschulter dankt es.</li>
+        <li><strong>Essen & Trinken:</strong> 2–3 Stunden vor dem Spiel die letzte große Mahlzeit; Wasser statt Energydrinks; nach dem Sport hilft Eiweiß + Kohlenhydrate bei der Erholung.</li>
+        <li><strong>Schlaf</strong> ist das beste Regenerationsmittel – vor Spieltagen 8+ Stunden.</li></ul>` },
+      { id: "ligen", h: "🏆 Ligasystem: Deutschland & MV", html: `
+        <p>So geht es von der Kreisliga bis ganz nach oben:</p>
+        <ul>
+        <li><strong>Bundesliga</strong> (1. & 2., bundesweit) → <strong>Dritte Liga</strong> → <strong>Regionalliga Nordost</strong> → <strong>Oberliga</strong> → dann die Ebene des Landesverbands.</li>
+        <li>In Mecklenburg-Vorpommern organisiert der <strong>Volleyballverband M-V (VMV)</strong> den Spielbetrieb: Verbandsliga → Landesliga → Landesklasse, dazu Pokal- und Jugendwettbewerbe.</li>
+        <li>Unsere SKV-Teams spielen in der Verbandsliga und den Landesligen – die aktuellen Tabellen findest du hier in der App unter „Tabelle“.</li>
+        <li>Gespielt wird meist an <strong>Spieltagen mit mehreren Teams</strong> in einer Halle – deshalb sind Heimspieltage mit Buffet und Auf-/Abbau echte Teamarbeit!</li></ul>` },
+      { id: "training", h: "🎯 Trainingsaufbau (für Trainer:innen)", html: `
         <p>Ein ausgewogenes Jugendtraining kombiniert Technik, Spielformen und Athletik:</p>
         <ul>
         <li><strong>Aufwärmen (15 min):</strong> Lauf-ABC, Ballgewöhnung, Mobilisation.</li>
         <li><strong>Technikblock (25 min):</strong> Fokus auf 1–2 Techniken, viele Wiederholungen.</li>
         <li><strong>Spielformen (30 min):</strong> Kleinfeld 2:2/3:3, Situationsspiele.</li>
         <li><strong>Abschlussspiel (15 min):</strong> 6:6 mit Aufgabenstellung.</li>
-        <li><strong>Cool-down (5 min):</strong> Dehnen, Feedback, Ausblick.</li></ul>` },
+        <li><strong>Cool-down (5 min):</strong> Dehnen, Feedback, Ausblick.</li></ul>
+        <p>Fertige Bausteine samt Quellen gibt es unter „Trainingsrückmeldung und Planung“ – dort lässt sich mit wenigen Klicks ein komplettes Training zusammenstellen.</p>` },
       { id: "begriffe", h: "📖 Glossar", html: `
         <dl class="kv">
         <dt>Ass</dt><dd>Direkter Punkt durch den Aufschlag.</dd>
-        <dt>Block</dt><dd>Abwehr des gegnerischen Angriffs am Netz.</dd>
+        <dt>Block</dt><dd>Abwehr des gegnerischen Angriffs direkt am Netz.</dd>
         <dt>Dig</dt><dd>Abwehr eines harten Angriffsballs.</dd>
+        <dt>Down Ball</dt><dd>Angriff ohne Sprung – der Block bleibt unten.</dd>
+        <dt>Free Ball</dt><dd>Leicht zu verteidigender Ball, der ohne Druck übers Netz kommt.</dd>
+        <dt>Joust</dt><dd>Gleichzeitiger Ballkontakt zweier Gegner:innen über der Netzkante – erlaubt.</dd>
         <dt>Lob / Finte</dt><dd>Angetäuschter Angriff, Ball wird kurz gelegt.</dd>
+        <dt>MVP</dt><dd>Wertvollste:r Spieler:in eines Spiels oder Turniers.</dd>
+        <dt>Pipe</dt><dd>Hinterfeldangriff durch die Mitte.</dd>
+        <dt>Rally</dt><dd>Ein kompletter Ballwechsel vom Aufschlag bis zum Punkt.</dd>
+        <dt>Rotation</dt><dd>Weiterrücken aller Spieler:innen im Uhrzeigersinn nach Gewinn des Aufschlagrechts.</dd>
         <dt>Side-Out</dt><dd>Das annehmende Team gewinnt den Ballwechsel.</dd>
-        <dt>Tie-Break</dt><dd>Entscheidungssatz bis 15 Punkte.</dd></dl>` },
-    ];
+        <dt>Tie-Break</dt><dd>Entscheidungssatz bis 15 Punkte.</dd>
+        <dt>Tool / Wischer</dt><dd>Absichtlicher Schlag gegen den Block ins Aus.</dd>
+        <dt>Transition</dt><dd>Umschalten von Abwehr auf Angriff.</dd>
+        <dt>Zuspiel über Kopf</dt><dd>Zuspiel nach hinten, ohne hinzusehen – Überraschungsmoment.</dd></dl>` },
+  ];
+  window.WikiArtikel = WIKI_ARTIKEL;
 
+  function wiki(el) {
+    const articles = WIKI_ARTIKEL;
+
+    const QUIZ_KAPITEL_NAMEN = { feld: "📐 Feld, Netz & Ball", punkte: "🔢 Zählweise & Sätze",
+      team: "👥 Team & Rotation", libero: "🦺 Libero", angriff: "🎯 Aufschlag & Angriff",
+      netz: "🚫 Netz, Block & Fehler", schiri: "🧑‍⚖️ Schiri-Regelquiz", begriffe: "📖 Begriffe & Profi-Wissen" };
+    const eigeneFragen = S().quizFragen || [];
     el.innerHTML = `
       ${head("Volleyball-Wiki", "Regeln, Techniken und Begriffe – ideal für neue Spieler und Eltern")}
+      ${window.Sync && Sync.active ? `
+      <div class="grid grid-2 mb">
+        <div class="card">
+          <div class="card-head"><h3>🏐 Quiz-Beteiligung der Spieler:innen</h3></div>
+          <div id="quizStatBox"><p class="soft">Wird geladen …</p></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>❓ Eigene Quizfragen</h3><span class="spacer"></span>
+            <button class="btn sm" data-qfneu>＋ Frage</button></div>
+          <p class="soft" style="font-size:.82rem;margin-top:0">Eigene Fragen erscheinen sofort im Portal-Quiz
+          des gewählten Kapitels und zählen ganz normal Punkte.</p>
+          <div class="list" style="max-height:260px;overflow-y:auto">
+            ${eigeneFragen.length ? eigeneFragen.map((q) => `
+              <div class="list-item" style="padding:8px 10px"><div class="grow">
+                <div class="title" style="font-size:.86rem">${esc(q.f)}</div>
+                <div class="sub">${esc(QUIZ_KAPITEL_NAMEN[q.kapitel] || q.kapitel)} · richtig: ${esc((q.a || [])[q.r] || "?")}</div></div>
+                <button class="btn sm ghost" data-qfedit="${q.id}">✏️</button>
+                <button class="btn sm ghost" data-qfdel="${q.id}">🗑️</button>
+              </div>`).join("") : `<p class="soft">Noch keine eigenen Fragen.</p>`}
+          </div>
+        </div>
+      </div>` : ""}
       <div class="grid cols-toc">
         <div class="card wiki-toc" style="position:sticky;top:80px">
           <h3 style="font-size:.9rem">Inhalt</h3>
           ${articles.map((a) => `<a href="#/wiki" data-goto="${a.id}">${esc(a.h)}</a>`).join("")}
           <hr style="border:none;border-top:1px solid var(--border);margin:10px 0">
-          <a href="https://www.volleyball-verband.de/regelwerk" target="_blank" rel="noopener">📘 Offizielles Regelwerk (DVV) ↗</a>
+          <a href="https://www.volleyball-verband.de/de/service/schiedsrichter/regelwerk/" target="_blank" rel="noopener">📘 Offizielles Regelwerk (DVV) ↗</a>
         </div>
         <div class="card wiki-article">
           ${articles.map((a) => `<div id="wiki-${a.id}"><h3>${esc(a.h)}</h3>${a.html}</div>`).join("")}
@@ -2095,6 +3360,71 @@
       const t = el.querySelector(`#wiki-${a.dataset.goto}`);
       if (t) t.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+
+    // Quiz-Beteiligung laden (Server-Modus) + eigene Fragen verwalten
+    if (window.Sync && Sync.active) {
+      (async () => {
+        const res = await apiZugang("/api/quiz-uebersicht");
+        const box = $("#quizStatBox", el);
+        if (!box) return;
+        if (!res.ok) { box.innerHTML = `<p class="soft">Konnte nicht geladen werden.</p>`; return; }
+        const st = res.data;
+        box.innerHTML = `
+          <p class="soft" style="margin-top:0;font-size:.82rem"><strong>${st.beteiligt} von ${st.gesamt}</strong>
+          Spieler:innen-Konten haben schon Punkte gesammelt · Woche ${esc(st.woche)}</p>
+          <div class="list" style="max-height:220px;overflow-y:auto">
+            ${st.spieler.length ? st.spieler.map((s2, i) => `
+              <div class="list-item" style="padding:7px 10px"><div class="grow">
+                <div class="title" style="font-size:.86rem">${["🥇", "🥈", "🥉"][s2.wochenPunkte > 0 ? i : 99] || ""} ${esc(s2.name)}</div>
+                <div class="sub">${s2.beantwortetWoche} Fragen diese Woche${s2.zuletzt ? ` · zuletzt ${fmtDateShort(new Date(s2.zuletzt * 1000).toISOString())}` : " · noch nie gespielt"}</div></div>
+                <span class="badge accent">${s2.wochenPunkte} P. Woche</span>
+                <span class="badge">${s2.punkte} P. gesamt</span>
+              </div>`).join("") : `<p class="soft">Noch keine Spieler:innen-Konten.</p>`}
+          </div>`;
+      })();
+      const KAP = { feld: "📐 Feld, Netz & Ball", punkte: "🔢 Zählweise & Sätze", team: "👥 Team & Rotation",
+        libero: "🦺 Libero", angriff: "🎯 Aufschlag & Angriff", netz: "🚫 Netz, Block & Fehler",
+        schiri: "🧑‍⚖️ Schiri-Regelquiz", begriffe: "📖 Begriffe & Profi-Wissen" };
+      const qfForm = (q) => {
+        const isEdit = !!q;
+        q = q || { kapitel: "begriffe", f: "", a: ["", "", ""], r: 0, stufe: 2 };
+        modal({
+          title: isEdit ? "Quizfrage bearbeiten" : "Neue Quizfrage",
+          body: `<form id="qf"><div class="form-grid">
+            <div class="field"><label>Kategorie</label><select name="kapitel">
+              ${Object.entries(KAP).map(([k, l]) => `<option value="${k}" ${k === q.kapitel ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+            <div class="field"><label>Schwierigkeit</label><select name="stufe">
+              <option value="1" ${q.stufe === 1 ? "selected" : ""}>🟢 Anfänger (5 P.)</option>
+              <option value="2" ${!q.stufe || q.stufe === 2 ? "selected" : ""}>🟡 Fortgeschritten (10 P.)</option>
+              <option value="3" ${q.stufe === 3 ? "selected" : ""}>🔴 Profi (15 P.)</option></select></div>
+            <div class="field full"><label>Frage</label><input name="f" value="${esc(q.f)}" required></div>
+            ${[0, 1, 2].map((i) => `<div class="field full"><label>Antwort ${i + 1} ${q.r === i ? "" : ""}</label>
+              <div class="flex" style="gap:8px"><input name="a${i}" value="${esc(q.a[i] || "")}" required style="flex:1">
+              <label style="font-weight:400;display:flex;align-items:center;gap:5px;white-space:nowrap">
+                <input type="radio" name="richtig" value="${i}" ${q.r === i ? "checked" : ""} style="width:auto"> richtig</label></div></div>`).join("")}
+          </div></form>`,
+          footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+          onOpen(m) {
+            m.querySelector("[data-x]").onclick = closeModal;
+            m.querySelector("[data-s]").onclick = () => {
+              const f = m.querySelector("#qf"); if (!f.reportValidity()) return;
+              const d = formData(f);
+              const werte = { kapitel: d.kapitel, f: d.f, stufe: Number(d.stufe) || 2,
+                              a: [d.a0, d.a1, d.a2], r: +(f.querySelector("[name=richtig]:checked") || {}).value || 0 };
+              if (isEdit) Store.update("quizFragen", q.id, werte);
+              else Store.add("quizFragen", Object.assign({ id: Store.uid("qc") }, werte));
+              closeModal(); toast("Quizfrage gespeichert – ab sofort im Portal", "good"); reload();
+            };
+          },
+        });
+      };
+      const neu = $("[data-qfneu]", el);
+      if (neu) neu.onclick = () => qfForm();
+      $$("[data-qfedit]", el).forEach((b) => b.onclick = () => qfForm(Store.byId("quizFragen", b.dataset.qfedit)));
+      $$("[data-qfdel]", el).forEach((b) => b.onclick = () => confirmDialog("Frage löschen?", () => {
+        Store.remove("quizFragen", b.dataset.qfdel); toast("Frage gelöscht"); reload();
+      }));
+    }
   }
 
   /* ======================================================================
@@ -2160,31 +3490,115 @@
       </div>`;
 
     $("[data-add]", el).onclick = () => taskForm();
-    $$("[data-tdone]", el).forEach((cb) => cb.onchange = () => { Store.update("tasks", cb.dataset.tdone, { done: cb.checked }); reload(); });
+    $$("[data-tdone]", el).forEach((cb) => cb.onchange = () => {
+      Store.update("tasks", cb.dataset.tdone, { done: cb.checked });
+      if (cb.checked) volleyballFlug();
+      reload();
+    });
     $$("[data-tdel]", el).forEach((b) => b.onclick = () => { Store.remove("tasks", b.dataset.tdel); toast("Gelöscht"); reload(); });
+    $$("[data-terinnern]", el).forEach((b) => b.onclick = async (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
+      const res = await apiZugang("/api/aufgaben/erinnern", { taskId: b.dataset.terinnern });
+      if (!res.ok) toast(res.data.error || "Erinnerung fehlgeschlagen", "bad");
+      else toast(`🔔 Erinnerung an ${res.data.empfaenger} Konto/Konten geschickt (${res.data.ok} Push-Abos erreicht)`, "good");
+    });
+    $$("[data-tedit2]", el).forEach((b) => b.onclick = (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
+      taskForm(Store.byId("tasks", b.dataset.tedit2));
+    });
+    $$("[data-tdup]", el).forEach((b) => b.onclick = (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
+      taskForm(Store.byId("tasks", b.dataset.tdup), true);
+    });
   }
+  const TASK_ZIEL = { spieler: "🏐 an Spieler:innen", eltern: "👪 an Eltern", alle: "👨‍👩‍👧 an alle im Portal" };
   function taskRow(t) {
     const overdue = !t.done && daysUntil(t.due) < 0;
+    const portalZiel = t.zielRolle && t.zielRolle !== "trainer";
+    const zielInfo = portalZiel
+      ? ` <span class="badge info">${TASK_ZIEL[t.zielRolle] || "Portal"}${(t.zielPlayerIds || []).length ? ` · ${t.zielPlayerIds.length} ausgewählt` : ""}</span>
+          <span class="badge ${(t.erledigtVon || []).length ? "good" : ""}">${(t.erledigtVon || []).length}× erledigt</span>`
+      : "";
     return `<label class="list-item" style="cursor:pointer">
       <input type="checkbox" data-tdone="${t.id}" ${t.done ? "checked" : ""} style="width:auto">
       <div class="grow"><div class="title" style="${t.done ? "text-decoration:line-through;opacity:.6" : ""}">${esc(t.title)}</div>
-        <div class="sub">${t.done ? "erledigt" : `fällig ${relDays(t.due)}`} · ${prioBadge(t.priority)} ${overdue ? '<span class="badge bad">überfällig</span>' : ""}</div></div>
+        <div class="sub">${t.done ? "erledigt" : `fällig ${relDays(t.due)}`} · ${prioBadge(t.priority)} ${overdue ? '<span class="badge bad">überfällig</span>' : ""}${zielInfo}</div></div>
+      ${portalZiel && !t.done && window.Sync && Sync.active
+        ? `<button class="btn sm ghost" data-terinnern="${t.id}" title="Push-Erinnerung an alle schicken, die noch nicht erledigt haben">🔔</button>` : ""}
+      <button class="btn sm ghost" data-tedit2="${t.id}" title="Bearbeiten">✏️</button>
+      <button class="btn sm ghost" data-tdup="${t.id}" title="Duplizieren">⧉</button>
       <button class="btn sm ghost" data-tdel="${t.id}">🗑️</button></label>`;
   }
-  function taskForm() {
+  function taskForm(t, alsKopie) {
+    const isEdit = !!t && !alsKopie;
+    t = t || { title: "", due: new Date().toISOString(), priority: "mittel", zielRolle: "trainer", zielPlayerIds: [] };
+    const aktive = S().players.filter((p) => p.membershipStatus !== "inaktiv")
+      .sort((a, b) => a.lastName.localeCompare(b.lastName));
     modal({
-      title: "Neue Aufgabe",
+      title: isEdit ? "Aufgabe bearbeiten" : alsKopie ? "Aufgabe duplizieren" : "Neue Aufgabe",
       body: `<form id="tf"><div class="form-grid">
-        <div class="field full"><label>Aufgabe</label><input name="title" required></div>
-        <div class="field"><label>Fällig am</label><input type="date" name="due" value="${new Date().toISOString().slice(0, 10)}"></div>
-        <div class="field"><label>Priorität</label><select name="priority"><option>hoch</option><option selected>mittel</option><option>niedrig</option></select></div>
+        <div class="field full"><label>Aufgabe</label><input name="title" value="${esc(t.title)}" required></div>
+        <div class="field"><label>Fällig am</label><input type="date" name="due" value="${String(t.due || "").slice(0, 10) || new Date().toISOString().slice(0, 10)}"></div>
+        <div class="field"><label>Priorität</label><select name="priority">
+          ${["hoch", "mittel", "niedrig"].map((x) => `<option ${x === t.priority ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+        <div class="field full"><label>👥 Zuweisung</label><select name="zielRolle" id="tfRolle">
+          <option value="trainer" ${!t.zielRolle || t.zielRolle === "trainer" ? "selected" : ""}>Nur Trainerteam (interne Aufgabe)</option>
+          <option value="spieler" ${t.zielRolle === "spieler" ? "selected" : ""}>Alle Spieler:innen (Portal)</option>
+          <option value="eltern" ${t.zielRolle === "eltern" ? "selected" : ""}>Alle Eltern (Portal)</option>
+          <option value="alle" ${t.zielRolle === "alle" ? "selected" : ""}>Alle im Portal (Spieler:innen + Eltern)</option>
+        </select></div>
+        <div class="field full" id="tfEinzel" ${!t.zielRolle || t.zielRolle === "trainer" ? "hidden" : ""}><label>Nur für einzelne Spieler:innen/Familien <span class="soft" style="font-weight:400">(leer = alle der gewählten Rolle)</span></label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px 14px;max-height:160px;overflow-y:auto;padding:6px 2px">
+          ${aktive.map((p) => `<label style="font-weight:400;display:flex;align-items:center;gap:6px;font-size:.86rem">
+            <input type="checkbox" name="zp_${p.id}" ${(t.zielPlayerIds || []).includes(p.id) ? "checked" : ""} style="width:auto"> ${esc(p.firstName)} ${esc(p.lastName)}</label>`).join("")}
+          </div></div>
+        ${!isEdit ? `
+        <div class="field"><label>🔁 Wiederholen</label><select name="wdh">
+          <option value="">nicht wiederholen</option>
+          <option value="7">wöchentlich</option>
+          <option value="14">alle 2 Wochen</option>
+          <option value="30">monatlich</option>
+        </select></div>
+        <div class="field"><label>Wiederholen bis</label><input type="date" name="wdhBis"></div>` : ""}
+        <p class="soft full" style="font-size:.8rem;margin:0">Portal-Aufgaben erscheinen den Empfänger:innen auf der
+        Portal-Übersicht und können dort abgehakt werden. Erinnerung: automatisch per Push-Mitteilung zum
+        Fälligkeitstag – oder jederzeit über den 🔔-Knopf in der Aufgabenliste.</p>
       </div></form>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
       onOpen(m) {
         m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("#tfRolle").onchange = (ev) => {
+          m.querySelector("#tfEinzel").hidden = ev.target.value === "trainer";
+        };
         m.querySelector("[data-s]").onclick = () => {
           const f = m.querySelector("#tf"); if (!f.reportValidity()) return;
-          const d = formData(f); d.due = new Date(d.due).toISOString(); d.done = false;
+          const d = formData(f);
+          const wdh = Number(d.wdh) || 0;
+          const wdhBis = d.wdhBis ? new Date(d.wdhBis + "T23:59:59") : null;
+          delete d.wdh; delete d.wdhBis;
+          d.due = new Date(d.due).toISOString();
+          d.zielPlayerIds = d.zielRolle === "trainer" ? []
+            : Object.keys(d).filter((k) => k.startsWith("zp_") && d[k]).map((k) => k.slice(3));
+          Object.keys(d).forEach((k) => { if (k.startsWith("zp_")) delete d[k]; });
+          if (isEdit) {
+            Store.update("tasks", t.id, d);
+            closeModal(); toast("Aufgabe aktualisiert", "good"); reload();
+            return;
+          }
+          d.done = false;
+          d.erledigtVon = [];
+          if (wdh && wdhBis) {
+            // Serie: eigenständige Aufgaben im gewählten Rhythmus (max. 26)
+            const seriesId = Store.uid("ts");
+            let cur = new Date(d.due), n = 0;
+            while (cur <= wdhBis && n < 26) {
+              Store.add("tasks", Object.assign({}, d, { due: cur.toISOString(), erledigtVon: [], seriesId }));
+              cur = new Date(cur.getTime() + wdh * 86400000);
+              n++;
+            }
+            closeModal(); toast(`Aufgaben-Serie angelegt: ${n} Termine`, "good"); reload();
+            return;
+          }
           Store.add("tasks", d); closeModal(); toast("Aufgabe angelegt", "good"); reload();
         };
       },
@@ -2257,7 +3671,7 @@
     const byCat = {};
     s.departments.forEach((d) => (byCat[d.category] = byCat[d.category] || []).push(d));
     el.innerHTML = `
-      ${head("Abteilungen & Mannschaften", `Alle Teams des ${esc(s.club)} – Aktive, Jugend, Nachwuchs und Breitensport`, `<button class="btn" data-add>＋ Abteilung</button>`)}
+      ${head("Mannschaften", `Alle Teams der Abteilung Volleyball des ${esc(s.club)}`, `<button class="btn" data-add>＋ Mannschaft</button>`)}
       <div class="grid grid-4 mb">
         ${stat("🏟️", "Abteilungen", s.departments.length)}
         ${stat("🧑‍🤝‍🧑", "Mitglieder gesamt", s.players.length)}
@@ -2268,7 +3682,7 @@
         <h3 style="margin:18px 0 10px">${esc(cat)}</h3>
         <div class="grid grid-3 mb">
           ${byCat[cat].map((d) => {
-            const members = s.players.filter((p) => p.departmentId === d.id).length;
+            const members = s.players.filter((p) => inDept(p, d.id)).length;
             return `<div class="card">
               <div class="flex mb"><strong style="font-size:1.05rem">${esc(d.name)}</strong><span class="spacer"></span>
                 <span class="badge ${catBadge[d.category] || ""}">${esc(d.category)}</span></div>
@@ -2293,9 +3707,9 @@
     $$("[data-dedit]", el).forEach((b) => b.onclick = () => departmentForm(Store.byId("departments", b.dataset.dedit)));
     $$("[data-ddel]", el).forEach((b) => b.onclick = () => {
       const d = Store.byId("departments", b.dataset.ddel);
-      const members = S().players.filter((p) => p.departmentId === d.id).length;
+      const members = S().players.filter((p) => inDept(p, d.id)).length;
       confirmDialog(`Abteilung „${d.name}" löschen?${members ? ` ${members} Spieler(nen) verlieren die Zuordnung.` : ""}`, () => {
-        S().players.forEach((p) => { if (p.departmentId === d.id) Store.update("players", p.id, { departmentId: null }); });
+        S().players.forEach((p) => { if (inDept(p, d.id)) { const ids = playerDeptIds(p).filter((x) => x !== d.id); Store.update("players", p.id, { departmentIds: ids, departmentId: ids[0] || null }); } });
         Store.remove("departments", d.id); toast("Abteilung gelöscht"); reload();
       });
     });
@@ -2353,8 +3767,8 @@
         ${stat("✅", "Gemeldet", s.meldungen.filter((m) => m.status !== "Entwurf").length)}
         ${stat("👥", "Gemeldete Spieler", s.meldungen.reduce((a, m) => a + m.entries.length, 0))}
       </div>
-      <a class="link-card mb" href="https://mv.sams-ticket.de/public/" target="_blank" rel="noopener">
-        <span class="ic">🌐</span><div class="grow"><div class="title">VVMV Meldeportal (SAMS)</div>
+      <a class="link-card mb" href="https://vmv.sams-server.de/ma/" target="_blank" rel="noopener">
+        <span class="ic">🌐</span><div class="grow"><div class="title">VMV Meldeportal (SAMS)</div>
         <div class="sub">Offizielle Online-Meldung des Volleyball-Verbands MV</div></div><span class="arr">↗</span></a>
       <div class="grid grid-2">
         ${s.meldungen.length ? s.meldungen.map((m) => `
@@ -2410,7 +3824,7 @@
         m.querySelector("[data-x]").onclick = closeModal;
         m.querySelector("[data-s]").onclick = () => {
           const data = formData(m.querySelector("#mf"));
-          const roster = S().players.filter((p) => p.departmentId === data.departmentId && p.membershipStatus !== "inaktiv");
+          const roster = S().players.filter((p) => inDept(p, data.departmentId) && p.membershipStatus !== "inaktiv");
           const entries = roster.map((p) => ({
             playerId: p.id, passNumber: p.passNumber || "",
             jahrgang: jahrgang(p.birthDate), role: p.position === "Libero" ? "Libero" : "Spieler",
@@ -2487,14 +3901,14 @@
   function addMeldungPlayer(m) {
     const inList = new Set(m.entries.map((e) => e.playerId));
     const avail = S().players.filter((p) => !inList.has(p.id))
-      .sort((a, b) => (a.departmentId === m.departmentId ? -1 : 1) - (b.departmentId === m.departmentId ? -1 : 1) || a.lastName.localeCompare(b.lastName));
+      .sort((a, b) => (inDept(a, m.departmentId) ? -1 : 1) - (inDept(b, m.departmentId) ? -1 : 1) || a.lastName.localeCompare(b.lastName));
     if (!avail.length) { toast("Alle Spieler sind bereits gemeldet"); return; }
     modal({
       title: "Spieler zur Meldung hinzufügen",
       body: `<div class="list">${avail.map((p) => `
-        <label class="list-item" style="cursor:pointer">${avatar(p.firstName, p.lastName)}
+        <label class="list-item" style="cursor:pointer">${avatar(p.firstName, p.lastName, p)}
           <div class="grow"><div class="title">${esc(p.firstName)} ${esc(p.lastName)}</div>
-          <div class="sub">Jg. ${jahrgang(p.birthDate)} · ${esc(deptName(p.departmentId))} · ${esc(p.passNumber || "ohne Pass-Nr.")}</div></div>
+          <div class="sub">Jg. ${jahrgang(p.birthDate)} · ${esc(playerDeptNames(p))} · ${esc(p.passNumber || "ohne Pass-Nr.")}</div></div>
           <input type="checkbox" data-pl="${p.id}" style="width:auto"></label>`).join("")}</div>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Hinzufügen</button>`,
       onOpen(mm) {
@@ -2674,10 +4088,699 @@
     }, "Laden");
   }
 
+  // ---- Portal-Zugänge (Phase 3): Einladungscodes je Spieler:in + Kontenliste ----
+  async function apiZugang(pfad, body, methode) {
+    const opts = { credentials: "same-origin", headers: { "Content-Type": "application/json" } };
+    if (window.Sync && Sync.csrf) opts.headers["X-CSRF-Token"] = Sync.csrf;
+    if (body || methode) { opts.method = methode || "POST"; if (body) opts.body = JSON.stringify(body); }
+    const res = await fetch(pfad, opts);
+    let data = {};
+    try { data = await res.json(); } catch (e) { /* leer */ }
+    return { ok: res.ok, data };
+  }
+
+  // Einladungs-Vorlage: eine PDF-Seite je Code mit QR, Link, Code und
+  // Kurzanleitung – zum Ausdrucken (Trainingsbeutel) oder Teilen (WhatsApp).
+  function einladungsBlocks(rolle, zielName, code, url) {
+    const eltern = rolle === "eltern";
+    const spieler = rolle === "spieler";
+    const B = [];
+    const p = (runs) => B.push({ art: "p", runs: Array.isArray(runs) ? runs : [{ t: runs }] });
+    const li = (runs) => B.push({ art: "li", runs: Array.isArray(runs) ? runs : [{ t: runs }] });
+    const h2 = (t) => B.push({ art: "h2", runs: [{ t }] });
+
+    B.push({ art: "h1", runs: [{ t: "Einladung ins SKV-Müritz-Portal" }] });
+    B.push({ art: "sub", runs: [{ t: `SKV Müritz · Abteilung Volleyball · ${eltern ? "Eltern-Zugang" : spieler ? "Zugang für Spieler:innen" : "Trainer:innen-Zugang"}${zielName ? ` · für ${zielName}` : ""}` }] });
+    p(eltern
+      ? "Liebe Eltern, unsere Volleyball-Abteilung hat ein eigenes Online-Portal: alle Termine und Spiele auf einen Blick, Trainingsrückmeldung für euer Kind mit einem Tipp, Fahrplätze für Auswärtsspiele anbieten, Heimspiel-Jobs übernehmen und Vereinskleidung anfordern – alles an einem Ort, auch als App auf dem Handy."
+      : spieler
+      ? "Hallo! Unsere Volleyball-Abteilung hat ein eigenes Online-Portal: alle Trainings und Spiele auf einen Blick, deine Trainingsrückmeldung mit einem Tipp, Vereinskleidung anfordern und deine Kontaktdaten immer aktuell – auch als App auf dem Handy."
+      : "Willkommen im Trainerteam! Über diesen Zugang kommst du in die komplette Online-Verwaltung (mit Pflicht-2FA beim ersten Login).");
+    h2("So richtest du deinen Zugang ein – 3 Schritte");
+    li([{ t: "1. ", b: true }, { t: "QR-Code mit der Handy-Kamera scannen oder den Link öffnen." }]);
+    li([{ t: "2. ", b: true }, { t: "Benutzernamen und Passwort selbst wählen – der Einladungscode ist im Link schon eingetragen." }]);
+    li([{ t: "3. ", b: true }, { t: "„Registrieren“ antippen und anmelden – fertig!" }]);
+    B.push({ art: "qr", runs: [{ t: url }] });
+    p([{ t: url, b: true }]);
+    B.push({ art: "sub", runs: [{ t: "Falls nach dem Code gefragt wird – einfach diesen eingeben:" }] });
+    B.push({ art: "code", runs: [{ t: code }] });
+    B.push({ art: "sub", runs: [{ t: "Der Code ist persönlich, nur einmal verwendbar und 14 Tage gültig." }] });
+    h2("Das kannst du im Portal");
+    if (eltern) {
+      li("Termine, Spiele und Ferien ansehen");
+      li("Trainingsrückmeldung für euer Kind abgeben (Zusagen/Absagen)");
+      li("Fahrplätze für Auswärtsspiele anbieten und Heimspiel-Jobs übernehmen");
+      li("Vereinskleidung anfordern und eure Kontaktdaten aktuell halten");
+      p([{ t: "Datenschutz: Ihr seht ausschließlich die Daten eures eigenen Kindes – niemals Namen oder Angaben anderer Kinder.", b: true }]);
+    } else if (spieler) {
+      li("Trainings und Spiele ansehen, mit einem Tipp zu- oder absagen");
+      li("Vereinskleidung anfordern");
+      li("Deine Kontaktdaten selbst aktuell halten");
+    } else {
+      li("Komplette Vereinsverwaltung: Kader, Termine, Rückmeldungen, Briefe, Finanzen");
+      li("Beim ersten Login wird die Zwei-Faktor-Anmeldung eingerichtet (Authenticator-App)");
+    }
+    h2("Als App aufs Handy (empfohlen)");
+    p("iPhone: Link in Safari öffnen → Teilen-Knopf → „Zum Home-Bildschirm“. Android: In Chrome öffnen → Menü → „App installieren“. Danach startet das Portal wie eine normale App.");
+    B.push({ art: "leer" });
+    p("Fragen? Das Trainerteam hilft jederzeit gern. Viele Grüße – das Trainerteam des SKV Müritz Volleyball");
+    return B;
+  }
+
+  function codeModal(rolle, zielName, code, url) {
+    const nachricht = `Hallo${zielName ? " " + zielName : ""}! 🏐 Für das Online-Portal des SKV Müritz Volleyball bekommst du hier deinen persönlichen Zugang (Rolle: ${rolle === "eltern" ? "Eltern" : rolle === "spieler" ? "Spieler:in" : "Trainer:in"}):\n\n${url}\n\nEinfach den Link öffnen und mit dem Code ${code} registrieren – er ist 14 Tage gültig.\n\nKurzanleitung: Link öffnen → Benutzername + Passwort wählen → Registrieren → Anmelden. Tipp fürs Handy: In Safari/Chrome öffnen und „Zum Home-Bildschirm“ hinzufügen – dann ist das Portal eine App.\n\nViele Grüße, das Trainerteam`;
+    const dateiname = `Einladung Portal – ${zielName || rolle}`;
+    modal({
+      title: "Einladungscode erstellt",
+      body: `
+        <p class="soft" style="margin-top:0">Für <strong>${esc(zielName || "neues Konto")}</strong> · Rolle
+        <strong>${esc(rolle)}</strong> · 14 Tage gültig. Der Code wird aus Sicherheitsgründen nur EINMAL angezeigt.</p>
+        <div class="field"><label>Code</label><input readonly value="${esc(code)}" onclick="this.select()"></div>
+        <div class="field"><label>Registrierungslink</label><input readonly value="${esc(url)}" onclick="this.select()"></div>
+        <p class="soft" style="font-size:.82rem">📄 Die <strong>Einladungs-Vorlage</strong> ist eine fertige PDF-Seite mit
+        QR-Code, Link, Code und Kurzanleitung – zum Ausdrucken oder direkt per WhatsApp verschicken.</p>`,
+      footer: `<button class="btn ghost" data-x>Schließen</button>
+        <button class="btn outline" data-copy title="Einladungstext in die Zwischenablage">📋 Text kopieren</button>
+        <button class="btn outline" data-pdf title="Einladungs-Vorlage als PDF herunterladen">📄 Vorlage (PDF)</button>
+        <button class="btn outline" data-pdfshare title="Einladungs-PDF teilen, z. B. per WhatsApp">📤 Vorlage teilen</button>
+        <a class="btn" style="text-decoration:none" target="_blank" rel="noopener"
+           href="https://wa.me/?text=${encodeURIComponent(nachricht)}">💬 WhatsApp</a>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-copy]").onclick = async () => {
+          try { await navigator.clipboard.writeText(nachricht); toast("Nachricht kopiert", "good"); }
+          catch (e) { toast("Kopieren nicht möglich – bitte Felder markieren", "bad"); }
+        };
+        m.querySelector("[data-pdf]").onclick = () => pdfVomServer(dateiname, einladungsBlocks(rolle, zielName, code, url), false);
+        m.querySelector("[data-pdfshare]").onclick = () => pdfVomServer(dateiname, einladungsBlocks(rolle, zielName, code, url), true);
+      },
+    });
+  }
+
+  // ---- Kurzanleitungen je Rolle (eine kompakte PDF-Seite je Rolle) ----
+  // Bei Textänderungen bitte Version und Stand mit hochziehen!
+  const ANLEITUNG_VERSION = "1.2";
+  const ANLEITUNG_STAND = "20.08.2026";
+
+  function kurzanleitungBlocks(rolle, codeInfo) {
+    const B = [];
+    const p = (runs) => B.push({ art: "p", runs: Array.isArray(runs) ? runs : [{ t: runs }] });
+    const li = (t) => B.push({ art: "li2", runs: [{ t }] });
+    const h2 = (t) => B.push({ art: "h2box", runs: [{ t }] });
+    const titelJeRolle = { trainer: "Trainer:innen", spieler: "Spieler:innen", eltern: "Eltern" };
+
+    B.push({ art: "h1c", runs: [{ t: `Kurzanleitung für ${titelJeRolle[rolle]}` }] });
+    B.push({ art: "subc", runs: [{ t: `SKV Müritz Volleyball · volleyball.nettverwaltet.de · Version ${ANLEITUNG_VERSION} · Stand ${ANLEITUNG_STAND}` }] });
+
+    if (rolle === "spieler") {
+      B.push({ art: "kasten", runs: [
+        { t: "So bist du in 3 Schritten dabei: ", b: true },
+        { t: "① Einladungslink vom Trainerteam öffnen (oder Code eingeben) · ② Benutzernamen und Passwort wählen · ③ Als App installieren: im Browser Teilen-Menü → „Zum Home-Bildschirm“." },
+      ] });
+      h2("🏐 Rückmelden – deine wichtigste Aufgabe");
+      li("Auf der Übersicht bei „Kommst du?“ einfach Daumen hoch (komme), Fragezeichen (unsicher) oder Daumen runter (kann nicht) antippen.");
+      li("Bei Fragezeichen und Daumen runter bitte kurz den Grund dazuschreiben (z. B. krank, Klassenfahrt).");
+      li("Bei Daumen hoch kannst du eine Bemerkung ergänzen, z. B. „+1“ oder „muss 10 Min eher los“.");
+      li("Umentschieden? Einfach neu antippen – die Antwort lässt sich jederzeit ändern.");
+      h2("📅 Termine");
+      li("Im Termine-Tab stehen alle Trainings und Spiele – mit Wetter am Spielort und Kartenlink.");
+      li("Heimspiel: Trag ein, was du fürs Buffet mitbringst. Auswärtsspiel: Sag Bescheid, wenn ihr Plätze im Auto frei habt.");
+      li("Im Konto kannst du den Kalender abonnieren – dann stehen alle Termine automatisch in deinem Handy-Kalender.");
+      h2("🧠 Quiz, Wiki & Abzeichen");
+      li("Im Wiki-Tab wartet das Volleyball-Quiz: Jede Woche neuer Wettbewerb mit Bestenliste und Medaillen-Abzeichen für die Top 3.");
+      li("Im Wiki lernst du alles über Volleyball – von den Regeln bis zu Profi-Tricks.");
+      li("Abzeichen gibt es fürs zuverlässige Rückmelden und fürs Dabeisein – sie erscheinen auf deiner Startseite.");
+      h2("⚙️ Konto");
+      li("Profilbild hochladen oder Emoji-Avatar wählen.");
+      li("Abwesenheit melden (krank, Klassenfahrt, Urlaub) – die Absagen für den Zeitraum laufen dann automatisch.");
+      li("Unterschriebene Einverständniserklärung als PDF oder Foto hochladen.");
+      li("Mitteilungen aktivieren, damit nichts an dir vorbeigeht (iPhone: zuerst als App installieren!).");
+      li("Über die Übersicht der WhatsApp-Gruppe des Teams beitreten.");
+      li("Passwort vergessen? Am Anmeldebildschirm auf „Passwort vergessen?“ tippen – das Trainerteam schickt dir einen Wiederherstellungscode.");
+      B.push({ art: "leer" });
+      p([{ t: "Fragen? Das Trainerteam hilft dir gern weiter. Viel Spaß! 🏐", b: true }]);
+    }
+
+    if (rolle === "eltern") {
+      B.push({ art: "kasten", runs: [
+        { t: "So seid ihr in 3 Schritten dabei: ", b: true },
+        { t: "① Einladungslink vom Trainerteam öffnen (oder Code eingeben) · ② Benutzernamen und Passwort wählen · ③ Als App installieren: im Browser Teilen-Menü → „Zum Home-Bildschirm“. Mehrere Kinder im Verein? Im Konto einfach den weiteren Code einlösen – dann seht ihr alle Kinder in einem Zugang." },
+      ] });
+      h2("👍 Rückmelden für euer Kind");
+      li("Auf der Übersicht je Termin Daumen hoch (kommt), Fragezeichen (unsicher) oder Daumen runter (kann nicht) antippen – bei Absagen bitte kurz den Grund angeben.");
+      li("Längere Abwesenheit (Krankheit, Klassenfahrt, Urlaub) im Konto melden – die Absagen laufen dann automatisch.");
+      h2("🚗 Mithelfen");
+      li("Auswärtsspiele: freie Plätze im Auto anbieten – das Trainerteam plant damit die Fahrten.");
+      li("Heimspiele: eintragen, was ihr zum Buffet beisteuert (Salat, Brötchen, Kuchen, Getränke).");
+      li("Im Mithelfen-Tab offene Heimspiel-Aufgaben übernehmen (z. B. Aufbau, Standdienst).");
+      h2("📅 Termine & Infos");
+      li("Alle Trainings und Spiele mit Wetter und Kartenlink; die Ferien MV stehen gleich mit dabei.");
+      li("Kalender-Abo im Konto: Alle Termine erscheinen automatisch im eigenen Handy-Kalender.");
+      li("Mitteilungen aktivieren – Ankündigungen und Erinnerungen kommen direkt aufs Handy.");
+      li("Der WhatsApp-Elterngruppe beitreten (Link auf der Übersicht) – unser wichtigster Infoweg.");
+      h2("📝 Einverständnis & Datenschutz");
+      li("Die unterschriebene Sammel-Einverständniserklärung im Konto hochladen – als PDF oder einfach als Foto.");
+      li("Datenschutz: Ihr seht im Portal ausschließlich das eigene Kind – nie andere Kinder.");
+      li("Passwort vergessen? Am Anmeldebildschirm auf „Passwort vergessen?“ tippen – das Trainerteam schickt einen Wiederherstellungscode.");
+      B.push({ art: "leer" });
+      p([{ t: "Fragen? Das Trainerteam hilft gern weiter. Danke für eure Unterstützung! 🏐", b: true }]);
+    }
+
+    if (rolle === "trainer") {
+      B.push({ art: "kasten", runs: [
+        { t: "Anmeldung: ", b: true },
+        { t: "Mit Benutzername und Passwort anmelden; beim ersten Login wird die Zwei-Faktor-Anmeldung (Authenticator-App) eingerichtet. Danach am besten als App installieren: Teilen-Menü → „Zum Home-Bildschirm“." },
+      ] });
+      h2("📅 Kalender & Sportstätten");
+      li("Termine einzeln oder als Serie anlegen (wöchentlich/14-tägig, Ferien MV werden automatisch ausgelassen).");
+      li("Sporthallen über den Knopf „Sportstätten“ im Kalender verwalten (Adresse, Bild, Heimmannschaft) – beim Termin-Anlegen wird der Ort automatisch vervollständigt.");
+      li("Je Termin eine Leitung zuordnen – vorbelegt ist immer die angemeldete Trainer:in.");
+      h2("🏐 Trainingsrückmeldung und Planung");
+      li("Rückmeldestand je Termin im Blick; Daumen für Spieler:innen direkt setzen – erneutes Antippen nimmt zurück.");
+      li("Training absagen mit Notiz: Alle, die schon geantwortet haben, bekommen automatisch eine Push-Mitteilung.");
+      li("Trainingsplan aus Bausteinen zusammenstellen (automatischer Vorschlag passend zur Zusagen-Zahl) – als PDF drucken oder als Spicker fürs Handy mitnehmen.");
+      li("Automatische Warnung, wenn 24 Stunden vor einem Termin weniger als die Hälfte geantwortet hat.");
+      h2("📈 Team-Analyse & Abzeichen");
+      li("Quoten je Spieler:in (Rückmeldungen, Zusagen) nach Zeitraum und Termin-Art filtern – wer ist zuverlässig, wer braucht Ansprache?");
+      li("Abzeichen frei definieren (z. B. Trainingsteilnahme 75–100 %) – die Spieler:innen sehen sie im Portal.");
+      h2("💌 Elternbriefe & Einverständnis");
+      li("Serienbrief: ein personalisierter Brief je Spieler:in mit Terminen, Rückmeldeabschnitt und vorausgefüllten Pflicht-Erklärungen.");
+      li("Je Spieler:in als PDF herunterladen oder direkt per WhatsApp an die richtige Nummer schicken.");
+      li("Hochgeladene Einverständniserklärungen der Familien landen automatisch im Bereich Einverständnis.");
+      h2("🔑 Portal-Zugänge & Kommunikation");
+      li("Einladungscodes je Spieler:in und Eltern erzeugen und mit fertiger Vorlage teilen; Konten und Nutzung im Blick.");
+      li("Ankündigungen erreichen alle per Push; Aufgaben lassen sich zuweisen, duplizieren und als Serie wiederholen – erinnert wird automatisch.");
+      li("WhatsApp-Gruppenlinks (Spieler:innen/Eltern) einmal hinterlegen – das Portal zeigt jeder Rolle den passenden Link.");
+      li("Passwort vergessen? Anfragen erscheinen oben bei den Konten – per Klick Wiederherstellungscode erzeugen und weitergeben; Konten lassen sich dort auch bearbeiten.");
+      h2("⚙️ Gut zu wissen");
+      li("Die Verbandsliga-Tabelle wird täglich automatisch von vmv24.de übernommen.");
+      li("Vereinskleidung mit Fotos pflegen; Fahrerplanung und Heimspiel-Jobs füllen sich aus den Portal-Angaben.");
+      li("Quiz-Beteiligung einsehen und eigene Quizfragen ergänzen (Bereich Volleyball-Wiki).");
+      li("Datensicherung: Der Server sichert täglich automatisch; zusätzlich gibt es den Export unter „Datensicherung“.");
+    }
+
+    // Optional: persönlicher Einladungscode samt QR am Ende der Anleitung
+    if (codeInfo && codeInfo.code) {
+      B.push({ art: "h2box", runs: [{ t: `Persönlicher Einladungscode${codeInfo.name ? ` für ${codeInfo.name}` : ""}` }] });
+      B.push({ art: "code", runs: [{ t: codeInfo.code }] });
+      if (codeInfo.url) B.push({ art: "qr", runs: [{ t: codeInfo.url }] });
+      p([{ t: "QR-Code scannen oder den Code unter „Mit Einladungscode registrieren“ eingeben – gültig 14 Tage, nur einmal einlösbar." }]);
+    }
+    return B;
+  }
+  window.KurzanleitungBlocks = kurzanleitungBlocks;
+
+  // Konto bearbeiten: Name, Benutzername, Rolle und verknüpfte Spieler:innen
+  function kontoForm(k, fertig) {
+    const aktive = S().players.filter((p) => p.membershipStatus !== "inaktiv")
+      .sort((a, b) => a.lastName.localeCompare(b.lastName));
+    modal({
+      title: `Konto bearbeiten – ${esc(k.name)}`,
+      body: `<form id="kf"><div class="form-grid">
+        <div class="field"><label>Anzeigename</label><input name="name" value="${esc(k.name)}" required></div>
+        <div class="field"><label>Benutzername (für die Anmeldung)</label><input name="username" value="${esc(k.username)}" required></div>
+        <div class="field"><label>Rolle</label><select name="role">
+          ${["trainer", "spieler", "eltern"].map((r) => `<option value="${r}" ${k.role === r ? "selected" : ""}>${r === "trainer" ? "Trainer:in" : r === "spieler" ? "Spieler:in" : "Eltern"}</option>`).join("")}
+        </select></div>
+        <div class="field full"><label>Verknüpfte Spieler:innen</label>
+          <div class="list" style="max-height:220px;overflow-y:auto">
+            ${aktive.map((p) => `<label class="list-item" style="cursor:pointer;padding:6px 10px">
+              <input type="checkbox" data-kfpid="${p.id}" ${k.player_ids.includes(p.id) ? "checked" : ""} style="width:auto">
+              <div class="grow"><div class="title" style="font-size:.86rem">${esc(p.firstName)} ${esc(p.lastName)}</div></div>
+            </label>`).join("")}
+          </div></div>
+      </div>
+      <p class="soft" style="font-size:.8rem">Rollenwechsel zu Trainer:in verlangt beim nächsten Login die 2FA-Einrichtung.
+      Passwort ändern geht über den 🔑-Wiederherstellungscode.</p></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = async () => {
+          const f = m.querySelector("#kf"); if (!f.reportValidity()) return;
+          const d = formData(f);
+          const playerIds = Array.from(m.querySelectorAll("[data-kfpid]:checked")).map((c) => c.dataset.kfpid);
+          const r = await apiZugang(`/api/accounts/${k.id}`, {
+            name: d.name, username: d.username, role: d.role, playerIds });
+          if (!r.ok) { toast(r.data.error || "Speichern fehlgeschlagen", "bad"); return; }
+          closeModal(); toast("Konto gespeichert", "good");
+          if (fertig) fertig();
+        };
+      },
+    });
+  }
+
+  // Wiederherstellungscode anzeigen und teilen (24 h gültig, einmal einlösbar)
+  function resetCodeModal(username, code) {
+    const anleitung = `Hallo! Hier ist dein Wiederherstellungscode für die SKV-Volleyball-App:\n\n${code}\n\n` +
+      `So geht's: volleyball.nettverwaltet.de öffnen → „Passwort vergessen?“ → Code eingeben und neues Passwort wählen. ` +
+      `Der Code gilt 24 Stunden und funktioniert nur einmal.`;
+    modal({
+      title: `🔑 Wiederherstellungscode für ${esc(username)}`,
+      body: `
+        <p class="soft" style="margin-top:0;font-size:.88rem">Diesen Code an die Person weitergeben (z. B. per WhatsApp).
+        Damit setzt sie unter „Passwort vergessen?“ am Anmeldebildschirm selbst ein neues Passwort –
+        <strong>gültig 24 Stunden, einmal einlösbar</strong>.</p>
+        <p style="text-align:center;font-size:1.6rem;font-weight:800;letter-spacing:.08em;border:2px solid var(--accent,#1e3a8a);border-radius:12px;padding:12px 8px">${esc(code)}</p>`,
+      footer: `<button class="btn ghost" data-x>Schließen</button>
+        <button class="btn outline" data-kopie>📋 Kopieren</button>
+        <a class="btn" style="text-decoration:none" href="https://wa.me/?text=${encodeURIComponent(anleitung)}" target="_blank" rel="noopener">💬 Per WhatsApp teilen</a>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-kopie]").onclick = () => {
+          navigator.clipboard.writeText(anleitung).then(() => toast("Text mit Code kopiert", "good"),
+            () => toast("Kopieren nicht möglich", "bad"));
+        };
+      },
+    });
+  }
+
+  function zugaenge(el) {
+    if (!window.Sync || !Sync.active) {
+      el.innerHTML = `${head("Portal-Zugänge", "Einladungscodes und Konten für Spieler:innen und Eltern")}
+        <div class="card"><p class="soft" style="margin:0">🔒 Die Zugangs-Verwaltung funktioniert nur in der
+        <strong>Online-Version</strong> (mit Server-Anmeldung) – dort werden Codes erzeugt und Konten verwaltet.</p></div>`;
+      return;
+    }
+    const s = S();
+    const aktive = s.players.filter((p) => p.membershipStatus !== "inaktiv")
+      .sort((a, b) => a.lastName.localeCompare(b.lastName));
+    el.innerHTML = `
+      ${head("Portal-Zugänge", "Einladungscodes je Spieler:in erzeugen, per WhatsApp verschicken und Konten verwalten")}
+      <div class="grid grid-4 mb" id="zgStat"></div>
+      <div class="card">
+        <div class="card-head"><h3>🔑 Zugangscodes je Spieler:in</h3><span class="spacer"></span>
+          <button class="btn sm outline" data-tcode>🧑‍🏫 Trainer:in-Code</button></div>
+        <p class="soft" style="font-size:.85rem;margin-top:0">Je Spieler:in gibt es zwei Codes: einen für das
+        <strong>Spieler:innen-Konto</strong> und einen für das <strong>Eltern-Konto</strong>. Die Registrierung
+        verknüpft das Konto automatisch mit der richtigen Person – Eltern sehen im Portal nur das eigene Kind.</p>
+        <div class="list">
+          ${aktive.map((p) => `<div class="list-item"><div class="grow">
+              <div class="title" style="font-size:.9rem">${esc(p.firstName)} ${esc(p.lastName)}</div>
+              <div class="sub">${esc(playerDeptNames(p))}</div>
+              <div class="sub" data-online="${p.id}"></div></div>
+            <button class="btn sm ghost" data-cs="${p.id}" title="Code für Spieler:innen-Konto">🏐 Spieler:in</button>
+            <button class="btn sm ghost" data-ce="${p.id}" title="Code für Eltern-Konto">👪 Eltern</button>
+          </div>`).join("") || empty("🧑‍🤝‍🧑", "Keine aktiven Spieler:innen")}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>💬 WhatsApp-Gruppen fürs Portal</h3></div>
+        <p class="soft" style="font-size:.85rem;margin-top:0">Je Rolle der passende Einladungslink:
+        Spieler:innen sehen im Portal nur die Spieler-Gruppe, Eltern nur die Eltern-Gruppe.</p>
+        <div class="form-grid">
+          <div class="field"><label>🏐 Gruppe für Spieler:innen</label>
+            <input id="waSpieler" placeholder="https://chat.whatsapp.com/…" value="${esc((s.whatsapp || {}).spieler || "")}"></div>
+          <div class="field"><label>👪 Gruppe für Eltern</label>
+            <input id="waEltern" placeholder="https://chat.whatsapp.com/…" value="${esc((s.whatsapp || {}).eltern || "")}"></div>
+        </div>
+        <button class="btn sm mt" data-wasave>Speichern</button>
+      </div>
+      <div class="card">
+        <div class="card-head"><h3>📚 Kurzanleitungen</h3></div>
+        <p class="soft" style="font-size:.85rem;margin-top:0">Eine kompakte Anleitung je Rolle – zum Ausdrucken
+        oder direkt per WhatsApp an neue Mitglieder schicken (z. B. zusammen mit dem Einladungscode).</p>
+        <div class="list">
+          ${[["trainer", "🧑‍🏫", "Für Trainer:innen", "Kalender, Rückmeldungen, Analyse, Briefe, Zugänge"],
+             ["spieler", "🏐", "Für Spieler:innen", "Rückmelden, Termine, Quiz, Abzeichen, Konto"],
+             ["eltern", "👪", "Für Eltern", "Rückmelden, Mithelfen, Termine, Einverständnis"]].map(([r, ic, titel, sub]) => `
+          <div class="list-item">
+            <div style="font-size:1.3rem">${ic}</div>
+            <div class="grow"><div class="title" style="font-size:.9rem">${titel}</div>
+              <div class="sub">${sub}</div></div>
+            <button class="btn sm ghost" data-anlpdf="${r}" title="Kurzanleitung als PDF herunterladen">⬇️ PDF</button>
+            <button class="btn sm ghost" data-anlshare="${r}" title="Kurzanleitung teilen (z. B. WhatsApp)">📤 Teilen</button>
+          </div>`).join("")}
+        </div>
+      </div>
+      <div class="card"><div class="card-head"><h3>👥 Konten</h3></div><div class="list" id="zgKonten">
+        <p class="soft">Wird geladen …</p></div></div>
+      <div class="card"><div class="card-head"><h3>🎟️ Offene Einladungscodes</h3></div><div class="list" id="zgCodes">
+        <p class="soft">Wird geladen …</p></div></div>`;
+
+    const spielerName = (pid) => {
+      const p = Store.byId("players", pid);
+      return p ? `${p.firstName} ${p.lastName}` : "unbekannt";
+    };
+
+    const erzeugen = async (rolle, p) => {
+      const res = await apiZugang("/api/invites", {
+        role: rolle,
+        name: rolle === "eltern" ? ([p.parentName, p.parent2Name].filter(Boolean)[0] || "") : `${p.firstName} ${p.lastName}`,
+        playerIds: [p.id],
+      });
+      if (!res.ok) { toast(res.data.error || "Code konnte nicht erstellt werden", "bad"); return; }
+      codeModal(rolle, rolle === "eltern" ? `Eltern von ${p.firstName}` : p.firstName, res.data.code, res.data.url);
+      ladeCodes();
+    };
+    $("[data-wasave]", el).onclick = () => {
+      const st2 = S();
+      st2.whatsapp = { spieler: $("#waSpieler", el).value.trim(), eltern: $("#waEltern", el).value.trim() };
+      Store.save();
+      toast("WhatsApp-Gruppen gespeichert – Portal zeigt je Rolle den passenden Link", "good");
+    };
+    // Kurzanleitung erstellen – wahlweise mit frisch erzeugtem Einladungscode am Ende
+    const ANL_ROLLE = { trainer: "Trainer:innen", spieler: "Spieler:innen", eltern: "Eltern" };
+    const ANL_DATEI = { trainer: "Trainer-innen", spieler: "Spieler-innen", eltern: "Eltern" };
+    const anleitungErstellen = (rolle, teilen) => {
+      const kandidaten = rolle === "trainer" ? [] : aktive;
+      modal({
+        title: `Kurzanleitung für ${ANL_ROLLE[rolle]}`,
+        body: `
+          <div class="field"><label>🎟️ Einladungscode am Ende anfügen?</label>
+            <select id="anlCode">
+              <option value="">ohne Einladungscode (allgemeine Anleitung)</option>
+              ${rolle === "trainer"
+                ? `<option value="neu">Neuen Trainer:innen-Code erzeugen und anfügen</option>`
+                : kandidaten.map((p) => `<option value="${p.id}">Code für ${esc(p.firstName)} ${esc(p.lastName)}${rolle === "eltern" ? " (Eltern-Konto)" : ""}</option>`).join("")}
+            </select></div>
+          <p class="soft" style="font-size:.82rem">Mit Code steht unten auf der Anleitung der persönliche
+          Einladungscode samt QR-Code – ideal, um alles in einem Schritt zu verschicken (Code gilt 14 Tage).</p>`,
+        footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>${teilen ? "📤 Erstellen & teilen" : "⬇️ PDF erstellen"}</button>`,
+        onOpen(m) {
+          m.querySelector("[data-x]").onclick = closeModal;
+          m.querySelector("[data-s]").onclick = async () => {
+            const wahl = m.querySelector("#anlCode").value;
+            let codeInfo = null;
+            let dateiname = `SKV-Volleyball-Kurzanleitung-${ANL_DATEI[rolle]}-v${ANLEITUNG_VERSION}`;
+            if (wahl) {
+              const p = wahl === "neu" ? null : Store.byId("players", wahl);
+              const res = await apiZugang("/api/invites", {
+                role: rolle,
+                name: p ? (rolle === "eltern" ? ([p.parentName, p.parent2Name].filter(Boolean)[0] || "") : `${p.firstName} ${p.lastName}`) : "",
+                playerIds: p ? [p.id] : [],
+              });
+              if (!res.ok) { toast(res.data.error || "Code konnte nicht erzeugt werden", "bad"); return; }
+              codeInfo = { code: res.data.code, url: res.data.url,
+                           name: p ? (rolle === "eltern" ? `die Eltern von ${p.firstName}` : `${p.firstName} ${p.lastName}`) : "" };
+              if (p) dateiname += `-${p.firstName}-${p.lastName}`;
+              ladeCodes();
+            }
+            closeModal();
+            pdfVomServer(dateiname, kurzanleitungBlocks(rolle, codeInfo), teilen);
+          };
+        },
+      });
+    };
+    $$("[data-anlpdf]", el).forEach((b) => b.onclick = () => anleitungErstellen(b.dataset.anlpdf, false));
+    $$("[data-anlshare]", el).forEach((b) => b.onclick = () => anleitungErstellen(b.dataset.anlshare, true));
+    $$("[data-cs]", el).forEach((b) => b.onclick = () => erzeugen("spieler", Store.byId("players", b.dataset.cs)));
+    $$("[data-ce]", el).forEach((b) => b.onclick = () => erzeugen("eltern", Store.byId("players", b.dataset.ce)));
+    $("[data-tcode]", el).onclick = async () => {
+      const res = await apiZugang("/api/invites", { role: "trainer", name: "", playerIds: [] });
+      if (!res.ok) { toast(res.data.error || "Code konnte nicht erstellt werden", "bad"); return; }
+      codeModal("trainer", "", res.data.code, res.data.url);
+      ladeCodes();
+    };
+
+    const ROLLE_BADGE = { trainer: "accent", spieler: "info", eltern: "good" };
+    const zuletztAktiv = (ts) => {
+      if (!ts) return "noch nie angemeldet";
+      const tage = Math.floor((Date.now() / 1000 - ts) / 86400);
+      if (tage <= 0) return "heute aktiv";
+      if (tage === 1) return "gestern aktiv";
+      return `zuletzt aktiv vor ${tage} Tagen (${fmtDateShort(new Date(ts * 1000).toISOString())})`;
+    };
+    async function ladeKonten() {
+      const res = await apiZugang("/api/accounts");
+      const ziel = $("#zgKonten", el);
+      if (!res.ok) { ziel.innerHTML = `<p class="soft">Konten konnten nicht geladen werden.</p>`; return; }
+      const st = res.data.statistik || {};
+      $("#zgStat", el).innerHTML = `
+        ${stat("👥", "Portal-Konten", st.portalKonten != null ? st.portalKonten : "—", `${st.konten || 0} Konten gesamt`)}
+        ${stat("📈", "Aktiv (7 Tage)", st.aktiv7 != null ? st.aktiv7 : "—", `${st.aktiv30 || 0} in 30 Tagen`)}
+        ${stat("🔔", "Push-Abos", st.pushAbos != null ? st.pushAbos : "—", "Mitteilungen aktiviert")}
+        ${stat("🎟️", "Offene Codes", st.offeneCodes != null ? st.offeneCodes : "—", "noch nicht eingelöst")}`;
+      // Offene Passwort-Anfragen prominent über der Kontenliste
+      const anfragen = res.data.anfragen || [];
+      const konten = res.data.accounts;
+      const anfrageHTML = anfragen.length ? `
+        <div style="border:1.5px solid #e8a13c;border-radius:12px;padding:10px 12px;margin-bottom:10px">
+          <strong style="font-size:.9rem">🔑 Offene Passwort-Anfragen</strong>
+          ${anfragen.map((a) => {
+            const konto = konten.find((k) => k.username.toLowerCase() === String(a.username).toLowerCase());
+            return `<div class="flex" style="justify-content:space-between;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
+              <span style="font-size:.88rem">„${esc(a.username)}“ <span class="soft">· ${zuletztAktiv(a.created_at).replace("aktiv", "angefragt")}</span>
+                ${konto ? "" : ' <span class="badge warn" title="Kein Konto mit diesem Benutzernamen – ggf. Tippfehler, bitte nachfragen">unbekannt</span>'}</span>
+              <span class="flex" style="gap:6px">
+                ${konto ? `<button class="btn sm outline" data-anfcode="${konto.id}">🔑 Code erzeugen</button>` : ""}
+                <button class="btn sm ghost" data-anfweg="${a.id}" title="Anfrage verwerfen">🗑️</button>
+              </span></div>`;
+          }).join("")}
+        </div>` : "";
+      ziel.innerHTML = anfrageHTML + konten.map((k) => `
+        <div class="list-item"><div class="grow">
+          <div class="title" style="font-size:.9rem">${esc(k.name)} <span class="soft">(${esc(k.username)})</span></div>
+          <div class="sub">${k.player_ids.length ? "verknüpft: " + k.player_ids.map(spielerName).map(esc).join(", ") : "keine Spieler:in verknüpft"}${k.totp_enabled ? " · 2FA ✔" : ""}${k.push_abos ? ` · 🔔 ${k.push_abos}` : ""}</div>
+          <div class="sub">${zuletztAktiv(k.last_login)}</div>
+        </div>
+        <span class="badge ${ROLLE_BADGE[k.role] || ""}">${esc(k.role)}</span>
+        <button class="btn sm ghost" data-kedit="${k.id}" title="Konto bearbeiten (Name, Rolle, Verknüpfungen)">✏️</button>
+        <button class="btn sm ghost" data-kreset="${k.id}" title="Passwort-Wiederherstellungscode erzeugen">🔑</button>
+        ${k.active ? `<button class="btn sm ghost" data-deakt="${k.id}">Deaktivieren</button>`
+                   : `<span class="badge bad">deaktiviert</span><button class="btn sm ghost" data-akt="${k.id}">Aktivieren</button>`}
+        </div>`).join("") || `<p class="soft">Noch keine Konten.</p>`;
+      $$("[data-deakt]", ziel).forEach((b) => b.onclick = () =>
+        confirmDialog("Konto deaktivieren? Die Person kann sich dann nicht mehr anmelden.", async () => {
+          const r = await apiZugang(`/api/accounts/${b.dataset.deakt}/active`, { active: false });
+          if (!r.ok) toast(r.data.error || "Fehler", "bad"); else { toast("Konto deaktiviert"); ladeKonten(); }
+        }));
+      $$("[data-akt]", ziel).forEach((b) => b.onclick = async () => {
+        const r = await apiZugang(`/api/accounts/${b.dataset.akt}/active`, { active: true });
+        if (!r.ok) toast(r.data.error || "Fehler", "bad"); else { toast("Konto aktiviert", "good"); ladeKonten(); }
+      });
+      const resetErzeugen = async (kontoId) => {
+        const r = await apiZugang(`/api/accounts/${kontoId}/reset-code`, {});
+        if (!r.ok) { toast(r.data.error || "Code konnte nicht erzeugt werden", "bad"); return; }
+        resetCodeModal(r.data.username, r.data.code);
+        ladeKonten();
+      };
+      $$("[data-kreset]", ziel).forEach((b) => b.onclick = () => resetErzeugen(b.dataset.kreset));
+      $$("[data-anfcode]", ziel).forEach((b) => b.onclick = () => resetErzeugen(b.dataset.anfcode));
+      $$("[data-anfweg]", ziel).forEach((b) => b.onclick = async () => {
+        const r = await apiZugang(`/api/passwort-anfragen/${b.dataset.anfweg}`, null, "DELETE");
+        if (!r.ok) toast("Löschen fehlgeschlagen", "bad"); else ladeKonten();
+      });
+      $$("[data-kedit]", ziel).forEach((b) => b.onclick = () => {
+        const k = konten.find((x) => String(x.id) === b.dataset.kedit);
+        if (k) kontoForm(k, ladeKonten);
+      });
+      // In der Code-Liste je Spieler:in anzeigen, wann Spieler:in- und
+      // Eltern-Konto zuletzt online waren
+      $$("[data-online]", el).forEach((n) => {
+        const pid = n.dataset.online;
+        const sp = konten.find((k) => k.role === "spieler" && k.active && k.player_ids.includes(pid));
+        const elt = konten.find((k) => k.role === "eltern" && k.active && k.player_ids.includes(pid));
+        const teil = (icon, k) => k ? `${icon} ${zuletztAktiv(k.last_login)}` : `${icon} noch kein Konto`;
+        n.textContent = `${teil("🏐", sp)} · ${teil("👪", elt)}`;
+      });
+    }
+    async function ladeCodes() {
+      const res = await apiZugang("/api/invites");
+      const ziel = $("#zgCodes", el);
+      if (!res.ok) { ziel.innerHTML = `<p class="soft">Codes konnten nicht geladen werden.</p>`; return; }
+      const jetzt = Math.floor(Date.now() / 1000);
+      const offen = res.data.invites.filter((i) => !i.used_by && i.expires_at > jetzt);
+      ziel.innerHTML = offen.map((i) => `
+        <div class="list-item"><div class="grow">
+          <div class="title" style="font-size:.9rem">${esc(i.name || "ohne Namen")}${i.player_ids.length ? ` · ${i.player_ids.map(spielerName).map(esc).join(", ")}` : ""}</div>
+          <div class="sub">läuft ab ${fmtDateShort(new Date(i.expires_at * 1000).toISOString())} · von ${esc(i.created_by)}</div></div>
+        <span class="badge ${ROLLE_BADGE[i.role] || ""}">${esc(i.role)}</span>
+        <button class="btn sm ghost" data-cdel="${i.id}">🗑️</button>
+        </div>`).join("") || `<p class="soft">Keine offenen Codes. Codes werden bei der Registrierung automatisch eingelöst.</p>`;
+      $$("[data-cdel]", ziel).forEach((b) => b.onclick = async () => {
+        const r = await apiZugang(`/api/invites/${b.dataset.cdel}`, null, "DELETE");
+        if (!r.ok) toast("Löschen fehlgeschlagen", "bad"); else { toast("Code gelöscht"); ladeCodes(); }
+      });
+    }
+    ladeKonten();
+    ladeCodes();
+  }
+
   // ---- Export ----
+  /* ======================================================================
+     TEAM-ANALYSE & ABZEICHEN
+     Rückmelde- und Zusagenquoten je Spieler:in, filterbar nach Zeitraum und
+     Termin-Art. „Teilnahme" wird über die Zusagen abgebildet (eine echte
+     Anwesenheitsliste gibt es nicht). Abzeichen beziehen sich immer auf die
+     laufende Saison und brauchen mindestens 3 Termine im Bereich.
+     ====================================================================== */
+  const ABZ_MIN_TERMINE = 3;
+
+  function saisonBeginn() {
+    const jetzt = new Date();
+    return new Date(jetzt.getFullYear() - (jetzt.getMonth() < 6 ? 1 : 0), 6, 1);
+  }
+
+  function analyseTermine(zeitraum, typ) {
+    const jetzt = new Date();
+    // Abgesagte Termine zählen nicht – weder für Quoten noch für Abzeichen
+    let evs = S().events.filter((e) => ["training", "home", "away"].includes(e.type) && !e.abgesagt && new Date(e.start) < jetzt);
+    if (zeitraum === "saison") { const sb = saisonBeginn(); evs = evs.filter((e) => new Date(e.start) >= sb); }
+    if (zeitraum === "90") evs = evs.filter((e) => (jetzt - new Date(e.start)) <= 90 * 86400000);
+    if (typ === "training") evs = evs.filter((e) => e.type === "training");
+    if (typ === "spiel") evs = evs.filter((e) => e.type === "home" || e.type === "away");
+    return evs.sort((a, b) => new Date(a.start) - new Date(b.start));
+  }
+
+  function analyseStatistik(evs) {
+    const roster = S().players.filter((p) => p.membershipStatus !== "inaktiv")
+      .sort((a, b) => a.lastName.localeCompare(b.lastName));
+    const respByEvent = {};
+    S().responses.forEach((r) => { (respByEvent[r.eventId] = respByEvent[r.eventId] || {})[r.playerId] = r.status; });
+    return roster.map((p) => {
+      let geantwortet = 0, zusagen = 0, absagen = 0, unsicher = 0;
+      evs.forEach((e) => {
+        const st = (respByEvent[e.id] || {})[p.id];
+        if (st) geantwortet++;
+        if (st === "yes") zusagen++; else if (st === "no") absagen++; else if (st === "maybe") unsicher++;
+      });
+      const n = evs.length;
+      return { p, termine: n, geantwortet, zusagen, absagen, unsicher,
+        antwortQ: n ? Math.round(geantwortet / n * 100) : 0,
+        zusageQ: n ? Math.round(zusagen / n * 100) : 0 };
+    });
+  }
+
+  // Abzeichen je Spieler:in – immer über die laufende Saison gerechnet
+  function spielerAbzeichen() {
+    const statB = {};
+    ["alle", "training", "spiel"].forEach((k) => {
+      statB[k] = {};
+      analyseStatistik(analyseTermine("saison", k)).forEach((z) => { statB[k][z.p.id] = z; });
+    });
+    const defs = (S().abzeichenDefs || []).slice().sort((a, b) => (a.schwelle || 0) - (b.schwelle || 0));
+    const out = {};
+    S().players.forEach((p) => {
+      out[p.id] = defs.filter((d) => {
+        const z = (statB[d.bereich || "alle"] || {})[p.id];
+        if (!z || z.termine < ABZ_MIN_TERMINE) return false;
+        const q = d.typ === "teilnahme" ? z.zusageQ : z.antwortQ;
+        return q >= (d.schwelle || 0);
+      });
+    });
+    return out;
+  }
+
+  function abzeichenForm(d) {
+    const isEdit = !!d;
+    d = d || { name: "", emoji: "🏅", typ: "teilnahme", schwelle: 75, bereich: "training" };
+    modal({
+      title: isEdit ? "Abzeichen bearbeiten" : "Neues Abzeichen",
+      body: `<form id="abf"><div class="form-grid">
+        <div class="field"><label>Emoji</label><input name="emoji" value="${esc(d.emoji)}" maxlength="4" required></div>
+        <div class="field"><label>Name</label><input name="name" value="${esc(d.name)}" required placeholder="z. B. Trainingsteilnahme 85 %"></div>
+        <div class="field"><label>Gezählt wird</label><select name="typ">
+          <option value="rueckmeldung" ${d.typ === "rueckmeldung" ? "selected" : ""}>Rückmeldung abgegeben</option>
+          <option value="teilnahme" ${d.typ === "teilnahme" ? "selected" : ""}>Teilnahme (Zusagen)</option></select></div>
+        <div class="field"><label>Schwelle (%)</label><input type="number" name="schwelle" min="1" max="100" value="${d.schwelle}" required></div>
+        <div class="field"><label>Bereich</label><select name="bereich">
+          <option value="alle" ${d.bereich === "alle" ? "selected" : ""}>alle Termine</option>
+          <option value="training" ${d.bereich === "training" ? "selected" : ""}>nur Trainings</option>
+          <option value="spiel" ${d.bereich === "spiel" ? "selected" : ""}>nur Spiele</option></select></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#abf"); if (!f.reportValidity()) return;
+          const w = formData(f); w.schwelle = Number(w.schwelle) || 0;
+          if (isEdit) Store.update("abzeichenDefs", d.id, w); else Store.add("abzeichenDefs", w);
+          closeModal(); toast("Abzeichen gespeichert", "good"); reload();
+        };
+      },
+    });
+  }
+
+  function analyse(el) {
+    const zeit = analyse._zeit || "saison";
+    const typ = analyse._typ || "alle";
+    const evs = analyseTermine(zeit, typ);
+    const zeilen = analyseStatistik(evs);
+    const abz = spielerAbzeichen();
+    const defs = (S().abzeichenDefs || []).slice().sort((a, b) => (a.schwelle || 0) - (b.schwelle || 0));
+
+    const mitTerminen = zeilen.filter((z) => z.termine > 0);
+    const avg = (f) => mitTerminen.length ? Math.round(mitTerminen.reduce((s, z) => s + f(z), 0) / mitTerminen.length) : 0;
+    const beste = mitTerminen.filter((z) => z.termine >= ABZ_MIN_TERMINE)
+      .slice().sort((a, b) => b.antwortQ - a.antwortQ || b.zusageQ - a.zusageQ)[0];
+
+    // Trainings je Trainer:in im gewählten Zeitraum
+    const proTrainer = {};
+    evs.filter((e) => e.type === "training").forEach((e) => {
+      const n = (e.trainerName || "").trim() || "ohne Zuordnung";
+      proTrainer[n] = (proTrainer[n] || 0) + 1;
+    });
+
+    const balken = (q) => `<div style="display:flex;align-items:center;gap:8px;min-width:120px">
+      <div style="flex:1;height:7px;border-radius:4px;background:var(--border,#e3e6ee);overflow:hidden">
+        <div style="width:${q}%;height:100%;border-radius:4px;background:${q >= 75 ? "var(--good,#2e9e5b)" : q >= 50 ? "#e8a13c" : "#d05050"}"></div>
+      </div><span style="font-size:.82rem;width:38px;text-align:right">${q} %</span></div>`;
+
+    el.innerHTML = `
+      ${head("Team-Analyse", "Wer meldet zuverlässig zurück, wer ist oft dabei? Quoten, Abzeichen und Trends für das Trainerteam")}
+      <div class="flex mb" style="gap:10px;flex-wrap:wrap">
+        <div class="field" style="min-width:180px"><label>Zeitraum</label><select id="anZeit">
+          <option value="saison" ${zeit === "saison" ? "selected" : ""}>laufende Saison (ab 1. Juli)</option>
+          <option value="90" ${zeit === "90" ? "selected" : ""}>letzte 90 Tage</option>
+          <option value="alles" ${zeit === "alles" ? "selected" : ""}>gesamter Zeitraum</option></select></div>
+        <div class="field" style="min-width:160px"><label>Termin-Art</label><select id="anTyp">
+          <option value="alle" ${typ === "alle" ? "selected" : ""}>alle Termine</option>
+          <option value="training" ${typ === "training" ? "selected" : ""}>nur Trainings</option>
+          <option value="spiel" ${typ === "spiel" ? "selected" : ""}>nur Spiele</option></select></div>
+      </div>
+      <div class="grid grid-4 mb">
+        ${stat("📅", "Termine im Zeitraum", evs.length)}
+        ${stat("🔔", "Ø Rückmeldequote", avg((z) => z.antwortQ) + " %")}
+        ${stat("👍", "Ø Zusagenquote", avg((z) => z.zusageQ) + " %")}
+        ${stat("⭐", "Zuverlässigste:r", beste ? `${esc(beste.p.firstName)} ${esc(beste.p.lastName.slice(0, 1))}.` : "–")}
+      </div>
+      ${Object.keys(proTrainer).length ? `<div class="card mb" style="padding:10px 14px">
+        <div class="flex" style="flex-wrap:wrap;gap:8px;align-items:center">
+          <strong>🏐 Trainings je Trainer:in:</strong>
+          ${Object.keys(proTrainer).sort().map((n) => `<span class="badge ${n === "ohne Zuordnung" ? "" : "info"}">👤 ${esc(n)}: <strong>${proTrainer[n]}</strong></span>`).join(" ")}
+        </div></div>` : ""}
+      <div class="card mb" style="padding:0"><div class="table-wrap"><table>
+        <thead><tr><th>Spieler:in</th><th>Team</th><th>geantwortet</th><th>Rückmeldequote</th><th>Zusagen</th><th>Absagen</th><th>Abzeichen (Saison)</th></tr></thead>
+        <tbody>${zeilen.map((z) => `<tr>
+          <td><div class="flex">${avatar(z.p.firstName, z.p.lastName, z.p)}<strong>${esc(z.p.firstName)} ${esc(z.p.lastName)}</strong></div></td>
+          <td><span class="badge info">${esc(z.p.team)}</span></td>
+          <td>${z.geantwortet} / ${z.termine}</td>
+          <td>${balken(z.antwortQ)}</td>
+          <td>${balken(z.zusageQ)}</td>
+          <td>${z.absagen}${z.unsicher ? ` <span class="soft">(+${z.unsicher} ❔)</span>` : ""}</td>
+          <td style="font-size:1.05rem">${(abz[z.p.id] || []).map((d) => `<span title="${esc(d.name)} (ab ${d.schwelle} %)">${esc(d.emoji)}</span>`).join(" ") || '<span class="soft">–</span>'}</td>
+        </tr>`).join("")}</tbody>
+      </table></div></div>
+      <div class="card">
+        <div class="card-head"><h3>🏅 Abzeichen-Regeln</h3><span class="spacer"></span>
+          <button class="btn sm" data-abadd>＋ Abzeichen</button></div>
+        <p class="soft" style="font-size:.82rem;margin-top:0">Abzeichen werden automatisch über die <strong>laufende Saison</strong> vergeben
+          (mindestens ${ABZ_MIN_TERMINE} Termine im Bereich). „Teilnahme" zählt die Zusagen. Die Spieler:innen sehen ihre Abzeichen im Portal.</p>
+        <div class="list">
+          ${defs.map((d) => `<div class="list-item" style="padding:8px 10px">
+            <div style="font-size:1.3rem">${esc(d.emoji)}</div>
+            <div class="grow"><div class="title" style="font-size:.9rem">${esc(d.name)}</div>
+              <div class="sub">${d.typ === "teilnahme" ? "Teilnahme (Zusagen)" : "Rückmeldung abgegeben"} · ab ${d.schwelle} % ·
+                ${d.bereich === "training" ? "nur Trainings" : d.bereich === "spiel" ? "nur Spiele" : "alle Termine"}</div></div>
+            <button class="btn sm ghost" data-abedit="${d.id}">✏️</button>
+            <button class="btn sm ghost" data-abdel="${d.id}">🗑️</button>
+          </div>`).join("") || empty("🏅", "Noch keine Abzeichen definiert")}
+        </div>
+      </div>`;
+
+    $("#anZeit", el).onchange = (e2) => { analyse._zeit = e2.target.value; reload(); };
+    $("#anTyp", el).onchange = (e2) => { analyse._typ = e2.target.value; reload(); };
+    $("[data-abadd]", el).onclick = () => abzeichenForm(null);
+    $$("[data-abedit]", el).forEach((b) => b.onclick = () => abzeichenForm(Store.byId("abzeichenDefs", b.dataset.abedit)));
+    $$("[data-abdel]", el).forEach((b) => b.onclick = () => {
+      const d = Store.byId("abzeichenDefs", b.dataset.abdel);
+      if (d && confirm(`Abzeichen „${d.name}“ löschen?`)) { Store.remove("abzeichenDefs", d.id); toast("Abzeichen gelöscht"); reload(); }
+    });
+  }
+
   window.Views = {
-    dashboard, players, departments, calendar, training, drivers, jobs, consents,
+    dashboard, players, departments, calendar, training, analyse, drivers, jobs, consents,
     birthdays, finances, clothing, sponsors, standings, wiki,
-    announcements, tasks, inventory, verbandsmeldung, backup,
+    announcements, tasks, inventory, verbandsmeldung, backup, zugaenge,
   };
 })();

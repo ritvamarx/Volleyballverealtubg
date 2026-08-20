@@ -69,6 +69,21 @@ CREATE TABLE IF NOT EXISTS state_history (
     updated_by  TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS push_abos (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    endpoint    TEXT NOT NULL UNIQUE,
+    daten       TEXT NOT NULL,                  -- komplette Subscription als JSON
+    created_at  INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS quiz_stand (
+    user_id     INTEGER PRIMARY KEY REFERENCES users(id),
+    punkte      INTEGER NOT NULL DEFAULT 0,
+    beantwortet TEXT NOT NULL DEFAULT '[]',    -- JSON-Liste beantworteter Fragen-IDs
+    updated_at  INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS login_log (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
     ts        INTEGER NOT NULL,
@@ -77,6 +92,20 @@ CREATE TABLE IF NOT EXISTS login_log (
     ip        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_login_log_ts ON login_log(ts);
+CREATE TABLE IF NOT EXISTS reset_codes (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    code_hash   TEXT NOT NULL UNIQUE,
+    created_by  TEXT NOT NULL,
+    created_at  INTEGER NOT NULL,
+    expires_at  INTEGER NOT NULL,
+    used_at     INTEGER
+);
+CREATE TABLE IF NOT EXISTS passwort_anfragen (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    username    TEXT NOT NULL,
+    created_at  INTEGER NOT NULL
+);
 """
 
 
@@ -93,6 +122,15 @@ def init_db() -> None:
     con = connect()
     with con:
         con.executescript(SCHEMA)
+        # Nachträgliche Spalten (CREATE IF NOT EXISTS ergänzt keine Spalten)
+        for spalte in ("users ADD COLUMN last_login INTEGER",
+                       "users ADD COLUMN ics_token TEXT",
+                       "quiz_stand ADD COLUMN wochen_punkte INTEGER NOT NULL DEFAULT 0",
+                       "quiz_stand ADD COLUMN woche TEXT NOT NULL DEFAULT ''"):
+            try:
+                con.execute("ALTER TABLE " + spalte)
+            except sqlite3.OperationalError:
+                pass  # Spalte existiert bereits
     con.close()
 
 

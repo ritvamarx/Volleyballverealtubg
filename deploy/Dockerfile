@@ -9,11 +9,16 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# DejaVu-Schrift für die PDF-Erzeugung (Unicode: Umlaute, ☐, Gedankenstrich …)
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY server/requirements.txt server/requirements.txt
 RUN pip install --no-cache-dir -r server/requirements.txt
 
 COPY server/ server/
-COPY index.html ./
+COPY index.html manifest.webmanifest sw.js ./
 COPY assets/ assets/
 
 RUN useradd --create-home --uid 1000 appuser \

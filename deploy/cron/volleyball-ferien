@@ -1,0 +1,5 @@
+# /etc/cron.d/volleyball-ferien – wöchentlicher Schulferien-Abgleich MV (OpenHolidays)
+# Serverseitig (kein Browser/CORS); manuelle Ferien-Einträge bleiben erhalten.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+35 5 * * 1 root cd /opt/volleyball && docker compose exec -T volleyball ./manage.py ferien-sync >> /var/log/volleyball-ferien.log 2>&1

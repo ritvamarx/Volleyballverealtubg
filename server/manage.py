@@ -134,6 +134,20 @@ def cmd_backup(args) -> None:
         os.remove(os.path.join(args.ziel, old))
 
 
+def cmd_ferien_sync(_args) -> None:
+    """Schulferien DE-MV von OpenHolidays holen und in den Datenbestand schreiben."""
+    import ferien
+
+    print(ferien.sync())
+
+
+def cmd_tabelle_sync(args) -> None:
+    """Offizielle VMV-Ligatabelle (vmv24.de) in den Datenbestand übernehmen."""
+    import tabelle
+
+    print(tabelle.sync(args.liga or None))
+
+
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -164,6 +178,19 @@ def main() -> None:
     s = sub.add_parser("backup", help="Datenbank-Sicherung schreiben")
     s.add_argument("ziel")
     s.set_defaults(func=cmd_backup)
+
+    s = sub.add_parser("ferien-sync", help="Schulferien MV serverseitig abgleichen")
+    s.set_defaults(func=cmd_ferien_sync)
+
+    s = sub.add_parser("aufgaben-erinnern", help="Fällige Portal-Aufgaben per Push erinnern")
+    s.set_defaults(func=lambda _a: print(__import__("erinnerung").lauf()))
+
+    s = sub.add_parser("rueckmelde-warnung", help="Trainerteam warnen, wenn <24 h vor Terminen zu wenige Rückmeldungen da sind")
+    s.set_defaults(func=lambda _a: print(__import__("rueckmeldung").lauf()))
+
+    s = sub.add_parser("tabelle-sync", help="VMV-Ligatabelle (vmv24.de) abgleichen")
+    s.add_argument("--liga", default="", help="Liga-Slug, z. B. VerbandsligaMänner (Standard aus VV_TABELLE_LIGA)")
+    s.set_defaults(func=cmd_tabelle_sync)
 
     args = p.parse_args()
     args.func(args)

@@ -66,7 +66,14 @@
   function initials(first, last) {
     return `${(first || "?")[0]}${(last || "")[0] || ""}`.toUpperCase();
   }
-  function avatar(first, last) {
+  function avatar(first, last, profil) {
+    // profil (optional): Spieler-Objekt mit eigenem Foto oder Emoji-Avatar
+    if (profil && profil.foto) {
+      return `<div class="avatar" style="padding:0;overflow:hidden"><img src="${profil.foto}" alt="" style="width:100%;height:100%;object-fit:cover"></div>`;
+    }
+    if (profil && profil.avatarEmoji) {
+      return `<div class="avatar" style="background:#eef2ff;font-size:1.15rem">${esc(profil.avatarEmoji)}</div>`;
+    }
     const c = avatarColor(`${first}${last}`);
     return `<div class="avatar" style="background:${c}">${esc(initials(first, last))}</div>`;
   }
@@ -164,10 +171,64 @@
     </svg>`;
   }
 
+  // 🏐 Belohnungs-Animation: ein Volleyball fliegt durchs Bild – jedes Mal mit
+  // zufälliger Route (hoher Bogen, Boden-Praller oder Abprallen an der Wand),
+  // zufälliger Richtung, Größe und Geschwindigkeit.
+  function volleyballFlug() {
+    try {
+      const b = document.createElement("div");
+      b.textContent = "🏐";
+      const groesse = 46 + Math.round(Math.random() * 30);
+      const vonLinks = Math.random() < 0.5;
+      const B = window.innerWidth, H = window.innerHeight;
+      const startTop = H * (0.2 + Math.random() * 0.45);
+      b.style.cssText = `position:fixed;z-index:99999;left:${vonLinks ? -groesse - 40 : B + 40}px;top:${startTop}px;`
+        + `font-size:${groesse}px;pointer-events:none;will-change:transform;filter:drop-shadow(0 6px 8px rgba(0,0,0,.25))`;
+      document.body.appendChild(b);
+      const dirX = vonLinks ? 1 : -1;
+      const weite = B + groesse + 120;
+      const drall = (3 + Math.random() * 3) * dirX;
+      const kf = (off, x, y) => ({
+        offset: off,
+        transform: `translate(${dirX * x}px, ${y}px) rotate(${drall * off}turn)`,
+      });
+      const variante = Math.floor(Math.random() * 3);
+      let frames;
+      if (variante === 0) {
+        // Hoher Bogen über den Bildschirm
+        const hoehe = 100 + Math.random() * (startTop * 0.8);
+        frames = [kf(0, 0, 0), kf(0.5, weite * 0.5, -hoehe), kf(1, weite, 60)];
+      } else if (variante === 1) {
+        // Boden-Praller: hüpft mit abnehmender Höhe über den Boden
+        const boden = H - startTop - groesse - 8;
+        frames = [
+          kf(0, 0, 0),
+          kf(0.22, weite * 0.22, boden),
+          kf(0.42, weite * 0.42, boden - Math.min(boden, H * 0.34)),
+          kf(0.58, weite * 0.58, boden),
+          kf(0.73, weite * 0.73, boden - Math.min(boden, H * 0.17)),
+          kf(0.85, weite * 0.85, boden),
+          kf(1, weite, boden - Math.min(boden, H * 0.07)),
+        ];
+      } else {
+        // Wand-Praller: an der gegenüberliegenden Kante abprallen und zurück
+        const wand = B - groesse * 1.2;
+        frames = [
+          kf(0, 0, 0),
+          kf(0.45, wand, -H * (0.05 + Math.random() * 0.15)),
+          kf(0.7, wand * 0.55, H * 0.2),
+          kf(1, wand * 0.1, H - startTop + groesse),
+        ];
+      }
+      b.animate(frames, { duration: 1200 + Math.random() * 800, easing: "linear" }).onfinish = () => b.remove();
+      setTimeout(() => b.remove(), 2600); // Sicherheitsnetz für alte Browser
+    } catch (e) { /* Animation ist nur Zierde */ }
+  }
+
   window.U = {
     $, $$, esc, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtMoney,
     daysUntil, relDays, age, avatar, avatarColor, initials,
     toast, modal, closeModal, confirmDialog, formData,
-    clothingSVG, sponsorSVG, DOW, MON,
+    clothingSVG, sponsorSVG, DOW, MON, volleyballFlug,
   };
 })();

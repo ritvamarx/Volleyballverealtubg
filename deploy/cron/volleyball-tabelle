@@ -1,0 +1,5 @@
+# /etc/cron.d/volleyball-tabelle – täglicher Abgleich der offiziellen VMV-Ligatabelle
+# Quelle: www.vmv24.de (SAMS-CMS des Volleyballverbands MV); Liga über VV_TABELLE_LIGA in /opt/volleyball/.env
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+5 6 * * * root cd /opt/volleyball && docker compose exec -T volleyball ./manage.py tabelle-sync >> /var/log/volleyball-tabelle.log 2>&1

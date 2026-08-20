@@ -42,7 +42,7 @@ manuelles Vorgehen oder zum Nachschlagen.
 
 4. **Erstes Trainerkonto:**
    ```bash
-   ssh benutzer@server "cd /opt/volleyball && docker compose exec app ./manage.py create-trainer --username andreas --name 'Andreas Berg'"
+   ssh benutzer@server "cd /opt/volleyball && docker compose exec volleyball ./manage.py create-trainer --username andreas --name 'Andreas Berg'"
    ```
    Beim ersten Login richtet das Konto verpflichtend TOTP-2FA ein
    (Authenticator-App; Backup-Codes werden einmalig angezeigt).
@@ -50,7 +50,7 @@ manuelles Vorgehen oder zum Nachschlagen.
 5. **Weitere Trainer:** In der App anmelden … oder per CLI einen
    Einladungscode erzeugen und per WhatsApp verschicken:
    ```bash
-   docker compose exec app ./manage.py create-invite --role trainer --name "Katrin Sommer"
+   docker compose exec volleyball ./manage.py create-invite --role trainer --name "Katrin Sommer"
    ```
    Registrierung dann unter `https://volleyball.nettverwaltet.de/?code=XXXX-XXXX-XXXX`.
 
@@ -58,9 +58,12 @@ manuelles Vorgehen oder zum Nachschlagen.
    Browserdaten zu übertragen — oder Datensicherung → „Verschlüsselt
    importieren" mit der vorhandenen `.skv`-Datei.
 
-7. **Backup-Cron:** `deploy/cron/volleyball-backup` nach `/etc/cron.d/`
-   kopieren und das Ziel an euer bestehendes vereins-backup-Muster anpassen
-   (Sicherungen gehören zusätzlich auf ein anderes System!).
+7. **Backup:** läuft seit 2026-08-19 **zentral** über `/opt/backup-server.sh`
+   (Cron `/etc/cron.d/vereins-backup`, täglich 03:30): konsistenter
+   SQLite-Snapshot, Ablage `/opt/backups` (14 Stände) **plus Off-Site-Kopie
+   in die WerkHaus-Nextcloud**. Das Skript wird aus dem Vereinsverwaltung-Repo
+   (`deploy/backup-server.sh`) gepflegt; `deploy/cron/volleyball-backup` hier
+   ist nur noch eine Hinweisdatei.
 
 ## Updates (wie gewohnt)
 
@@ -73,10 +76,10 @@ werden nie angefasst.)
 ## Notfall-Kommandos
 
 ```bash
-docker compose exec app ./manage.py list-users
-docker compose exec app ./manage.py reset-2fa <benutzername>
-docker compose exec app ./manage.py reset-password <benutzername>
-docker compose exec app ./manage.py backup /app/data/backups
+docker compose exec volleyball ./manage.py list-users
+docker compose exec volleyball ./manage.py reset-2fa <benutzername>
+docker compose exec volleyball ./manage.py reset-password <benutzername>
+docker compose exec volleyball ./manage.py backup /app/data/backups
 ```
 
 ## Was Phase 1 kann — und was noch nicht
@@ -85,7 +88,25 @@ docker compose exec app ./manage.py backup /app/data/backups
   per Einladungscode (alle Rollen)
 - ✔ Zentraler Datenbestand mit Versionsprüfung, Verlauf (30 Stände, mit
   Autor), Konfliktwarnung, Offline-Puffer
-- ✔ Spieler-/Eltern-Konten können sich bereits registrieren und anmelden,
-  sehen aber nur eine „Portal folgt"-Seite — die gefilterte Portal-Sicht
-  ist Phase 3
-- ➜ Phase 2: PWA (Home-Bildschirm-App), Phase 4: Push, Ferien-Cron, DSGVO-Seiten
+- ✔ Phase 2: PWA — Manifest, 🏐-Icons, Service Worker (Offline-Shell,
+  Build-Hash-Version, Update-Hinweis); iPhone: Safari → Teilen →
+  „Zum Home-Bildschirm"
+- ✔ Phase 3: **Spieler-/Eltern-Portal** — Registrierung per Einladungscode
+  (Trainer-Bereich „Portal-Zugänge": Codes je Spieler:in, WhatsApp-Versand,
+  Kontenverwaltung), serverseitig gefilterte Sicht (`/api/portal` – Eltern
+  sehen keine Namen fremder Kinder), Aktionen: Trainingsrückmeldung,
+  Fahrer-Angebot, Heimspiel-Jobs, Kleidungs-Anfrage, eigene Kontaktdaten,
+  weiteren Code einlösen (Eltern mit mehreren Kindern)
+- ✔ PDF-Elternbriefe pro Spieler:in (`/api/brief-pdf`, fpdf2/DejaVu) mit
+  vorausgefüllten Pflicht-Erklärungen – Download oder Teilen (WhatsApp)
+- ✔ Phase 4: **Web-Push** (VAPID-Schlüssel entstehen automatisch in
+  `data/vapid.json`; Abo im Portal unter Konto; neue Ankündigungen gehen
+  automatisch als Mitteilung an die passende Zielgruppe), **Ferien-Cron**
+  `/etc/cron.d/volleyball-ferien` (Mo 05:35, OpenHolidays DE-MV,
+  `./manage.py ferien-sync`), **DSGVO-Seiten** `/datenschutz` + `/impressum`
+  (⚠ Anschrift/Register einmalig in `server/seiten/*.html` ergänzen)
+- ✔ **Tabellen-Automatik:** `/etc/cron.d/volleyball-tabelle` (täglich 06:05)
+  gleicht die offizielle VMV-Ligatabelle von www.vmv24.de ab
+  (`./manage.py tabelle-sync`; Liga über `VV_TABELLE_LIGA` in `.env`,
+  Standard `VerbandsligaMänner`; Saison wird automatisch erkannt).
+  Handpflege im Tabellen-Editor wird dabei überschrieben.

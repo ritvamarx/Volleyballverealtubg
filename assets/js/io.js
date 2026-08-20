@@ -300,7 +300,7 @@
   // ---------- Komplett-Backup: ALLE Daten als eine CSV-Datei ----------
   // Format: Abschnitte, eingeleitet mit  #TABELLE;<name>  gefolgt von normaler CSV.
   const BACKUP_COLLECTIONS = ["departments", "players", "events", "responses", "drivers", "jobs",
-    "consents", "consentTemplates", "calendarFeeds", "finances", "clothing", "clothingRequests",
+    "consents", "consentTemplates", "eventCategories", "buffet", "abwesenheiten", "uebungen", "quizFragen", "sportstaetten", "abzeichenDefs", "calendarFeeds", "finances", "clothing", "clothingRequests",
     "sponsors", "announcements", "tasks", "inventory", "standings", "meldungen", "holidays", "letters", "links"];
   const NUM_FIELDS = new Set(["amount", "seats", "qty", "price", "count", "target", "jerseyNumber",
     "games", "win", "loss", "setsW", "setsL", "points", "contribution"]);

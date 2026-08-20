@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "volleyball-statisch",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "exec python3 -m http.server \"${PORT:-8471}\" --directory /Users/ricky/Volleyballverealtubg"],
+      "port": 8471,
+      "autoPort": true
+    }
+  ]
+}

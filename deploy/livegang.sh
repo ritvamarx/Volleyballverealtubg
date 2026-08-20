@@ -62,7 +62,8 @@ ssh "$HOST" "mkdir -p $PFAD/data"
 rsync -az --delete \
   --exclude '.git' --exclude 'data' --exclude '.env' --exclude 'dist' \
   --exclude 'node_modules' \
-  "$REPO_ROOT/index.html" "$REPO_ROOT/assets" "$REPO_ROOT/server" "$REPO_ROOT/deploy" \
+  "$REPO_ROOT/index.html" "$REPO_ROOT/manifest.webmanifest" "$REPO_ROOT/sw.js" \
+  "$REPO_ROOT/assets" "$REPO_ROOT/server" "$REPO_ROOT/deploy" \
   "$HOST:$PFAD/"
 ssh "$HOST" "cd $PFAD && cp deploy/docker-compose.yml . \
   && sed -i 's/^  caddy:\$/  $NETZ:/; s/^      - caddy\$/      - $NETZ/' docker-compose.yml \
@@ -71,14 +72,14 @@ ok "Übertragen (docker-compose auf Netz '$NETZ' eingestellt, .env vorhanden)"
 
 # --------------------------------------------------- 4. Bauen & starten
 schritt "4/8 Image bauen und Container starten"
-ssh "$HOST" "cd $PFAD && docker compose up -d --build app"
+ssh "$HOST" "cd $PFAD && docker compose up -d --build volleyball"
 sleep 3
-GESUND="$(ssh "$HOST" "cd $PFAD && docker compose exec -T app python3 -c \"import urllib.request;print(urllib.request.urlopen('http://127.0.0.1:8000/gesund').read().decode())\"" || true)"
+GESUND="$(ssh "$HOST" "cd $PFAD && docker compose exec -T volleyball python3 -c \"import urllib.request;print(urllib.request.urlopen('http://127.0.0.1:8000/gesund').read().decode())\"" || true)"
 if echo "$GESUND" | grep -q '"ok"'; then
   ok "App-Container läuft und antwortet"
 else
   warn "Healthcheck fehlgeschlagen – letzte Logzeilen:"
-  ssh "$HOST" "cd $PFAD && docker compose logs --tail 25 app" || true
+  ssh "$HOST" "cd $PFAD && docker compose logs --tail 25 volleyball" || true
   exit 1
 fi
 
@@ -115,20 +116,22 @@ fi
 
 # --------------------------------------------------- 6. Erstes Trainerkonto
 schritt "6/8 Trainerkonto"
-ANZAHL="$(ssh "$HOST" "cd $PFAD && docker compose exec -T app ./manage.py list-users 2>/dev/null | wc -l" || echo 0)"
+ANZAHL="$(ssh "$HOST" "cd $PFAD && docker compose exec -T volleyball ./manage.py list-users 2>/dev/null | wc -l" || echo 0)"
 if [ "${ANZAHL:-0}" -gt 0 ]; then
   ok "Es existieren bereits $ANZAHL Konto/Konten – Schritt übersprungen"
 else
   read -r -p "  Benutzername für dein Trainerkonto: " TUSER
   read -r -p "  Voller Name: " TNAME
-  ssh -t "$HOST" "cd $PFAD && docker compose exec app ./manage.py create-trainer --username '$TUSER' --name '$TNAME'"
+  ssh -t "$HOST" "cd $PFAD && docker compose exec volleyball ./manage.py create-trainer --username '$TUSER' --name '$TNAME'"
   ok "Trainerkonto '$TUSER' angelegt (2FA wird beim ersten Login eingerichtet)"
 fi
 
 # --------------------------------------------------- 7. Backup-Cron
 schritt "7/8 Backup-Cron installieren"
-if ssh "$HOST" "cp $PFAD/deploy/cron/volleyball-backup /etc/cron.d/volleyball-backup" 2>/dev/null; then
-  ok "/etc/cron.d/volleyball-backup installiert (Ziel ggf. an vereins-backup-Muster angleichen)"
+if ssh "$HOST" "grep -q 'volleyball-app' /opt/backup-server.sh" 2>/dev/null; then
+  ok "Sicherung läuft zentral über /opt/backup-server.sh (vereins-backup, 03:30)"
+elif ssh "$HOST" "cp $PFAD/deploy/cron/volleyball-backup /etc/cron.d/volleyball-backup" 2>/dev/null; then
+  ok "/etc/cron.d/volleyball-backup installiert (Hinweisdatei – zentrale Sicherung einrichten!)"
 else
   warn "Konnte Cron nicht installieren (kein root?) – bitte manuell kopieren."
 fi
