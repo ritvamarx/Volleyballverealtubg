@@ -15,6 +15,14 @@
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
+  // Sichere URL fürs href-Attribut: nur unbedenkliche Schemata durchlassen,
+  // sonst "#" – verhindert javascript:/data:-Klick-XSS aus Nutzer-/Sync-Daten.
+  function escUrl(s) {
+    const roh = String(s == null ? "" : s).trim();
+    if (/^(https?:|mailto:|tel:|webcal:)/i.test(roh) || /^\//.test(roh)) return esc(roh);
+    return "#";
+  }
+
   // ---- Datum / Uhrzeit (deutsch) ----
   const DOW = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
   const MON = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
@@ -226,7 +234,7 @@
   }
 
   window.U = {
-    $, $$, esc, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtMoney,
+    $, $$, esc, escUrl, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtMoney,
     daysUntil, relDays, age, avatar, avatarColor, initials,
     toast, modal, closeModal, confirmDialog, formData,
     clothingSVG, sponsorSVG, DOW, MON, volleyballFlug,

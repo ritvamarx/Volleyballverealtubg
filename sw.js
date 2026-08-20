@@ -10,6 +10,7 @@ const SHELL = [
   "/assets/js/utils.js",
   "/assets/js/io.js",
   "/assets/js/views.js",
+  "/assets/js/portal.js",
   "/assets/js/app.js",
   "/assets/js/sync.js",
   "/assets/icons/icon-192.png",

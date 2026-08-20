@@ -302,8 +302,12 @@
   const BACKUP_COLLECTIONS = ["departments", "players", "events", "responses", "drivers", "jobs",
     "consents", "consentTemplates", "eventCategories", "buffet", "abwesenheiten", "uebungen", "quizFragen", "sportstaetten", "abzeichenDefs", "calendarFeeds", "finances", "clothing", "clothingRequests",
     "sponsors", "announcements", "tasks", "inventory", "standings", "meldungen", "holidays", "letters", "links"];
+  // Nicht-Listen-Schlüssel (Objekte) fürs Komplett-Backup separat behandeln
+  const BACKUP_OBJECTS = ["whatsapp", "standingsMeta"];
   const NUM_FIELDS = new Set(["amount", "seats", "qty", "price", "count", "target", "jerseyNumber",
-    "games", "win", "loss", "setsW", "setsL", "points", "contribution"]);
+    "games", "win", "loss", "setsW", "setsL", "points", "contribution",
+    // Quiz/Abzeichen/Übungen: Zahlenfelder müssen nach CSV-Restore Zahlen bleiben
+    "r", "stufe", "schwelle", "dauer", "minSp", "maxSp"]);
   const BOOL_FIELDS = new Set(["paid", "done", "consentOnFile", "required", "autoSync", "active"]);
 
   function cellOut(v) {
@@ -336,6 +340,14 @@
         return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
       }).join(";")));
     });
+    // Objekt-Schlüssel (keine Listen) als eigener JSON-Abschnitt
+    BACKUP_OBJECTS.forEach((key) => {
+      const val = s[key];
+      if (val && typeof val === "object") {
+        parts.push(`#OBJEKT;${key}`);
+        parts.push(JSON.stringify(val));
+      }
+    });
     return parts.join("\n");
   }
 
@@ -343,10 +355,16 @@
     text = text.replace(/^﻿/, "").replace(/\r/g, "");
     if (!text.includes("#TABELLE;")) throw new Error("Kein SKV-Backup: Abschnitt #TABELLE fehlt");
     const result = {};
-    const sections = text.split(/\n(?=#TABELLE;)/);
+    const sections = text.split(/\n(?=#TABELLE;|#OBJEKT;)/);
     sections.forEach((sec) => {
-      if (!sec.startsWith("#TABELLE;")) return;
       const nl = sec.indexOf("\n");
+      if (sec.startsWith("#OBJEKT;")) {
+        const name = sec.slice(8, nl).trim();
+        if (!BACKUP_OBJECTS.includes(name)) return;
+        try { result[name] = JSON.parse(sec.slice(nl + 1).trim()); } catch (e) { /* defekt – überspringen */ }
+        return;
+      }
+      if (!sec.startsWith("#TABELLE;")) return;
       const name = sec.slice(9, nl).trim();
       if (!BACKUP_COLLECTIONS.includes(name)) return;
       const body = sec.slice(nl + 1);
@@ -360,7 +378,8 @@
     });
     const found = Object.keys(result);
     if (!found.length) throw new Error("Keine bekannten Tabellen in der Datei gefunden");
-    return { data: result, tables: found, counts: found.map((t) => `${t}: ${result[t].length}`) };
+    return { data: result, tables: found,
+             counts: found.map((t) => `${t}: ${Array.isArray(result[t]) ? result[t].length : "1"}`) };
   }
 
   window.IO = {

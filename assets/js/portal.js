@@ -9,7 +9,7 @@
    ========================================================================== */
 (function () {
   "use strict";
-  const { $, esc, fmtDate, fmtTime, fmtDateShort, fmtMoney, toast, volleyballFlug } = U;
+  const { $, esc, escUrl, fmtDate, fmtTime, fmtDateShort, fmtMoney, toast, volleyballFlug } = U;
 
   const P = { daten: null, tab: "start", busy: false };
   window.Portal = P;
@@ -323,7 +323,7 @@
       ${abzeichenKarte}
       ${d.whatsapp ? `<div class="card"><h3>💬 ${istEltern() ? "WhatsApp-Elterngruppe" : "WhatsApp-Gruppe des Teams"}</h3>
         <p class="soft">Hier laufen kurzfristige Infos zusammen – komm gern dazu!</p>
-        <a class="btn" style="text-decoration:none" href="${esc(d.whatsapp)}" target="_blank" rel="noopener">💬 Gruppe öffnen / beitreten</a>
+        <a class="btn" style="text-decoration:none" href="${escUrl(d.whatsapp)}" target="_blank" rel="noopener">💬 Gruppe öffnen / beitreten</a>
       </div>` : ""}
       ${pushMoeglich() && !P.pushAktiv ? `<div class="card">
         <h3>🔔 Mitteilungen aktivieren</h3>
@@ -343,7 +343,7 @@
           </div></div>`).join("") : `<p class="soft">Aktuell stehen keine Termine an.</p>`}
       </div></div>
       ${d.links.length ? `<div class="card"><h3>🔗 Links</h3><div class="list">
-        ${d.links.map((l) => `<a class="list-item" href="${esc(l.url)}" target="_blank" rel="noopener"><div class="grow">
+        ${d.links.map((l) => `<a class="list-item" href="${escUrl(l.url)}" target="_blank" rel="noopener"><div class="grow">
           <div class="title">${esc(l.icon)} ${esc(l.title)}</div><div class="sub">${esc(l.sub)}</div></div><span class="arr">›</span></a>`).join("")}
       </div></div>` : ""}`;
   }

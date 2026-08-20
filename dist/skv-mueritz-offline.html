@@ -1296,6 +1296,14 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
+  // Sichere URL fürs href-Attribut: nur unbedenkliche Schemata durchlassen,
+  // sonst "#" – verhindert javascript:/data:-Klick-XSS aus Nutzer-/Sync-Daten.
+  function escUrl(s) {
+    const roh = String(s == null ? "" : s).trim();
+    if (/^(https?:|mailto:|tel:|webcal:)/i.test(roh) || /^\//.test(roh)) return esc(roh);
+    return "#";
+  }
+
   // ---- Datum / Uhrzeit (deutsch) ----
   const DOW = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
   const MON = ["Januar", "Februar", "März", "April", "Mai", "Juni", "Juli", "August", "September", "Oktober", "November", "Dezember"];
@@ -1507,7 +1515,7 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
   }
 
   window.U = {
-    $, $$, esc, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtMoney,
+    $, $$, esc, escUrl, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtMoney,
     daysUntil, relDays, age, avatar, avatarColor, initials,
     toast, modal, closeModal, confirmDialog, formData,
     clothingSVG, sponsorSVG, DOW, MON, volleyballFlug,
@@ -1821,8 +1829,12 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
   const BACKUP_COLLECTIONS = ["departments", "players", "events", "responses", "drivers", "jobs",
     "consents", "consentTemplates", "eventCategories", "buffet", "abwesenheiten", "uebungen", "quizFragen", "sportstaetten", "abzeichenDefs", "calendarFeeds", "finances", "clothing", "clothingRequests",
     "sponsors", "announcements", "tasks", "inventory", "standings", "meldungen", "holidays", "letters", "links"];
+  // Nicht-Listen-Schlüssel (Objekte) fürs Komplett-Backup separat behandeln
+  const BACKUP_OBJECTS = ["whatsapp", "standingsMeta"];
   const NUM_FIELDS = new Set(["amount", "seats", "qty", "price", "count", "target", "jerseyNumber",
-    "games", "win", "loss", "setsW", "setsL", "points", "contribution"]);
+    "games", "win", "loss", "setsW", "setsL", "points", "contribution",
+    // Quiz/Abzeichen/Übungen: Zahlenfelder müssen nach CSV-Restore Zahlen bleiben
+    "r", "stufe", "schwelle", "dauer", "minSp", "maxSp"]);
   const BOOL_FIELDS = new Set(["paid", "done", "consentOnFile", "required", "autoSync", "active"]);
 
   function cellOut(v) {
@@ -1855,6 +1867,14 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
         return /[";\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
       }).join(";")));
     });
+    // Objekt-Schlüssel (keine Listen) als eigener JSON-Abschnitt
+    BACKUP_OBJECTS.forEach((key) => {
+      const val = s[key];
+      if (val && typeof val === "object") {
+        parts.push(`#OBJEKT;${key}`);
+        parts.push(JSON.stringify(val));
+      }
+    });
     return parts.join("\n");
   }
 
@@ -1862,10 +1882,16 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
     text = text.replace(/^﻿/, "").replace(/\r/g, "");
     if (!text.includes("#TABELLE;")) throw new Error("Kein SKV-Backup: Abschnitt #TABELLE fehlt");
     const result = {};
-    const sections = text.split(/\n(?=#TABELLE;)/);
+    const sections = text.split(/\n(?=#TABELLE;|#OBJEKT;)/);
     sections.forEach((sec) => {
-      if (!sec.startsWith("#TABELLE;")) return;
       const nl = sec.indexOf("\n");
+      if (sec.startsWith("#OBJEKT;")) {
+        const name = sec.slice(8, nl).trim();
+        if (!BACKUP_OBJECTS.includes(name)) return;
+        try { result[name] = JSON.parse(sec.slice(nl + 1).trim()); } catch (e) { /* defekt – überspringen */ }
+        return;
+      }
+      if (!sec.startsWith("#TABELLE;")) return;
       const name = sec.slice(9, nl).trim();
       if (!BACKUP_COLLECTIONS.includes(name)) return;
       const body = sec.slice(nl + 1);
@@ -1879,7 +1905,8 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
     });
     const found = Object.keys(result);
     if (!found.length) throw new Error("Keine bekannten Tabellen in der Datei gefunden");
-    return { data: result, tables: found, counts: found.map((t) => `${t}: ${result[t].length}`) };
+    return { data: result, tables: found,
+             counts: found.map((t) => `${t}: ${Array.isArray(result[t]) ? result[t].length : "1"}`) };
   }
 
   window.IO = {
@@ -1900,7 +1927,7 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
    ========================================================================== */
 (function () {
   "use strict";
-  const { $, $$, esc, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtMoney,
+  const { $, $$, esc, escUrl, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtMoney,
     daysUntil, relDays, age, avatar, toast, modal, closeModal, confirmDialog,
     formData, clothingSVG, sponsorSVG, DOW, MON, volleyballFlug } = U;
 
@@ -1949,7 +1976,7 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
   function linkListHTML() {
     return S().links.map((lk) => `
       <div class="flex" style="gap:0">
-        <a class="link-card grow" href="${esc(lk.url)}" target="_blank" rel="noopener" style="border-radius:12px 0 0 12px;border-right:none">
+        <a class="link-card grow" href="${escUrl(lk.url)}" target="_blank" rel="noopener" style="border-radius:12px 0 0 12px;border-right:none">
           <span class="ic">${esc(lk.icon || "🔗")}</span>
           <div class="grow"><div class="title">${esc(lk.title)}</div><div class="sub">${esc(lk.sub || "")}</div></div>
           <span class="arr">↗</span></a>
@@ -2142,7 +2169,7 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
     const wa = waGroupLink();
     el.innerHTML = `
       ${head("Spielerverwaltung", "Kader, Kontaktdaten von Spielern und Eltern",
-        `${wa ? `<a class="btn secondary" href="${esc(wa.url)}" target="_blank" rel="noopener">💬 WhatsApp-Gruppe</a>` : ""}<button class="btn outline" data-io>⇅ Import / Export</button><button class="btn" data-add>＋ Spieler</button>`)}
+        `${wa ? `<a class="btn secondary" href="${escUrl(wa.url)}" target="_blank" rel="noopener">💬 WhatsApp-Gruppe</a>` : ""}<button class="btn outline" data-io>⇅ Import / Export</button><button class="btn" data-add>＋ Spieler</button>`)}
       <div class="chip-row mb">${chips.join("")}</div>
       <div class="card" style="padding:0">
         <div class="table-wrap"><table>
@@ -2414,7 +2441,7 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
                 <div class="sub">${contactLine(r.email, r.phone)}</div></div>
             </label>`).join("") : '<div class="muted">Keine Kontaktdaten hinterlegt.</div>'}
         </div>
-        ${(() => { const wa = waGroupLink(); return wa ? `<a class="btn sm secondary mb" href="${esc(wa.url)}" target="_blank" rel="noopener">💬 WhatsApp-Gruppe öffnen</a>` : ""; })()}
+        ${(() => { const wa = waGroupLink(); return wa ? `<a class="btn sm secondary mb" href="${escUrl(wa.url)}" target="_blank" rel="noopener">💬 WhatsApp-Gruppe öffnen</a>` : ""; })()}
         <form id="cf"><div class="field"><label>Betreff</label><input name="subject" value="SKV Müritz – Info zu ${esc(p.firstName)}"></div>
         <div class="field mt"><label>Nachricht</label><textarea name="msg" rows="5">Hallo,\n\n</textarea></div></form>`,
       footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn" data-send>E-Mail öffnen</button>`,
@@ -3342,7 +3369,7 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
           ${gewaehlt.map((u) => `<div class="list-item" style="padding:8px 10px"><div class="grow">
             <div class="title" style="font-size:.88rem">${phasenName(u.kategorie)} · ${esc(u.name)} <span class="soft">(${u.dauer}′)</span></div>
             ${u.beschreibung ? `<div class="sub">${esc(u.beschreibung)}</div>` : ""}
-            ${u.quelle || u.link ? `<div class="sub">📚 ${esc(u.quelle || "Quelle")}${u.link ? ` · <a href="${esc(u.link)}" target="_blank" rel="noopener">${/youtu/.test(u.link) ? "▶️ Video" : "📄 Anleitung"} öffnen</a>` : ""}</div>` : ""}</div>
+            ${u.quelle || u.link ? `<div class="sub">📚 ${esc(u.quelle || "Quelle")}${u.link ? ` · <a href="${escUrl(u.link)}" target="_blank" rel="noopener">${/youtu/.test(u.link) ? "▶️ Video" : "📄 Anleitung"} öffnen</a>` : ""}</div>` : ""}</div>
             <button class="btn sm ghost" data-planweg="${u.id}" title="Aus dem Plan entfernen">✕</button>
           </div>`).join("")}</div>` : `<p class="soft">Noch kein Plan – unten Bausteine antippen oder 🎲 Vorschlag nutzen.</p>`}
         ${PLAN_PHASEN.map(([kat, label]) => {
@@ -3527,7 +3554,7 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
             <div class="list-item" style="padding:8px 10px"><div class="grow">
               <div class="title" style="font-size:.88rem">${esc(u.name)} <span class="soft">(${u.dauer}′ · ${u.minSp || "egal"}${u.maxSp ? "–" + u.maxSp : u.minSp ? "+" : ""} Teiln.)</span></div>
               ${u.beschreibung ? `<div class="sub">${esc(u.beschreibung)}</div>` : ""}
-              ${u.quelle || u.link ? `<div class="sub">📚 ${esc(u.quelle || "Quelle")}${u.link ? ` · <a href="${esc(u.link)}" target="_blank" rel="noopener">${/youtu/.test(u.link) ? "▶️ Video" : "📄 Anleitung"}</a>` : ""}</div>` : ""}</div>
+              ${u.quelle || u.link ? `<div class="sub">📚 ${esc(u.quelle || "Quelle")}${u.link ? ` · <a href="${escUrl(u.link)}" target="_blank" rel="noopener">${/youtu/.test(u.link) ? "▶️ Video" : "📄 Anleitung"}</a>` : ""}</div>` : ""}</div>
               <button class="btn sm ghost" data-uedit="${u.id}">✏️</button>
               <button class="btn sm ghost" data-udel="${u.id}">🗑️</button>
             </div>`).join("");
@@ -4915,7 +4942,7 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
             <dl class="kv" style="width:100%">
               <dt>Beitrag</dt><dd>${fmtMoney(sp.contribution)}</dd>
               <dt>Kontakt</dt><dd class="soft">${esc(sp.contact || "—")}</dd>
-              <dt>Web</dt><dd>${sp.website ? `<a href="${esc(sp.website)}" target="_blank" rel="noopener">Website ↗</a>` : "—"}</dd>
+              <dt>Web</dt><dd>${sp.website ? `<a href="${escUrl(sp.website)}" target="_blank" rel="noopener">Website ↗</a>` : "—"}</dd>
             </dl>
             <div class="flex" style="width:100%"><span class="spacer"></span>
               <button class="btn sm ghost" data-sedit="${sp.id}">✏️</button>
@@ -6396,6 +6423,7 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
       return `zuletzt aktiv vor ${tage} Tagen (${fmtDateShort(new Date(ts * 1000).toISOString())})`;
     };
     async function ladeKonten() {
+      _trainerNamen = null; // Konten wurden (neu) geladen/geändert → Trainer-Dropdown-Cache verwerfen
       const res = await apiZugang("/api/accounts");
       const ziel = $("#zgKonten", el);
       if (!res.ok) { ziel.innerHTML = `<p class="soft">Konten konnten nicht geladen werden.</p>`; return; }
@@ -6895,7 +6923,7 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
    ========================================================================== */
 (function () {
   "use strict";
-  const { $, esc, fmtDate, fmtTime, fmtDateShort, fmtMoney, toast, volleyballFlug } = U;
+  const { $, esc, escUrl, fmtDate, fmtTime, fmtDateShort, fmtMoney, toast, volleyballFlug } = U;
 
   const P = { daten: null, tab: "start", busy: false };
   window.Portal = P;
@@ -7209,7 +7237,7 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
       ${abzeichenKarte}
       ${d.whatsapp ? `<div class="card"><h3>💬 ${istEltern() ? "WhatsApp-Elterngruppe" : "WhatsApp-Gruppe des Teams"}</h3>
         <p class="soft">Hier laufen kurzfristige Infos zusammen – komm gern dazu!</p>
-        <a class="btn" style="text-decoration:none" href="${esc(d.whatsapp)}" target="_blank" rel="noopener">💬 Gruppe öffnen / beitreten</a>
+        <a class="btn" style="text-decoration:none" href="${escUrl(d.whatsapp)}" target="_blank" rel="noopener">💬 Gruppe öffnen / beitreten</a>
       </div>` : ""}
       ${pushMoeglich() && !P.pushAktiv ? `<div class="card">
         <h3>🔔 Mitteilungen aktivieren</h3>
@@ -7229,7 +7257,7 @@ button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
           </div></div>`).join("") : `<p class="soft">Aktuell stehen keine Termine an.</p>`}
       </div></div>
       ${d.links.length ? `<div class="card"><h3>🔗 Links</h3><div class="list">
-        ${d.links.map((l) => `<a class="list-item" href="${esc(l.url)}" target="_blank" rel="noopener"><div class="grow">
+        ${d.links.map((l) => `<a class="list-item" href="${escUrl(l.url)}" target="_blank" rel="noopener"><div class="grow">
           <div class="title">${esc(l.icon)} ${esc(l.title)}</div><div class="sub">${esc(l.sub)}</div></div><span class="arr">›</span></a>`).join("")}
       </div></div>` : ""}`;
   }

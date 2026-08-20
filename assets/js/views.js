@@ -5,7 +5,7 @@
    ========================================================================== */
 (function () {
   "use strict";
-  const { $, $$, esc, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtMoney,
+  const { $, $$, esc, escUrl, fmtDate, fmtDateShort, fmtTime, fmtDateTime, fmtMoney,
     daysUntil, relDays, age, avatar, toast, modal, closeModal, confirmDialog,
     formData, clothingSVG, sponsorSVG, DOW, MON, volleyballFlug } = U;
 
@@ -54,7 +54,7 @@
   function linkListHTML() {
     return S().links.map((lk) => `
       <div class="flex" style="gap:0">
-        <a class="link-card grow" href="${esc(lk.url)}" target="_blank" rel="noopener" style="border-radius:12px 0 0 12px;border-right:none">
+        <a class="link-card grow" href="${escUrl(lk.url)}" target="_blank" rel="noopener" style="border-radius:12px 0 0 12px;border-right:none">
           <span class="ic">${esc(lk.icon || "🔗")}</span>
           <div class="grow"><div class="title">${esc(lk.title)}</div><div class="sub">${esc(lk.sub || "")}</div></div>
           <span class="arr">↗</span></a>
@@ -247,7 +247,7 @@
     const wa = waGroupLink();
     el.innerHTML = `
       ${head("Spielerverwaltung", "Kader, Kontaktdaten von Spielern und Eltern",
-        `${wa ? `<a class="btn secondary" href="${esc(wa.url)}" target="_blank" rel="noopener">💬 WhatsApp-Gruppe</a>` : ""}<button class="btn outline" data-io>⇅ Import / Export</button><button class="btn" data-add>＋ Spieler</button>`)}
+        `${wa ? `<a class="btn secondary" href="${escUrl(wa.url)}" target="_blank" rel="noopener">💬 WhatsApp-Gruppe</a>` : ""}<button class="btn outline" data-io>⇅ Import / Export</button><button class="btn" data-add>＋ Spieler</button>`)}
       <div class="chip-row mb">${chips.join("")}</div>
       <div class="card" style="padding:0">
         <div class="table-wrap"><table>
@@ -519,7 +519,7 @@
                 <div class="sub">${contactLine(r.email, r.phone)}</div></div>
             </label>`).join("") : '<div class="muted">Keine Kontaktdaten hinterlegt.</div>'}
         </div>
-        ${(() => { const wa = waGroupLink(); return wa ? `<a class="btn sm secondary mb" href="${esc(wa.url)}" target="_blank" rel="noopener">💬 WhatsApp-Gruppe öffnen</a>` : ""; })()}
+        ${(() => { const wa = waGroupLink(); return wa ? `<a class="btn sm secondary mb" href="${escUrl(wa.url)}" target="_blank" rel="noopener">💬 WhatsApp-Gruppe öffnen</a>` : ""; })()}
         <form id="cf"><div class="field"><label>Betreff</label><input name="subject" value="SKV Müritz – Info zu ${esc(p.firstName)}"></div>
         <div class="field mt"><label>Nachricht</label><textarea name="msg" rows="5">Hallo,\n\n</textarea></div></form>`,
       footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn" data-send>E-Mail öffnen</button>`,
@@ -1447,7 +1447,7 @@
           ${gewaehlt.map((u) => `<div class="list-item" style="padding:8px 10px"><div class="grow">
             <div class="title" style="font-size:.88rem">${phasenName(u.kategorie)} · ${esc(u.name)} <span class="soft">(${u.dauer}′)</span></div>
             ${u.beschreibung ? `<div class="sub">${esc(u.beschreibung)}</div>` : ""}
-            ${u.quelle || u.link ? `<div class="sub">📚 ${esc(u.quelle || "Quelle")}${u.link ? ` · <a href="${esc(u.link)}" target="_blank" rel="noopener">${/youtu/.test(u.link) ? "▶️ Video" : "📄 Anleitung"} öffnen</a>` : ""}</div>` : ""}</div>
+            ${u.quelle || u.link ? `<div class="sub">📚 ${esc(u.quelle || "Quelle")}${u.link ? ` · <a href="${escUrl(u.link)}" target="_blank" rel="noopener">${/youtu/.test(u.link) ? "▶️ Video" : "📄 Anleitung"} öffnen</a>` : ""}</div>` : ""}</div>
             <button class="btn sm ghost" data-planweg="${u.id}" title="Aus dem Plan entfernen">✕</button>
           </div>`).join("")}</div>` : `<p class="soft">Noch kein Plan – unten Bausteine antippen oder 🎲 Vorschlag nutzen.</p>`}
         ${PLAN_PHASEN.map(([kat, label]) => {
@@ -1632,7 +1632,7 @@
             <div class="list-item" style="padding:8px 10px"><div class="grow">
               <div class="title" style="font-size:.88rem">${esc(u.name)} <span class="soft">(${u.dauer}′ · ${u.minSp || "egal"}${u.maxSp ? "–" + u.maxSp : u.minSp ? "+" : ""} Teiln.)</span></div>
               ${u.beschreibung ? `<div class="sub">${esc(u.beschreibung)}</div>` : ""}
-              ${u.quelle || u.link ? `<div class="sub">📚 ${esc(u.quelle || "Quelle")}${u.link ? ` · <a href="${esc(u.link)}" target="_blank" rel="noopener">${/youtu/.test(u.link) ? "▶️ Video" : "📄 Anleitung"}</a>` : ""}</div>` : ""}</div>
+              ${u.quelle || u.link ? `<div class="sub">📚 ${esc(u.quelle || "Quelle")}${u.link ? ` · <a href="${escUrl(u.link)}" target="_blank" rel="noopener">${/youtu/.test(u.link) ? "▶️ Video" : "📄 Anleitung"}</a>` : ""}</div>` : ""}</div>
               <button class="btn sm ghost" data-uedit="${u.id}">✏️</button>
               <button class="btn sm ghost" data-udel="${u.id}">🗑️</button>
             </div>`).join("");
@@ -3020,7 +3020,7 @@
             <dl class="kv" style="width:100%">
               <dt>Beitrag</dt><dd>${fmtMoney(sp.contribution)}</dd>
               <dt>Kontakt</dt><dd class="soft">${esc(sp.contact || "—")}</dd>
-              <dt>Web</dt><dd>${sp.website ? `<a href="${esc(sp.website)}" target="_blank" rel="noopener">Website ↗</a>` : "—"}</dd>
+              <dt>Web</dt><dd>${sp.website ? `<a href="${escUrl(sp.website)}" target="_blank" rel="noopener">Website ↗</a>` : "—"}</dd>
             </dl>
             <div class="flex" style="width:100%"><span class="spacer"></span>
               <button class="btn sm ghost" data-sedit="${sp.id}">✏️</button>
@@ -4501,6 +4501,7 @@
       return `zuletzt aktiv vor ${tage} Tagen (${fmtDateShort(new Date(ts * 1000).toISOString())})`;
     };
     async function ladeKonten() {
+      _trainerNamen = null; // Konten wurden (neu) geladen/geändert → Trainer-Dropdown-Cache verwerfen
       const res = await apiZugang("/api/accounts");
       const ziel = $("#zgKonten", el);
       if (!res.ok) { ziel.innerHTML = `<p class="soft">Konten konnten nicht geladen werden.</p>`; return; }

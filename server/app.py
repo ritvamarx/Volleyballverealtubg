@@ -797,7 +797,7 @@ def create_app() -> Flask:
                       for l in daten.get("links", [])],
             "fahrer": fahrer,
             "jobs": jobs,
-            "quizFragen": [{k: q.get(k) for k in ("id", "kapitel", "f", "a", "r")}
+            "quizFragen": [{k: q.get(k) for k in ("id", "kapitel", "f", "a", "r", "stufe")}
                            for q in daten.get("quizFragen", [])],
             "kleidung": [{k: c.get(k) for k in ("id", "name", "description", "price", "sizes", "kind", "color", "bild")}
                          for c in daten.get("clothing", [])],
@@ -914,10 +914,16 @@ def create_app() -> Flask:
         if body.get("loeschen"):
             aid = body.get("abwesenheitId")
 
+            eigene = sess_player_ids(sess)
+
             def mut_weg(d):
                 d["abwesenheiten"] = [a for a in d.get("abwesenheiten", [])
                                       if not (a.get("id") == aid and a.get("userId") == sess["user_id"])]
-                d["responses"] = [r for r in d.get("responses", []) if r.get("autoAbwesenheit") != aid]
+                # Auto-Absagen nur entfernen, wenn sie zu einem eigenen Kind gehören –
+                # sonst könnte eine fremde abwesenheitId fremde Rückmeldungen löschen (IDOR)
+                d["responses"] = [r for r in d.get("responses", [])
+                                  if not (r.get("autoAbwesenheit") == aid
+                                          and r.get("playerId") in eigene)]
 
             if speichere_portal_aenderung(mut_weg, f"{sess['name']} (Portal)") is None:
                 return err(409, "Speichern gerade nicht möglich – bitte erneut versuchen")
@@ -989,6 +995,8 @@ def create_app() -> Flask:
         rollen_ok = ("alle", sess["role"])
         ergebnis = []
         for t in daten.get("tasks", []):
+            if t.get("done"):
+                continue  # vom Trainerteam global erledigte Aufgaben nicht mehr zeigen
             if t.get("zielRolle") not in rollen_ok:
                 continue
             ziel_pids = set(t.get("zielPlayerIds") or [])
@@ -1126,8 +1134,11 @@ def create_app() -> Flask:
             if frage_id in beantwortet:
                 return jsonify({"ok": True, "punkte": row["punkte"],
                                 "wochenPunkte": wochen_punkte, "neu": 0})
-            if len(beantwortet) >= 300:
-                return err(400, "Quiz-Limit erreicht")
+            # Wochen-Deckel bremst Massen-Manipulation (Skript mit erfundenen frageIds).
+            # Ehrlich spielbar sind ~60 Fragen + eigene; vollständige Absicherung bräuchte
+            # die Fragen-Wahrheit auf dem Server (siehe Review, größerer Umbau).
+            if len(beantwortet) >= 120:
+                return err(400, "Quiz-Limit für diese Woche erreicht")
             beantwortet.append(frage_id)
             gesamt = (row["punkte"] if row else 0) + punkte
             wochen_punkte += punkte
@@ -1331,8 +1342,8 @@ def create_app() -> Flask:
                        f"SUMMARY:{esc_ics(titel)}"]
             if e.get("location"):
                 zeilen.append(f"LOCATION:{esc_ics(e['location'])}")
-            if e.get("description"):
-                zeilen.append(f"DESCRIPTION:{esc_ics(e['description'])}")
+            # description bewusst NICHT ausgeben: kann interne Notizen enthalten und
+            # wird auch im /api/portal-Payload für Trainings/Spiele weggelassen
             zeilen.append("END:VEVENT")
         zeilen.append("END:VCALENDAR")
         return "\r\n".join(zeilen) + "\r\n"
@@ -1643,6 +1654,11 @@ def create_app() -> Flask:
         if not ziel["active"]:
             return err(400, "Konto ist deaktiviert – zuerst aktivieren")
         code = auth.new_code()
+        # Frühere unbenutzte Codes desselben Kontos entwerten – es soll immer nur
+        # EIN gültiger Wiederherstellungscode je Konto existieren
+        con().execute(
+            "UPDATE reset_codes SET used_at = ? WHERE user_id = ? AND used_at IS NULL",
+            (db.now(), user_id))
         con().execute(
             "INSERT INTO reset_codes (user_id, code_hash, created_by, created_at, expires_at)"
             " VALUES (?,?,?,?,?)",
@@ -1704,6 +1720,10 @@ def create_app() -> Flask:
     @app.post("/api/passwort-reset")
     def api_passwort_reset():
         """Öffentlich: Mit gültigem Wiederherstellungscode ein neues Passwort setzen."""
+        # Brute-Force auf den Code drosseln (gleiche Sperre wie beim Login, IP-basiert)
+        wait = rate_limited("reset")
+        if wait:
+            return err(429, f"Zu viele Versuche – bitte {wait} Sekunden warten")
         body = request.get_json(silent=True) or {}
         code = str(body.get("code") or "").strip().upper()
         password = str(body.get("password") or "")
@@ -1712,6 +1732,7 @@ def create_app() -> Flask:
         row = con().execute("SELECT * FROM reset_codes WHERE code_hash = ?",
                             (auth.hash_code(code),)).fetchone()
         if row is None or row["used_at"] or row["expires_at"] < db.now():
+            log_login("reset", False)  # Fehlversuch zählt in die Drosselung
             return err(400, "Code ungültig oder abgelaufen – bitte neuen Code anfordern")
         nutzer = con().execute("SELECT * FROM users WHERE id = ? AND active = 1",
                                (row["user_id"],)).fetchone()
@@ -1725,6 +1746,7 @@ def create_app() -> Flask:
             c.execute("DELETE FROM sessions WHERE user_id = ?", (nutzer["id"],))
             c.execute("DELETE FROM passwort_anfragen WHERE lower(username) = lower(?)",
                       (nutzer["username"],))
+        log_login("reset", True)
         return jsonify({"ok": True, "username": nutzer["username"],
                         "hint": "Passwort geändert – jetzt anmelden"})
 
