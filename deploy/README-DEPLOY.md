@@ -32,7 +32,7 @@ manuelles Vorgehen oder zum Nachschlagen.
    Beim ersten Lauf entsteht `/opt/volleyball` mit `data/` (Volume) und einer
    `.env` aus der Vorlage → **SECRET_KEY setzen**:
    ```bash
-   ssh benutzer@server "cd /opt/volleyball && sed -i \"s/BITTE-ERSETZEN/$(python3 -c 'import secrets;print(secrets.token_hex(32))')/\" .env && docker compose up -d app"
+   ssh benutzer@server "cd /opt/volleyball && sed -i \"s/BITTE-ERSETZEN/$(python3 -c 'import secrets;print(secrets.token_hex(32))')/\" .env && docker compose up -d volleyball"
    ```
 
 3. **Caddy:** Block aus `deploy/Caddyfile-snippet.txt` ins bestehende
@@ -70,7 +70,7 @@ manuelles Vorgehen oder zum Nachschlagen.
 ```bash
 ./deploy/deploy.sh benutzer@server
 ```
-(rsync → `docker compose up -d --build app` → Healthcheck. `data/` und `.env`
+(rsync → `docker compose up -d --build volleyball` → Healthcheck. `data/` und `.env`
 werden nie angefasst.)
 
 ## Notfall-Kommandos

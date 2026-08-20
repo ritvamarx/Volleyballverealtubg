@@ -90,21 +90,16 @@ def sync(liga: str | None = None) -> str:
     import time
     con = db.connect()
     try:
-        for _ in range(4):
-            row = db.get_state(con)
-            if row is None:
-                return "Noch kein Datenbestand vorhanden – nichts zu tun."
-            daten = json.loads(row["data"])
+        def merker(daten):
             daten["standings"] = zeilen
             daten["standingsMeta"] = {
                 "liga": liga, "saison": saison, "quelle": url,
                 "stand": time.strftime("%Y-%m-%dT%H:%M:%S"),
             }
-            version, _konflikt = db.put_state(
-                con, row["version"], json.dumps(daten, ensure_ascii=False), "Tabellen-Automatik (VMV)")
-            if version is not None:
-                return (f"{len(zeilen)} Teams aus {liga} {saison} übernommen "
-                        f"(Version {version}).")
-        return "Abbruch: Datenbestand wurde dauerhaft parallel geändert."
+
+        version = db.mutate_state(con, merker, "Tabellen-Automatik (VMV)")
+        if version is not None:
+            return f"{len(zeilen)} Teams aus {liga} {saison} übernommen (Version {version})."
+        return "Abbruch: kein Datenbestand oder Datenbestand dauerhaft parallel geändert."
     finally:
         con.close()

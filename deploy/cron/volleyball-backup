@@ -1,8 +1,12 @@
-# /etc/cron.d/volleyball-backup – bewusst ohne Eintrag.
+# /etc/cron.d/volleyball-backup – lokale tägliche SQLite-Sicherung (Fallback).
 #
-# Die Volleyball-Datenbank wird seit 2026-08-19 ZENTRAL gesichert:
-# /opt/backup-server.sh (Cron /etc/cron.d/vereins-backup, täglich 03:30)
-# enthält einen eigenen Aufruf `sichern volleyball-app volleyball
-# /opt/volleyball/data /app/data` – konsistenter SQLite-Snapshot, Ablage in
-# /opt/backups (14 Stände) und Off-Site-Kopie in die WerkHaus-Nextcloud.
-# Quelle des Skripts: Vereinsverwaltung-Repo, deploy/backup-server.sh.
+# Wird von deploy/livegang.sh NUR installiert, wenn KEIN zentrales
+# /opt/backup-server.sh mit einem volleyball-Eintrag existiert. Auf dem
+# WerkHaus-Server sichert stattdessen /opt/backup-server.sh zentral (täglich
+# 03:30, inkl. Off-Site-Kopie in die Nextcloud) – dann läuft dieser Cron nicht.
+#
+# manage.py backup schreibt volleyball_<datum>.db und behält die letzten 30
+# Stände selbst. Ablage: /opt/volleyball/data/backup (persistentes Volume).
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 3 * * * root cd /opt/volleyball && docker compose exec -T volleyball ./manage.py backup /app/data/backup >> /var/log/volleyball-backup.log 2>&1

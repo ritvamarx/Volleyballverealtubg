@@ -131,7 +131,7 @@ schritt "7/8 Backup-Cron installieren"
 if ssh "$HOST" "grep -q 'volleyball-app' /opt/backup-server.sh" 2>/dev/null; then
   ok "Sicherung läuft zentral über /opt/backup-server.sh (vereins-backup, 03:30)"
 elif ssh "$HOST" "cp $PFAD/deploy/cron/volleyball-backup /etc/cron.d/volleyball-backup" 2>/dev/null; then
-  ok "/etc/cron.d/volleyball-backup installiert (Hinweisdatei – zentrale Sicherung einrichten!)"
+  ok "/etc/cron.d/volleyball-backup installiert – lokale tägliche SQLite-Sicherung (03:30)"
 else
   warn "Konnte Cron nicht installieren (kein root?) – bitte manuell kopieren."
 fi

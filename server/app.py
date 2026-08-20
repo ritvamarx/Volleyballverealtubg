@@ -321,18 +321,16 @@ def create_app() -> Flask:
             return err(400, "eventId fehlt")
         titel = str(body.get("titel") or "Termin")[:80]
         notiz = str(body.get("notiz") or "")[:160]
-        start = str(body.get("start") or "")
         wann = ""
-        try:
-            import datetime as _dt
+        z = db.parse_iso(body.get("start"))
+        if z is not None:
             from zoneinfo import ZoneInfo
-            z = _dt.datetime.fromisoformat(start.replace("Z", "+00:00"))
-            lokal = z.astimezone(ZoneInfo("Europe/Berlin"))
-            wann = lokal.strftime(" am %d.%m. um %H:%M Uhr")
-        except Exception:
-            pass
+            wann = z.astimezone(ZoneInfo("Europe/Berlin")).strftime(" am %d.%m. um %H:%M Uhr")
         row = db.get_state(con())
-        daten = json.loads(row["data"]) if row else {}
+        try:
+            daten = json.loads(row["data"]) if row else {}
+        except (ValueError, TypeError):
+            daten = {}
         betroffen = {r.get("playerId") for r in daten.get("responses", [])
                      if r.get("eventId") == event_id}
         if not betroffen:
@@ -525,13 +523,7 @@ def create_app() -> Flask:
 
     def speichere_portal_aenderung(mutation, autor: str):
         """Kleine Portal-Änderung am zentralen Datenbestand (mit Konflikt-Retry)."""
-        for _ in range(4):
-            version, daten = lade_state()
-            mutation(daten)
-            neu, _row = db.put_state(con(), version, json.dumps(daten, ensure_ascii=False), autor)
-            if neu is not None:
-                return neu
-        return None
+        return db.mutate_state(con(), mutation, autor)
 
     def sess_player_ids(sess) -> set:
         try:
@@ -548,7 +540,10 @@ def create_app() -> Flask:
         return prefix + _secrets.token_hex(5)
 
     def iso_jetzt() -> str:
-        return time.strftime("%Y-%m-%dT%H:%M:%S")
+        # UTC mit 'Z' – gleiches Format wie das clientseitige new Date().toISOString(),
+        # damit Portal- und Trainer-Zeitstempel (responses.at usw.) vergleichbar bleiben
+        import datetime as _dt
+        return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     @app.get("/api/portal")
     def api_portal():
@@ -569,6 +564,11 @@ def create_app() -> Flask:
 
         events = daten.get("events", [])
         antworten = daten.get("responses", [])
+        # Antworten einmal nach eventId gruppieren – sonst scannt jeder Termin
+        # die komplette responses-Liste (quadratisch bei vielen Terminen/Antworten)
+        antworten_je_event = {}
+        for r in antworten:
+            antworten_je_event.setdefault(r.get("eventId"), []).append(r)
 
         def termin_wetter(e):
             """Vorhersage fürs Termin-Datum, wenn es höchstens 7 Tage entfernt ist."""
@@ -587,9 +587,7 @@ def create_app() -> Flask:
             zu = {"yes": 0, "no": 0, "maybe": 0}
             mein = {}
             gruende = {}
-            for r in antworten:
-                if r.get("eventId") != eid:
-                    continue
+            for r in antworten_je_event.get(eid, []):
                 st = r.get("status")
                 if st in zu:
                     zu[st] += 1
@@ -604,8 +602,8 @@ def create_app() -> Flask:
             ohne Gründe oder Bemerkungen (Eltern sehen nur das eigene Kind)."""
             if rolle != "spieler":
                 return None
-            return [r.get("playerId") for r in antworten
-                    if r.get("eventId") == eid and r.get("status") == "yes"]
+            return [r.get("playerId") for r in antworten_je_event.get(eid, [])
+                    if r.get("status") == "yes"]
 
         def training_obj(e):
             zu, mein, gruende = rsvp_info(e.get("id"))
@@ -654,29 +652,29 @@ def create_app() -> Flask:
                                  "category": j.get("category") or "other",
                                  "title": j.get("title") or "", "meiner": meiner})
 
-        # Abzeichen (laufende Saison, mind. 3 Termine im Bereich) für die eigenen
-        # Spieler:innen berechnen – gleiche Logik wie in der Team-Analyse
-        def abzeichen_fuer(pids: list) -> dict:
+        # Vergangene, nicht abgesagte Termine der laufenden Saison + Antwort-Index –
+        # einmal aufbereitet, von Abzeichen UND Eltern-Statistik gemeinsam genutzt.
+        # Saisonbeginn 1. Juli 00:00 Europe/Berlin (deckt sich mit der Trainer-App).
+        def _saison_termine_antworten():
             import datetime as _dt
+            from zoneinfo import ZoneInfo
+            berlin = ZoneInfo("Europe/Berlin")
             jetzt = _dt.datetime.now(_dt.timezone.utc)
-            jahr = jetzt.year - (1 if jetzt.month < 7 else 0)
-            saison_start = _dt.datetime(jahr, 7, 1, tzinfo=_dt.timezone.utc)
-
-            def startzeit(e):
-                try:
-                    z = _dt.datetime.fromisoformat(str(e.get("start") or "").replace("Z", "+00:00"))
-                    return z if z.tzinfo else z.replace(tzinfo=_dt.timezone.utc)
-                except Exception:
-                    return None
-
-            # Abgesagte Termine zählen nicht – gleiche Regel wie in der Team-Analyse
+            jahr = jetzt.astimezone(berlin).year - (1 if jetzt.astimezone(berlin).month < 7 else 0)
+            saison_start = _dt.datetime(jahr, 7, 1, tzinfo=berlin)
             past = [e for e in daten.get("events", [])
                     if e.get("type") in ("training", "home", "away")
                     and not e.get("abgesagt")
-                    and (z := startzeit(e)) is not None and saison_start <= z < jetzt]
+                    and (z := db.parse_iso(e.get("start"))) is not None and saison_start <= z < jetzt]
             antworten = {}
             for r in daten.get("responses", []):
                 antworten.setdefault(r.get("eventId"), {})[r.get("playerId")] = r.get("status")
+            return past, antworten
+
+        # Abzeichen (laufende Saison, mind. 3 Termine im Bereich) für die eigenen
+        # Spieler:innen berechnen – gleiche Logik wie in der Team-Analyse
+        def abzeichen_fuer(pids: list) -> dict:
+            past, antworten = _saison_termine_antworten()
             bereiche = {
                 "alle": past,
                 "training": [e for e in past if e.get("type") == "training"],
@@ -705,25 +703,7 @@ def create_app() -> Flask:
         # Eltern: Rückmeldeverhalten des eigenen Kindes im Vergleich zum Team –
         # nur Quoten, Durchschnitt und Rangnummer, KEINE Daten anderer Personen
         def eltern_statistik(pids: list) -> dict:
-            import datetime as _dt
-            jetzt = _dt.datetime.now(_dt.timezone.utc)
-            jahr = jetzt.year - (1 if jetzt.month < 7 else 0)
-            saison_start = _dt.datetime(jahr, 7, 1, tzinfo=_dt.timezone.utc)
-
-            def startzeit(e):
-                try:
-                    z = _dt.datetime.fromisoformat(str(e.get("start") or "").replace("Z", "+00:00"))
-                    return z if z.tzinfo else z.replace(tzinfo=_dt.timezone.utc)
-                except Exception:
-                    return None
-
-            past = [e for e in daten.get("events", [])
-                    if e.get("type") in ("training", "home", "away")
-                    and not e.get("abgesagt")
-                    and (z := startzeit(e)) is not None and saison_start <= z < jetzt]
-            antworten = {}
-            for r in daten.get("responses", []):
-                antworten.setdefault(r.get("eventId"), {})[r.get("playerId")] = r.get("status")
+            past, antworten = _saison_termine_antworten()
             aktive = [p for p in daten.get("players", [])
                       if p.get("membershipStatus") != "inaktiv"]
 
@@ -750,7 +730,15 @@ def create_app() -> Flask:
 
         statistik = eltern_statistik([p["id"] for p in meine]) if rolle == "eltern" else None
 
+        # „leicht": Nach einer Aktion lädt das Portal ohne die großen Base64-Fotos
+        # neu (der Client behält sie aus dem ersten vollen Load) – spart Bandbreite.
+        leicht = request.args.get("leicht") == "1"
+        foto_von = (lambda v: "") if leicht else (lambda v: v or "")
+
         abt = {d.get("id"): d.get("name") for d in daten.get("departments", [])}
+        # Kategorie-Label einmal aufbauen (statt pro „weiterer" Termin neu)
+        kat_label = {c.get("id"): (((c.get("emoji") or "") + " ").strip() + " " + (c.get("name") or "")).strip()
+                     for c in daten.get("eventCategories", [])}
         ank = sorted(
             [{"id": a.get("id"), "title": a.get("title"), "body": a.get("body"), "date": a.get("date")}
              for a in daten.get("announcements", []) if a.get("audience") in ("alle", rolle)],
@@ -763,7 +751,7 @@ def create_app() -> Flask:
             "team": ([{"id": p["id"],
                        "name": f"{p.get('firstName', '')} {p.get('lastName', '')}".strip(),
                        "avatarEmoji": p.get("avatarEmoji") or "",
-                       "foto": p.get("foto") or ""}
+                       "foto": foto_von(p.get("foto"))}
                       for p in daten.get("players", [])
                       if p.get("membershipStatus") != "inaktiv"]
                      if rolle == "spieler" else []),
@@ -772,7 +760,7 @@ def create_app() -> Flask:
             "spieler": [{"id": p["id"],
                          "name": f"{p.get('firstName', '')} {p.get('lastName', '')}".strip(),
                          "avatarEmoji": p.get("avatarEmoji") or "",
-                         "foto": p.get("foto") or "",
+                         "foto": foto_von(p.get("foto")),
                          "abzeichen": abz.get(p["id"], []),
                          "abteilung": ", ".join(
                              n for n in (abt.get(i) for i in (
@@ -784,8 +772,7 @@ def create_app() -> Flask:
                 {"id": e.get("id"), "title": e.get("title") or "", "start": e.get("start"),
                  "end": e.get("end"), "location": e.get("location") or "",
                  "wetter": termin_wetter(e),
-                 "kategorie": {c.get("id"): (((c.get("emoji") or "") + " ").strip() + " " + (c.get("name") or "")).strip()
-                               for c in daten.get("eventCategories", [])}.get(e.get("type")) or "📌 Termin"}
+                 "kategorie": kat_label.get(e.get("type")) or "📌 Termin"}
                 for e in kommend([e for e in events
                                   if e.get("type") not in ("training", "home", "away")], 15)],
             "ferien": sorted([{"name": h.get("name"), "start": h.get("start"), "end": h.get("end")}
@@ -799,7 +786,8 @@ def create_app() -> Flask:
             "jobs": jobs,
             "quizFragen": [{k: q.get(k) for k in ("id", "kapitel", "f", "a", "r", "stufe")}
                            for q in daten.get("quizFragen", [])],
-            "kleidung": [{k: c.get(k) for k in ("id", "name", "description", "price", "sizes", "kind", "color", "bild")}
+            "kleidung": [dict({k: c.get(k) for k in ("id", "name", "description", "price", "sizes", "kind", "color")},
+                              bild=foto_von(c.get("bild")))
                          for c in daten.get("clothing", [])],
             "kleidungAnfragen": [{"id": r.get("id"), "itemId": r.get("itemId"), "playerId": r.get("playerId"),
                                   "size": r.get("size"), "qty": r.get("qty"), "status": r.get("status")}
@@ -1063,8 +1051,6 @@ def create_app() -> Flask:
 
     # ---------- API: Volleyball-Quiz (Punkte je Konto) ----------
 
-    QUIZ_MAX_PUNKTE = 10
-
     def quiz_woche() -> str:
         """Aktueller Wochen-Schlüssel (ISO-Woche, Reset montags)."""
         import datetime as _dt
@@ -1086,9 +1072,13 @@ def create_app() -> Flask:
             beantwortet = json.loads(row["beantwortet"]) if aktuelle_woche else []
         except Exception:
             beantwortet = []
+        import quiz_fragen
+        _v, daten = lade_state()
         antwort = {"punkte": row["punkte"] if row else 0,
                    "wochenPunkte": row["wochen_punkte"] if aktuelle_woche else 0,
-                   "woche": woche, "beantwortet": beantwortet}
+                   "woche": woche, "beantwortet": beantwortet,
+                   # Fragen kommen jetzt vom Server – ohne richtige Antwort (r)
+                   "kapitel": quiz_fragen.kapitel_public(daten.get("quizFragen", []))}
         # Bestenliste NUR für Spieler:innen-Konten – Eltern dürfen keine Namen
         # anderer Kinder sehen (Datenschutz-Grundsatz des Portals).
         if sess["role"] == "spieler":
@@ -1108,48 +1098,70 @@ def create_app() -> Flask:
 
     @app.post("/api/portal/quiz")
     def api_quiz_antwort():
+        """Server wertet die Antwort selbst aus: prüft den gewählten Index gegen die
+        richtige Antwort und vergibt die Punkte nach Stufe (Client kann weder die
+        Lösung noch die Punktzahl fälschen)."""
         sess, failure = require_portal()
         if failure:
             return failure
+        import quiz_fragen
         body = request.get_json(silent=True) or {}
         frage_id = str(body.get("frageId") or "")[:40]
         try:
-            punkte = int(body.get("punkte", 0))
+            antwort_index = int(body.get("antwortIndex"))
         except (TypeError, ValueError):
-            punkte = 0
-        # Punktwerte je Schwierigkeitsstufe: Anfänger 5 (Fehlversuch 3),
-        # Fortgeschritten 10 (5), Profi 15 (8)
-        if not frage_id or punkte not in (3, 5, 8, 10, 15):
             return err(400, "Ungültige Quiz-Antwort")
+        _v, daten = lade_state()
+        frage = quiz_fragen.index_by_id(daten.get("quizFragen", [])).get(frage_id)
+        if frage is None:
+            return err(400, "Frage nicht gefunden")
+        korrekt_index = frage.get("r")
+        richtig = antwort_index == korrekt_index
         woche = quiz_woche()
         with con() as c:
-            row = c.execute("SELECT punkte, wochen_punkte, woche, beantwortet FROM quiz_stand"
-                            " WHERE user_id = ?", (sess["user_id"],)).fetchone()
+            row = c.execute("SELECT punkte, wochen_punkte, woche, beantwortet, fehlversuche"
+                            " FROM quiz_stand WHERE user_id = ?", (sess["user_id"],)).fetchone()
             aktuelle_woche = bool(row and row["woche"] == woche)
             try:
                 beantwortet = json.loads(row["beantwortet"]) if aktuelle_woche else []
+                fehl = json.loads(row["fehlversuche"]) if (aktuelle_woche and row["fehlversuche"]) else {}
             except Exception:
-                beantwortet = []
+                beantwortet, fehl = [], {}
             wochen_punkte = row["wochen_punkte"] if aktuelle_woche else 0
+            gesamt = row["punkte"] if row else 0
+            # Schon richtig beantwortet: keine weitere Wertung
             if frage_id in beantwortet:
-                return jsonify({"ok": True, "punkte": row["punkte"],
-                                "wochenPunkte": wochen_punkte, "neu": 0})
-            # Wochen-Deckel bremst Massen-Manipulation (Skript mit erfundenen frageIds).
-            # Ehrlich spielbar sind ~60 Fragen + eigene; vollständige Absicherung bräuchte
-            # die Fragen-Wahrheit auf dem Server (siehe Review, größerer Umbau).
-            if len(beantwortet) >= 120:
-                return err(400, "Quiz-Limit für diese Woche erreicht")
+                return jsonify({"ok": True, "richtig": True, "korrektIndex": korrekt_index,
+                                "punkte": gesamt, "wochenPunkte": wochen_punkte, "neu": 0})
+            if not richtig:
+                # Fehlversuch merken (mindert die Punkte beim späteren Treffer)
+                fehl[frage_id] = int(fehl.get(frage_id, 0)) + 1
+                c.execute(
+                    "INSERT INTO quiz_stand (user_id, punkte, wochen_punkte, woche, beantwortet, fehlversuche, updated_at)"
+                    " VALUES (?,?,?,?,?,?,?)"
+                    " ON CONFLICT(user_id) DO UPDATE SET woche = excluded.woche,"
+                    " beantwortet = excluded.beantwortet, fehlversuche = excluded.fehlversuche,"
+                    " updated_at = excluded.updated_at",
+                    (sess["user_id"], gesamt, wochen_punkte, woche,
+                     json.dumps(beantwortet), json.dumps(fehl), db.now()))
+                return jsonify({"ok": True, "richtig": False, "korrektIndex": korrekt_index,
+                                "punkte": gesamt, "wochenPunkte": wochen_punkte, "neu": 0})
+            # Richtig: Punkte nach Stufe, reduziert wenn zuvor falsch geraten wurde
+            neu = quiz_fragen.punkte_fuer(frage, erstversuch=frage_id not in fehl)
             beantwortet.append(frage_id)
-            gesamt = (row["punkte"] if row else 0) + punkte
-            wochen_punkte += punkte
+            gesamt += neu
+            wochen_punkte += neu
             c.execute(
-                "INSERT INTO quiz_stand (user_id, punkte, wochen_punkte, woche, beantwortet, updated_at)"
-                " VALUES (?,?,?,?,?,?)"
+                "INSERT INTO quiz_stand (user_id, punkte, wochen_punkte, woche, beantwortet, fehlversuche, updated_at)"
+                " VALUES (?,?,?,?,?,?,?)"
                 " ON CONFLICT(user_id) DO UPDATE SET punkte = excluded.punkte,"
                 " wochen_punkte = excluded.wochen_punkte, woche = excluded.woche,"
-                " beantwortet = excluded.beantwortet, updated_at = excluded.updated_at",
-                (sess["user_id"], gesamt, wochen_punkte, woche, json.dumps(beantwortet), db.now()))
-        return jsonify({"ok": True, "punkte": gesamt, "wochenPunkte": wochen_punkte, "neu": punkte})
+                " beantwortet = excluded.beantwortet, fehlversuche = excluded.fehlversuche,"
+                " updated_at = excluded.updated_at",
+                (sess["user_id"], gesamt, wochen_punkte, woche,
+                 json.dumps(beantwortet), json.dumps(fehl), db.now()))
+        return jsonify({"ok": True, "richtig": True, "korrektIndex": korrekt_index,
+                        "punkte": gesamt, "wochenPunkte": wochen_punkte, "neu": neu})
 
     @app.post("/api/portal/buffet")
     def api_portal_buffet():
@@ -1313,11 +1325,8 @@ def create_app() -> Flask:
                     .replace(",", "\\,").replace("\n", "\\n"))
 
         def zeit(iso):
-            try:
-                d = _dt.datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
-                return d.astimezone(_dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-            except ValueError:
-                return None
+            d = db.parse_iso(iso)
+            return d.astimezone(_dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ") if d else None
 
         kats = {c.get("id"): c.get("name") for c in daten.get("eventCategories", [])}
         grenze = (_dt.date.today() - _dt.timedelta(days=7)).isoformat()
@@ -1392,28 +1401,13 @@ def create_app() -> Flask:
 
     # ---------- Wetter für die Portal-Begrüßung (Server-Proxy, 30-min-Cache) ----------
 
-    _wetter_cache = {"ts": 0, "daten": None}
-
     @app.get("/api/portal/wetter")
     def api_portal_wetter():
         sess, failure = require_portal()
         if failure:
             return failure
-        if time.time() - _wetter_cache["ts"] > 1800 or _wetter_cache["daten"] is None:
-            try:
-                req = urllib.request.Request(
-                    "https://api.open-meteo.com/v1/forecast?latitude=53.516&longitude=12.678"
-                    "&current_weather=true",
-                    headers={"User-Agent": "skv-mueritz-volleyball"})
-                with urllib.request.urlopen(req, timeout=6) as antwort:
-                    roh = json.load(antwort).get("current_weather") or {}
-                _wetter_cache["daten"] = {"code": roh.get("weathercode"),
-                                          "temp": roh.get("temperature")}
-                _wetter_cache["ts"] = time.time()
-            except Exception:
-                _wetter_cache["daten"] = {"code": None, "temp": None}
-                _wetter_cache["ts"] = time.time() - 1500  # bald erneut probieren
-        return jsonify(_wetter_cache["daten"])
+        import wetter
+        return jsonify(wetter.aktuell())
 
     # ---------- Profilbild: Emoji-Avatar oder eigenes Foto (Portal) ----------
 

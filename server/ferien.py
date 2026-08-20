@@ -50,18 +50,17 @@ def sync() -> str:
         return "OpenHolidays lieferte keine Einträge – Bestand unverändert."
     con = db.connect()
     try:
-        for _ in range(4):
-            row = db.get_state(con)
-            if row is None:
-                return "Noch kein Datenbestand vorhanden – nichts zu tun."
-            daten = json.loads(row["data"])
+        behalten = [0]
+
+        def merker(daten):
             manuell = [h for h in daten.get("holidays", []) if h.get("src") != "auto"]
+            behalten[0] = len(manuell)
             daten["holidays"] = manuell + neue
-            version, _konflikt = db.put_state(
-                con, row["version"], json.dumps(daten, ensure_ascii=False), "Ferien-Automatik")
-            if version is not None:
-                return (f"{len(neue)} Ferienzeiträume (DE-MV) übernommen, "
-                        f"{len(manuell)} manuelle Einträge behalten (Version {version}).")
-        return "Abbruch: Datenbestand wurde dauerhaft parallel geändert."
+
+        version = db.mutate_state(con, merker, "Ferien-Automatik")
+        if version is not None:
+            return (f"{len(neue)} Ferienzeiträume (DE-MV) übernommen, "
+                    f"{behalten[0]} manuelle Einträge behalten (Version {version}).")
+        return "Abbruch: kein Datenbestand oder Datenbestand dauerhaft parallel geändert."
     finally:
         con.close()

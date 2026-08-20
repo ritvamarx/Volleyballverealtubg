@@ -9,6 +9,12 @@
     daysUntil, relDays, age, avatar, toast, modal, closeModal, confirmDialog,
     formData, clothingSVG, sponsorSVG, DOW, MON, volleyballFlug } = U;
 
+  // Quiz-Kapitel (Key → Titel) – eine Quelle für Trainer-Übersicht und -Formular.
+  // Keys müssen mit server/quiz_fragen.py übereinstimmen (Zuordnung eigener Fragen).
+  const QUIZ_KAPITEL_NAMEN = { feld: "📐 Feld, Netz & Ball", punkte: "🔢 Zählweise & Sätze",
+    team: "👥 Team & Rotation", libero: "🦺 Libero", angriff: "🎯 Aufschlag & Angriff",
+    netz: "🚫 Netz, Block & Fehler", schiri: "🧑‍⚖️ Schiri-Regelquiz", begriffe: "📖 Begriffe & Profi-Wissen" };
+
   const S = () => Store.get();
   const reload = () => App.reload();
 
@@ -641,6 +647,7 @@
       let lastKey = "";
       const rows = evs.map((e) => {
         const d = new Date(e.start);
+        const st2 = sportstaetteZuOrt(e.location);
         const key = `${d.getFullYear()}-${d.getMonth()}`;
         const headRow = key !== lastKey ? `<div class="list-month">${MON[d.getMonth()]} ${d.getFullYear()}</div>` : "";
         lastKey = key;
@@ -649,8 +656,8 @@
           <div class="list-item">
             <div class="cal-list-date" data-ev="${e.id}" style="cursor:pointer"><strong>${d.getDate()}.</strong><span>${DOW[d.getDay()]}</span></div>
             <div class="grow" data-ev="${e.id}" style="cursor:pointer"><div class="title">${esc(e.title)} ${e.abgesagt ? '<span class="badge bad">🚫 abgesagt</span>' : ""}${e.seriesId ? '<span class="badge">🔁 Serie</span>' : ""}${hol ? ' <span class="badge warn">🏖 schulfrei</span>' : ""}</div>
-            <div class="sub">${fmtTime(e.start)} Uhr · ${sportstaetteZuOrt(e.location)
-              ? `<a href="#" data-stort="${sportstaetteZuOrt(e.location).id}" title="Sportstätte anzeigen">🏟️ ${esc(e.location)}</a>`
+            <div class="sub">${fmtTime(e.start)} Uhr · ${st2
+              ? `<a href="#" data-stort="${st2.id}" title="Sportstätte anzeigen">🏟️ ${esc(e.location)}</a>`
               : esc(e.location || "—")}${e.trainerName ? ` · 👤 ${esc(e.trainerName)}` : ""}</div></div>
             <select class="ev-type" data-evtype="${e.id}" title="Art des Termins ändern" style="width:auto;font-size:.78rem;padding:5px 6px">
               ${typeOptions(e.type)}
@@ -860,16 +867,17 @@
     const responses = S().responses.filter((r) => r.eventId === id);
     const drivers = S().drivers.filter((d) => d.eventId === id);
     const jobs = S().jobs.filter((j) => j.eventId === id);
+    const st2 = sportstaetteZuOrt(e.location);
     modal({
       title: e.title,
       wide: true,
       body: `
         <div class="flex flex-wrap mb">${eventPill(e.type)}<span class="badge">${fmtDateTime(e.start)}</span><span class="badge">bis ${fmtTime(e.end)} Uhr</span></div>
-        ${(() => { const st2 = sportstaetteZuOrt(e.location); return st2 && st2.bild
-          ? `<img src="${st2.bild}" alt="${esc(st2.name)}" style="width:100%;max-height:180px;object-fit:cover;border-radius:12px;margin-bottom:10px">` : ""; })()}
+        ${st2 && st2.bild
+          ? `<img src="${st2.bild}" alt="${esc(st2.name)}" style="width:100%;max-height:180px;object-fit:cover;border-radius:12px;margin-bottom:10px">` : ""}
         <dl class="kv mb">
-          <dt>Ort</dt><dd>${(() => { const st2 = sportstaetteZuOrt(e.location);
-            return st2 ? `<a href="#" data-stlink="${st2.id}">🏟️ ${esc(e.location)}</a>${st2.ansprechpartner ? `<br><span class="soft">👤 ${esc(st2.ansprechpartner)}</span>` : ""}${st2.heimmannschaft ? `<br><span class="soft">Heim: ${esc(st2.heimmannschaft)}</span>` : ""}` : esc(e.location); })()}</dd>
+          <dt>Ort</dt><dd>${st2
+            ? `<a href="#" data-stlink="${st2.id}">🏟️ ${esc(e.location)}</a>${st2.ansprechpartner ? `<br><span class="soft">👤 ${esc(st2.ansprechpartner)}</span>` : ""}${st2.heimmannschaft ? `<br><span class="soft">Heim: ${esc(st2.heimmannschaft)}</span>` : ""}` : esc(e.location)}</dd>
           ${e.opponent ? `<dt>Gegner</dt><dd>${esc(e.opponent)}</dd>` : ""}
           ${e.description ? `<dt>Info</dt><dd>${esc(e.description)}</dd>` : ""}
         </dl>
@@ -2502,7 +2510,7 @@
       B.push({ art: "leer" });
       p([{ t: "Hiermit erkläre ich mich mit den nachfolgend angekreuzten Punkten einverstanden:", b: true }]);
       reqTpls.forEach((t, i) => {
-        B.push({ art: "sec", titel: `${i + 1}. ${t.name}`, text: t.text, ankreuz: true, runs: [] });
+        B.push({ art: "sec", titel: `${i + 1}. ${t.name}`, text: t.text, ankreuz: true });
       });
       B.push({ art: "leer" });
       p("Alle Einwilligungen sind freiwillig und können jederzeit mit Wirkung für die Zukunft schriftlich widerrufen werden. Die Daten werden ausschließlich für die Vereinsarbeit des SKV Müritz genutzt.");
@@ -3315,9 +3323,6 @@
   function wiki(el) {
     const articles = WIKI_ARTIKEL;
 
-    const QUIZ_KAPITEL_NAMEN = { feld: "📐 Feld, Netz & Ball", punkte: "🔢 Zählweise & Sätze",
-      team: "👥 Team & Rotation", libero: "🦺 Libero", angriff: "🎯 Aufschlag & Angriff",
-      netz: "🚫 Netz, Block & Fehler", schiri: "🧑‍⚖️ Schiri-Regelquiz", begriffe: "📖 Begriffe & Profi-Wissen" };
     const eigeneFragen = S().quizFragen || [];
     el.innerHTML = `
       ${head("Volleyball-Wiki", "Regeln, Techniken und Begriffe – ideal für neue Spieler und Eltern")}
@@ -3382,9 +3387,6 @@
               </div>`).join("") : `<p class="soft">Noch keine Spieler:innen-Konten.</p>`}
           </div>`;
       })();
-      const KAP = { feld: "📐 Feld, Netz & Ball", punkte: "🔢 Zählweise & Sätze", team: "👥 Team & Rotation",
-        libero: "🦺 Libero", angriff: "🎯 Aufschlag & Angriff", netz: "🚫 Netz, Block & Fehler",
-        schiri: "🧑‍⚖️ Schiri-Regelquiz", begriffe: "📖 Begriffe & Profi-Wissen" };
       const qfForm = (q) => {
         const isEdit = !!q;
         q = q || { kapitel: "begriffe", f: "", a: ["", "", ""], r: 0, stufe: 2 };
@@ -3392,7 +3394,7 @@
           title: isEdit ? "Quizfrage bearbeiten" : "Neue Quizfrage",
           body: `<form id="qf"><div class="form-grid">
             <div class="field"><label>Kategorie</label><select name="kapitel">
-              ${Object.entries(KAP).map(([k, l]) => `<option value="${k}" ${k === q.kapitel ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+              ${Object.entries(QUIZ_KAPITEL_NAMEN).map(([k, l]) => `<option value="${k}" ${k === q.kapitel ? "selected" : ""}>${l}</option>`).join("")}</select></div>
             <div class="field"><label>Schwierigkeit</label><select name="stufe">
               <option value="1" ${q.stufe === 1 ? "selected" : ""}>🟢 Anfänger (5 P.)</option>
               <option value="2" ${!q.stufe || q.stufe === 2 ? "selected" : ""}>🟡 Fortgeschritten (10 P.)</option>
@@ -4288,7 +4290,6 @@
     }
     return B;
   }
-  window.KurzanleitungBlocks = kurzanleitungBlocks;
 
   // Konto bearbeiten: Name, Benutzername, Rolle und verknüpfte Spieler:innen
   function kontoForm(k, fertig) {

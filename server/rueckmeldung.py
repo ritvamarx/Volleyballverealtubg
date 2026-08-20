@@ -17,14 +17,6 @@ import push
 SCHWELLE = 0.5  # unterhalb dieser Rückmeldequote wird gewarnt
 
 
-def _start(e) -> dt.datetime | None:
-    try:
-        z = dt.datetime.fromisoformat(str(e.get("start") or "").replace("Z", "+00:00"))
-        return z if z.tzinfo else z.replace(tzinfo=dt.timezone.utc)
-    except Exception:
-        return None
-
-
 def lauf() -> str:
     jetzt = dt.datetime.now(dt.timezone.utc)
     fenster_ende = jetzt + dt.timedelta(hours=24)
@@ -52,7 +44,7 @@ def lauf() -> str:
                 continue
             if e.get("abgesagt"):
                 continue  # abgesagte Termine brauchen keine Rückmelde-Warnung
-            start = _start(e)
+            start = db.parse_iso(e.get("start"))
             if start is None or not (jetzt < start <= fenster_ende):
                 continue
             zahl = sum(1 for p in roster if p.get("id") in antworten.get(e.get("id"), set()))
@@ -72,17 +64,16 @@ def lauf() -> str:
         if not alarm_ids:
             return "Alle Termine der nächsten 24 Stunden ausreichend zurückgemeldet."
         heute = dt.date.today().isoformat()
-        for _ in range(4):
-            row = db.get_state(con)
-            daten = json.loads(row["data"])
+
+        def merker(daten):
             for e in daten.get("events", []):
                 if e.get("id") in alarm_ids:
                     e["rueckmeldeAlarm"] = heute
-            version, _k = db.put_state(con, row["version"],
-                                       json.dumps(daten, ensure_ascii=False), "Rückmelde-Warnung")
-            if version is not None:
-                return (f"{len(alarm_ids)} Termin(e) gemeldet, {gesendet} Push-Mitteilungen "
-                        f"an das Trainerteam (Version {version}).")
+
+        version = db.mutate_state(con, merker, "Rückmelde-Warnung")
+        if version is not None:
+            return (f"{len(alarm_ids)} Termin(e) gemeldet, {gesendet} Push-Mitteilungen "
+                    f"an das Trainerteam (Version {version}).")
         return "Warnung gesendet, Merker konnte nicht gespeichert werden (Konflikt)."
     finally:
         con.close()

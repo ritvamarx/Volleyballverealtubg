@@ -126,7 +126,8 @@ def init_db() -> None:
         for spalte in ("users ADD COLUMN last_login INTEGER",
                        "users ADD COLUMN ics_token TEXT",
                        "quiz_stand ADD COLUMN wochen_punkte INTEGER NOT NULL DEFAULT 0",
-                       "quiz_stand ADD COLUMN woche TEXT NOT NULL DEFAULT ''"):
+                       "quiz_stand ADD COLUMN woche TEXT NOT NULL DEFAULT ''",
+                       "quiz_stand ADD COLUMN fehlversuche TEXT NOT NULL DEFAULT '{}'"):
             try:
                 con.execute("ALTER TABLE " + spalte)
             except sqlite3.OperationalError:
@@ -184,6 +185,40 @@ def list_history(con: sqlite3.Connection):
     return con.execute(
         "SELECT version, updated_at, updated_by, length(data) AS size FROM state_history ORDER BY version DESC"
     ).fetchall()
+
+
+# ---------- Gemeinsame Helfer (von App und Cron-Läufen genutzt) ----------
+
+def parse_iso(s):
+    """ISO-Zeitstring → tz-bewusste datetime (UTC-normalisiert); None bei ungültig.
+
+    Vereinheitlicht das früher an fünf Stellen kopierte fromisoformat-Parsing
+    (mit 'Z'→'+00:00' und Fallback naiv→UTC)."""
+    import datetime as _dt
+    try:
+        d = _dt.datetime.fromisoformat(str(s or "").replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=_dt.timezone.utc)
+
+
+def mutate_state(con: sqlite3.Connection, mutation, updated_by: str, versuche: int = 4):
+    """State laden → mutation(daten) in-place → mit optimistischem Locking speichern.
+
+    Bei Versionskonflikt wird bis `versuche`-mal neu gelesen. Rückgabe: neue
+    Version (int) oder None, wenn der Konflikt bestehen bleibt / kein State da ist.
+    Ersetzt die zuvor in jedem Cron-Modul kopierte Retry-Schleife."""
+    for _ in range(versuche):
+        row = get_state(con)
+        if row is None:
+            return None
+        daten = json.loads(row["data"])
+        mutation(daten)
+        version, _konflikt = put_state(con, row["version"],
+                                       json.dumps(daten, ensure_ascii=False), updated_by)
+        if version is not None:
+            return version
+    return None
 
 
 def get_history_version(con: sqlite3.Connection, version: int):

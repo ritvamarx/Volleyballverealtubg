@@ -68,17 +68,16 @@ def lauf() -> str:
             erinnert_ids.append(t.get("id"))
         if not erinnert_ids:
             return "Keine fälligen Portal-Aufgaben ohne Erinnerung."
-        for _ in range(4):
-            row = db.get_state(con)
-            daten = json.loads(row["data"])
+
+        def merker(daten):
             for t in daten.get("tasks", []):
                 if t.get("id") in erinnert_ids:
                     t["erinnertAm"] = heute
-            version, _k = db.put_state(con, row["version"],
-                                       json.dumps(daten, ensure_ascii=False), "Erinnerungs-Automatik")
-            if version is not None:
-                return (f"{len(erinnert_ids)} Aufgabe(n) erinnert, {gesendet} Push-Mitteilungen "
-                        f"zugestellt (Version {version}).")
+
+        version = db.mutate_state(con, merker, "Erinnerungs-Automatik")
+        if version is not None:
+            return (f"{len(erinnert_ids)} Aufgabe(n) erinnert, {gesendet} Push-Mitteilungen "
+                    f"zugestellt (Version {version}).")
         return "Erinnerungen gesendet, Merker konnte nicht gespeichert werden (Konflikt)."
     finally:
         con.close()

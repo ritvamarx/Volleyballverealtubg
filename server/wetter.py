@@ -18,6 +18,7 @@ WAREN = (53.516, 12.678)
 
 _geo_cache: dict = {}          # stadt -> (lat, lon)
 _vorhersage_cache: dict = {}   # (lat, lon, datum) -> (ts, daten|None)
+_aktuell_cache: dict = {"ts": 0.0, "daten": None}  # aktuelles Wetter in Waren
 
 
 def _hole_json(url: str):
@@ -76,3 +77,23 @@ def fuer_termin(ort: str, datum: str):
         daten = None
     _vorhersage_cache[schluessel] = (time.time(), daten)
     return daten
+
+
+def aktuell():
+    """Aktuelles Wetter {code, temp} in Waren (Müritz) – 30-Minuten-Cache.
+
+    Fällt bei Fehlern auf {code:None, temp:None} zurück (mit kurzem Retry-Fenster),
+    damit der Portal-Request nie blockiert."""
+    if time.time() - _aktuell_cache["ts"] <= 1800 and _aktuell_cache["daten"] is not None:
+        return _aktuell_cache["daten"]
+    lat, lon = WAREN
+    try:
+        roh = _hole_json(
+            "https://api.open-meteo.com/v1/forecast"
+            f"?latitude={lat}&longitude={lon}&current_weather=true").get("current_weather") or {}
+        _aktuell_cache["daten"] = {"code": roh.get("weathercode"), "temp": roh.get("temperature")}
+        _aktuell_cache["ts"] = time.time()
+    except Exception:
+        _aktuell_cache["daten"] = {"code": None, "temp": None}
+        _aktuell_cache["ts"] = time.time() - 1500  # bald erneut probieren
+    return _aktuell_cache["daten"]
