@@ -185,6 +185,16 @@ def main() -> None:
     s = sub.add_parser("aufgaben-erinnern", help="Fällige Portal-Aufgaben per Push erinnern")
     s.set_defaults(func=lambda _a: print(__import__("erinnerung").lauf()))
 
+    s = sub.add_parser("trainings-erinnern", help="06:30-Erinnerung an heutige Trainings (Push/E-Mail)")
+    s.set_defaults(func=lambda _a: print(__import__("trainingserinnerung").lauf()))
+
+    s = sub.add_parser("mail-test", help="Test-E-Mail verschicken (SMTP-Konfiguration prüfen)")
+    s.add_argument("adresse")
+    s.set_defaults(func=lambda a: print("gesendet ✓" if __import__("mail").senden(
+        a.adresse, "SKV Müritz Volleyball – Test",
+        "Test-E-Mail vom SKV-Müritz-Server. Wenn du das liest, funktioniert der Versand.")
+        else "NICHT gesendet – SMTP nicht konfiguriert oder Fehler (Logs prüfen)."))
+
     s = sub.add_parser("rueckmelde-warnung", help="Trainerteam warnen, wenn <24 h vor Terminen zu wenige Rückmeldungen da sind")
     s.set_defaults(func=lambda _a: print(__import__("rueckmeldung").lauf()))
 

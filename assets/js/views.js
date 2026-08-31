@@ -121,9 +121,14 @@
     if (e.abgesagt) return `<div class="sub"><span class="badge bad">🚫 abgesagt</span></div>`;
     const aktive = S().players.filter((p) => p.membershipStatus !== "inaktiv").length;
     const z = { yes: 0, no: 0, maybe: 0 };
-    S().responses.forEach((r) => { if (r.eventId === e.id && z[r.status] != null) z[r.status]++; });
-    const offen = Math.max(0, aktive - z.yes - z.no - z.maybe);
-    return `<div class="sub">👍 ${z.yes} · ❓ ${z.maybe} · 👎 ${z.no} · ⏳ ${offen} offen</div>`;
+    let nichtnom = 0;
+    S().responses.forEach((r) => {
+      if (r.eventId !== e.id) return;
+      if (r.status === "x") nichtnom++;
+      else if (z[r.status] != null) z[r.status]++;
+    });
+    const offen = Math.max(0, aktive - z.yes - z.no - z.maybe - nichtnom);
+    return `<div class="sub">👍 ${z.yes} · ❓ ${z.maybe} · 👎 ${z.no}${nichtnom ? ` · 🚫 ${nichtnom}` : ""} · ⏳ ${offen} offen</div>`;
   }
   // Auswahl-Optionen (feste Arten + eigene Kategorien) für Termin-Formulare
   function typeOptions(selected) {
@@ -1282,8 +1287,13 @@
     const tag = String(evt.start || "").slice(0, 10);
     const abwesend = {};
     (S().abwesenheiten || []).forEach((a) => { if (a.von <= tag && tag <= a.bis) abwesend[a.playerId] = a.grund || "abwesend"; });
-    const count = { yes: 0, no: 0, maybe: 0, open: 0 };
-    roster.forEach((p) => { const st = resp[p.id]; if (st) count[st]++; else count.open++; });
+    const count = { yes: 0, no: 0, maybe: 0, nichtnom: 0, open: 0 };
+    roster.forEach((p) => {
+      const st = resp[p.id];
+      if (st === "x") count.nichtnom++;
+      else if (st) count[st]++;
+      else count.open++;
+    });
 
     box.innerHTML = `
       ${evt.abgesagt ? `<div class="card mb" style="padding:10px 14px;border:1.5px solid #d05050">
@@ -1307,6 +1317,7 @@
         ${stat("❌", "Absagen", count.no)}
         ${stat("❔", "Unsicher", count.maybe)}
         ${stat("⏳", "Keine Rückmeldung", count.open)}
+        ${count.nichtnom ? stat("🚫", "Nicht nominiert", count.nichtnom) : ""}
       </div>
       ${Object.keys(gruende).length ? `<div class="card mb">
         <div class="card-head"><h3>💬 Bemerkungen der Spieler:innen</h3><span class="badge">${Object.keys(gruende).length}</span></div>
@@ -1330,6 +1341,7 @@
               <button class="rsvp-daumen sm ${st === "yes" ? "aktiv ja" : ""}" data-set="yes" data-pl="${p.id}" title="Zusagen">👍</button>
               <button class="rsvp-daumen sm ${st === "maybe" ? "aktiv viel" : ""}" data-set="maybe" data-pl="${p.id}" title="Unsicher">❓</button>
               <button class="rsvp-daumen sm ${st === "no" ? "aktiv nein" : ""}" data-set="no" data-pl="${p.id}" title="Absagen">👎</button>
+              <button class="rsvp-daumen sm ${st === "x" ? "aktiv nn" : ""}" data-set="x" data-pl="${p.id}" title="Nicht nominiert (Spieler:in kann selbst überschreiben)">🚫</button>
             </td></tr>`;
         }).join("")}</tbody>
       </table></div></div>
@@ -1662,7 +1674,8 @@
   }
   function rmBadge(st) {
     return ({ yes: '<span class="badge good">Zugesagt</span>', no: '<span class="badge bad">Abgesagt</span>',
-      maybe: '<span class="badge warn">Unsicher</span>', open: '<span class="badge">offen</span>' })[st] || "";
+      maybe: '<span class="badge warn">Unsicher</span>', x: '<span class="badge">🚫 nicht nominiert</span>',
+      open: '<span class="badge">offen</span>' })[st] || "";
   }
   function setResponse(eventId, playerId, status, grund) {
     // Begründung gehört zu Unsicher/Absage; bei Zusage wird sie gelöscht
@@ -4639,13 +4652,14 @@
     const respByEvent = {};
     S().responses.forEach((r) => { (respByEvent[r.eventId] = respByEvent[r.eventId] || {})[r.playerId] = r.status; });
     return roster.map((p) => {
-      let geantwortet = 0, zusagen = 0, absagen = 0, unsicher = 0;
+      let geantwortet = 0, zusagen = 0, absagen = 0, unsicher = 0, n = 0;
       evs.forEach((e) => {
         const st = (respByEvent[e.id] || {})[p.id];
+        if (st === "x") return;  // „nicht nominiert" zählt für diese Person nicht mit
+        n++;
         if (st) geantwortet++;
         if (st === "yes") zusagen++; else if (st === "no") absagen++; else if (st === "maybe") unsicher++;
       });
-      const n = evs.length;
       return { p, termine: n, geantwortet, zusagen, absagen, unsicher,
         antwortQ: n ? Math.round(geantwortet / n * 100) : 0,
         zusageQ: n ? Math.round(zusagen / n * 100) : 0 };

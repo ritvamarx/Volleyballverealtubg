@@ -1,0 +1,8 @@
+# /etc/cron.d/volleyball-trainingserinnerung – 06:30-Erinnerung an heutige Trainings
+# Wer sich noch nicht zurückgemeldet hat (und nicht „nicht nominiert" ist), bekommt
+# eine Erinnerung als Push und/oder E-Mail (je nach Benachrichtigungs-Einstellung).
+# Merker erinnertTraining am Termin verhindert Doppelversand. Einmalig aktivieren:
+#   cp /opt/volleyball/deploy/cron/volleyball-trainingserinnerung /etc/cron.d/
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+30 6 * * * root cd /opt/volleyball && docker compose exec -T volleyball ./manage.py trainings-erinnern >> /var/log/volleyball-trainingserinnerung.log 2>&1

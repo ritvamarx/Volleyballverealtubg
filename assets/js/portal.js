@@ -378,7 +378,8 @@
       const g = (t.gruende || {})[pid] || "";
       const M = { yes: ['<span class="badge good">✅ zugesagt</span>', ""],
                   maybe: ['<span class="badge warn">❔ unsicher</span>', ""],
-                  no: ['<span class="badge bad">❌ abgesagt</span>', ""] };
+                  no: ['<span class="badge bad">❌ abgesagt</span>', ""],
+                  x: ['<span class="badge">🚫 nicht nominiert</span>', ""] };
       return `<div class="portal-rsvp" style="gap:6px;align-items:center">
         ${st ? M[st][0] : '<span class="badge">⏳ noch keine Rückmeldung</span>'}
         ${st && g ? `<span class="sub">💬 ${esc(g)}</span>` : ""}
@@ -391,7 +392,9 @@
     const B = (status, symbol, titel) => `<button class="rsvp-daumen ${mein === status ? "aktiv " + MOD[status] : ""}"
       data-rsvp="${t.id}" data-pid="${pid}" data-status="${mein === status ? "" : status}"
       title="${titel}" aria-label="${titel}">${symbol}</button>`;
-    return `<div class="portal-rsvp">
+    return `${mein === "x" ? `<div class="portal-rsvp-zeile"><span class="badge-x">🚫 Du wurdest für diesen Termin nicht nominiert</span>
+      <span class="sub" style="display:block;margin-top:2px">Du kannst dich trotzdem selbst zurückmelden:</span></div>` : ""}
+    <div class="portal-rsvp">
       ${B("yes", "👍", "Ich komme")}${B("maybe", "❓", "Weiß noch nicht")}${B("no", "👎", "Ich kann nicht")}
     </div>
     ${offen ? `<div class="portal-fahrer rsvp-begruendung">
@@ -816,17 +819,31 @@
           <button class="btn sm">Einlösen</button>
         </form>
       </div>
-      <div class="card"><h3>🔔 Mitteilungen</h3>
-        <p class="soft">Neue Ankündigungen des Trainerteams als Mitteilung aufs Handy.
-        ${istIosOhneApp() ? "<br><strong>iPhone:</strong> zuerst als App installieren (Teilen → „Zum Home-Bildschirm“)." : ""}</p>
-        <div class="portal-fahrer">
+      ${(() => {
+        const b = d.benachrichtigungen || { prefs: {}, emailAdressen: [], mailMoeglich: false };
+        const pr = b.prefs || {};
+        const adr = b.emailAdressen || [];
+        const mailSub = !adr.length ? "Keine E-Mail-Adresse hinterlegt – im Profil oben ergänzen"
+          : !b.mailMoeglich ? "an " + adr.join(", ") + " · Versand wird noch eingerichtet"
+          : "an " + adr.join(", ");
+        const tog = (key, titel, sub) => `<button class="toggle-item ${pr[key] ? "an" : ""}" data-notify="${key}" aria-pressed="${pr[key] ? "true" : "false"}">
+          <span class="check">✓</span>
+          <div class="g"><div class="t">${titel}</div><div class="s">${sub}</div></div></button>`;
+        return `<div class="card"><h3>🔔 Benachrichtigungen</h3>
+        <p class="soft">Push auf dieses Gerät${istIosOhneApp() ? " (am iPhone zuerst als App installieren: Teilen → „Zum Home-Bildschirm“)" : ""}:</p>
+        <div class="portal-fahrer" style="margin-bottom:4px">
           ${P.pushAktiv
-            ? `<span class="badge good">aktiv</span>
+            ? `<span class="badge good">auf diesem Gerät aktiv</span>
                <button class="btn sm ghost" data-pushprobe>Probe senden</button>
-               <button class="btn sm ghost" data-pushaus>Abschalten</button>`
-            : `<button class="btn sm" data-pushan>🔔 Aktivieren</button>`}
+               <button class="btn sm ghost" data-pushaus>Gerät abmelden</button>`
+            : `<button class="btn sm" data-pushan>🔔 Push aktivieren</button>`}
         </div>
-      </div>
+        <div class="menu" style="margin-bottom:0">
+          ${tog("pushAllgemein", "📣 Ankündigungen", "Allgemeine Neuigkeiten des Trainerteams")}
+          ${tog("pushTeilnahme", "📅 Termin-Teilnahme", "Erinnerungen zum Rückmelden &amp; Absagen von Terminen")}
+          ${tog("email", "✉️ Zusätzlich per E-Mail", mailSub)}
+        </div></div>`;
+      })()}
       <div class="card">
         <button class="btn secondary" id="portalAbmelden">Abmelden</button>
         <p class="soft" style="font-size:.78rem;margin:12px 0 0;text-align:center">
@@ -1184,6 +1201,25 @@
       render();
     });
     wrap.querySelectorAll("[data-pushprobe]").forEach((b) => b.onclick = pushProbe);
+    // Benachrichtigungs-Schalter: sofort umlegen, im Hintergrund speichern (kein Neuladen)
+    wrap.querySelectorAll("[data-notify]").forEach((b) => b.onclick = async () => {
+      const key = b.dataset.notify;
+      const box = P.daten.benachrichtigungen || (P.daten.benachrichtigungen = { prefs: {} });
+      const pr = box.prefs || (box.prefs = {});
+      const neu = !pr[key];
+      b.classList.toggle("an", neu);
+      b.setAttribute("aria-pressed", neu ? "true" : "false");
+      pr[key] = neu;
+      const res = await api("/api/portal/benachrichtigungen", { [key]: neu });
+      if (!res.ok) {
+        pr[key] = !neu;
+        b.classList.toggle("an", !neu);
+        b.setAttribute("aria-pressed", !neu ? "true" : "false");
+        toast("Konnte nicht gespeichert werden", "bad");
+        return;
+      }
+      if (res.data && res.data.prefs) box.prefs = res.data.prefs;
+    });
     const abmelden = $("#portalAbmelden", wrap);
     if (abmelden) abmelden.onclick = async () => {
       await api("/api/logout", {});

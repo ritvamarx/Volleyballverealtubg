@@ -63,7 +63,7 @@ def lauf() -> str:
                 ergebnis = push.senden(
                     con, "✅ Erinnerung vom Trainerteam",
                     f"Bitte bis {faellig} erledigen: {str(t.get('title') or '')[:120]}",
-                    "/", saeumige)
+                    "/", saeumige, kategorie="teilnahme")
                 gesendet += ergebnis["ok"]
             erinnert_ids.append(t.get("id"))
         if not erinnert_ids:

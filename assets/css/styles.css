@@ -559,6 +559,7 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
 .rsvp-daumen.aktiv.ja  { background: var(--good); border-color: var(--good); color: #fff; transform: scale(1.03); }
 .rsvp-daumen.aktiv.nein { background: var(--bad);  border-color: var(--bad);  color: #fff; transform: scale(1.03); }
 .rsvp-daumen.aktiv.viel { background: var(--warn); border-color: var(--warn); color: #fff; transform: scale(1.03); }
+.rsvp-daumen.aktiv.nn { background: var(--text-soft); border-color: var(--text-soft); color: #fff; transform: scale(1.03); }
 .rsvp-daumen.aktiv { background: var(--accent); border-color: var(--accent); color: #fff; transform: scale(1.03);
   box-shadow: 0 2px 8px rgba(241,102,42,.3); }
 .portal-rsvp { display: flex; gap: 8px; margin-top: 8px; }

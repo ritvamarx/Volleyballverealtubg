@@ -53,12 +53,42 @@ def public_key() -> str:
     return _lade_schluessel()["public"]
 
 
-def senden(con, titel: str, text: str, url: str = "/", user_ids: list | None = None) -> dict:
+def _kategorie_erlaubt(prefs_json, kategorie: str) -> bool:
+    """Ob ein Konto Push dieser Kategorie erhalten möchte. Standard: an (Opt-out)."""
+    schluessel = {"allgemein": "pushAllgemein", "teilnahme": "pushTeilnahme"}.get(kategorie)
+    if not schluessel:
+        return True  # unbekannte/leere Kategorie → immer senden
+    try:
+        prefs = json.loads(prefs_json or "{}")
+    except Exception:
+        prefs = {}
+    return prefs.get(schluessel, True)
+
+
+def senden(con, titel: str, text: str, url: str = "/", user_ids: list | None = None,
+           kategorie: str | None = None) -> dict:
     """Push an alle Abos (oder nur an die der angegebenen Konten) schicken.
 
-    Rückgabe: {"ok": n, "weg": n} – weg = gelöschte abgelaufene Abos.
+    ``kategorie`` ("allgemein" | "teilnahme" | None): filtert die Empfänger nach
+    ihren Benachrichtigungs-Einstellungen (notify_prefs). None = immer senden
+    (z. B. Probe-Push). Rückgabe: {"ok": n, "weg": n} – weg = gelöschte Abos.
     """
     schl = _lade_schluessel()
+    # Bei gesetzter Kategorie zuerst die Konten aussortieren, die diese Art
+    # Mitteilung abbestellt haben.
+    if kategorie:
+        if user_ids is not None:
+            if not user_ids:
+                return {"ok": 0, "weg": 0}
+            platzhalter = ",".join("?" * len(user_ids))
+            rows = con.execute(
+                f"SELECT id, notify_prefs FROM users WHERE id IN ({platzhalter})",
+                list(user_ids)).fetchall()
+        else:
+            rows = con.execute("SELECT id, notify_prefs FROM users").fetchall()
+        user_ids = [r["id"] for r in rows if _kategorie_erlaubt(r["notify_prefs"], kategorie)]
+        if not user_ids:
+            return {"ok": 0, "weg": 0}
     if user_ids is not None:
         if not user_ids:
             return {"ok": 0, "weg": 0}

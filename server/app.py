@@ -19,6 +19,7 @@ from flask import Flask, g, jsonify, request, send_from_directory
 
 import auth
 import db
+import mail
 
 APP_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SESSION_COOKIE = "skv_session"
@@ -348,7 +349,7 @@ def create_app() -> Flask:
         ergebnis = push.senden(
             con(), "🚫 Abgesagt: " + titel,
             f"{titel}{wann} fällt aus." + (f" Grund: {notiz}" if notiz else ""),
-            "/", empfaenger)
+            "/", empfaenger, kategorie="teilnahme")
         return jsonify({"ok": True, "benachrichtigt": ergebnis["ok"]})
 
     # ---------- API: Einladungen (nur Trainer) ----------
@@ -468,7 +469,7 @@ def create_app() -> Flask:
                 if ids:
                     import push
                     push.senden(con(), "📣 " + str(a.get("title") or "Ankündigung")[:80],
-                                str(a.get("body") or "")[:180], "/", ids)
+                                str(a.get("body") or "")[:180], "/", ids, kategorie="allgemein")
         except Exception:
             pass  # Push darf das Speichern nie scheitern lassen
         return jsonify({"ok": True, "version": new_version})
@@ -685,6 +686,8 @@ def create_app() -> Flask:
                 erhalten = []
                 for d in daten.get("abzeichenDefs", []):
                     evs = bereiche.get(d.get("bereich") or "alle", [])
+                    # „nicht nominiert" (x): dieser Termin zählt für die Person gar nicht
+                    evs = [e for e in evs if antworten.get(e.get("id"), {}).get(pid) != "x"]
                     if len(evs) < 3:
                         continue
                     geantwortet = sum(1 for e in evs if antworten.get(e.get("id"), {}).get(pid))
@@ -708,9 +711,11 @@ def create_app() -> Flask:
                       if p.get("membershipStatus") != "inaktiv"]
 
             def quoten(pid):
-                n = len(past)
-                geantwortet = sum(1 for e in past if antworten.get(e.get("id"), {}).get(pid))
-                zusagen = sum(1 for e in past
+                # Termine mit „nicht nominiert" (x) zählen für diese Person nicht mit
+                rel = [e for e in past if antworten.get(e.get("id"), {}).get(pid) != "x"]
+                n = len(rel)
+                geantwortet = sum(1 for e in rel if antworten.get(e.get("id"), {}).get(pid))
+                zusagen = sum(1 for e in rel
                               if antworten.get(e.get("id"), {}).get(pid) == "yes")
                 return {"termine": n, "geantwortet": geantwortet, "zusagen": zusagen,
                         "antwortQ": round(geantwortet / n * 100) if n else 0,
@@ -746,6 +751,11 @@ def create_app() -> Flask:
 
         return jsonify({
             "user": {"name": sess["name"], "role": rolle},
+            "benachrichtigungen": {
+                "prefs": notify_prefs_lesen(sess["user_id"]),
+                "emailAdressen": portal_mailadressen(sess, daten),
+                "mailMoeglich": mail.konfiguriert(),
+            },
             "statistik": statistik,
             # Team-Avatare für die „Wer ist dabei?"-Anzeige – nur unter Spieler:innen
             "team": ([{"id": p["id"],
@@ -1045,7 +1055,7 @@ def create_app() -> Flask:
         ergebnis = push.senden(con(), "✅ Erinnerung vom Trainerteam",
                                f"Bitte noch erledigen: {str(t.get('title') or '')[:120]}"
                                + (f" (fällig {faellig[8:10]}.{faellig[5:7]}.)" if faellig else ""),
-                               "/", saeumige)
+                               "/", saeumige, kategorie="teilnahme")
         ergebnis["empfaenger"] = len(saeumige)
         return jsonify(ergebnis)
 
@@ -1478,6 +1488,66 @@ def create_app() -> Flask:
         if speichere_portal_aenderung(mut, f"{sess['name']} (Portal)") is None:
             return err(409, "Speichern gerade nicht möglich – bitte erneut versuchen")
         return jsonify({"ok": True})
+
+    # ---------- Benachrichtigungs-Einstellungen (Portal) ----------
+
+    NOTIFY_DEFAULT = {"pushAllgemein": True, "pushTeilnahme": True, "email": False}
+
+    def notify_prefs_lesen(user_id):
+        """Gespeicherte Einstellungen mit den Standardwerten auffüllen."""
+        prefs = dict(NOTIFY_DEFAULT)
+        row = con().execute("SELECT notify_prefs FROM users WHERE id = ?", (user_id,)).fetchone()
+        if row:
+            try:
+                gespeichert = json.loads(row["notify_prefs"] or "{}")
+                for k in NOTIFY_DEFAULT:
+                    if k in gespeichert:
+                        prefs[k] = bool(gespeichert[k])
+            except Exception:
+                pass
+        return prefs
+
+    def portal_mailadressen(sess, daten):
+        """E-Mail-Adressen, an die dieses Konto Mitteilungen bekäme."""
+        ids = sess_player_ids(sess)
+        adressen = []
+        felder = ("parentEmail", "parent2Email") if sess["role"] == "eltern" else ("playerEmail",)
+        for p in daten.get("players", []):
+            if p.get("id") not in ids:
+                continue
+            for feld in felder:
+                a = (p.get(feld) or "").strip()
+                if a and a not in adressen:
+                    adressen.append(a)
+        return adressen
+
+    @app.get("/api/portal/benachrichtigungen")
+    def api_portal_benachr_get():
+        sess, failure = require_portal()
+        if failure:
+            return failure
+        import mail
+        _, daten = lade_state()
+        return jsonify({
+            "prefs": notify_prefs_lesen(sess["user_id"]),
+            "emailAdressen": portal_mailadressen(sess, daten),
+            "mailMoeglich": mail.konfiguriert(),
+        })
+
+    @app.post("/api/portal/benachrichtigungen")
+    def api_portal_benachr_set():
+        sess, failure = require_portal()
+        if failure:
+            return failure
+        body = request.get_json(silent=True) or {}
+        prefs = notify_prefs_lesen(sess["user_id"])
+        for k in NOTIFY_DEFAULT:
+            if k in body:
+                prefs[k] = bool(body[k])
+        con().execute("UPDATE users SET notify_prefs = ? WHERE id = ?",
+                      (db.to_json(prefs), sess["user_id"]))
+        con().commit()
+        return jsonify({"ok": True, "prefs": prefs})
 
     # ---------- API: Web-Push (alle angemeldeten Konten) ----------
 

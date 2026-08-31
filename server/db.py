@@ -125,6 +125,7 @@ def init_db() -> None:
         # Nachträgliche Spalten (CREATE IF NOT EXISTS ergänzt keine Spalten)
         for spalte in ("users ADD COLUMN last_login INTEGER",
                        "users ADD COLUMN ics_token TEXT",
+                       "users ADD COLUMN notify_prefs TEXT NOT NULL DEFAULT '{}'",
                        "quiz_stand ADD COLUMN wochen_punkte INTEGER NOT NULL DEFAULT 0",
                        "quiz_stand ADD COLUMN woche TEXT NOT NULL DEFAULT ''",
                        "quiz_stand ADD COLUMN fehlversuche TEXT NOT NULL DEFAULT '{}'"):

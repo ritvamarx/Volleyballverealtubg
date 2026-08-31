@@ -590,6 +590,7 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
 .rsvp-daumen.aktiv.ja  { background: var(--good); border-color: var(--good); color: #fff; transform: scale(1.03); }
 .rsvp-daumen.aktiv.nein { background: var(--bad);  border-color: var(--bad);  color: #fff; transform: scale(1.03); }
 .rsvp-daumen.aktiv.viel { background: var(--warn); border-color: var(--warn); color: #fff; transform: scale(1.03); }
+.rsvp-daumen.aktiv.nn { background: var(--text-soft); border-color: var(--text-soft); color: #fff; transform: scale(1.03); }
 .rsvp-daumen.aktiv { background: var(--accent); border-color: var(--accent); color: #fff; transform: scale(1.03);
   box-shadow: 0 2px 8px rgba(241,102,42,.3); }
 .portal-rsvp { display: flex; gap: 8px; margin-top: 8px; }
@@ -2169,9 +2170,14 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
     if (e.abgesagt) return `<div class="sub"><span class="badge bad">🚫 abgesagt</span></div>`;
     const aktive = S().players.filter((p) => p.membershipStatus !== "inaktiv").length;
     const z = { yes: 0, no: 0, maybe: 0 };
-    S().responses.forEach((r) => { if (r.eventId === e.id && z[r.status] != null) z[r.status]++; });
-    const offen = Math.max(0, aktive - z.yes - z.no - z.maybe);
-    return `<div class="sub">👍 ${z.yes} · ❓ ${z.maybe} · 👎 ${z.no} · ⏳ ${offen} offen</div>`;
+    let nichtnom = 0;
+    S().responses.forEach((r) => {
+      if (r.eventId !== e.id) return;
+      if (r.status === "x") nichtnom++;
+      else if (z[r.status] != null) z[r.status]++;
+    });
+    const offen = Math.max(0, aktive - z.yes - z.no - z.maybe - nichtnom);
+    return `<div class="sub">👍 ${z.yes} · ❓ ${z.maybe} · 👎 ${z.no}${nichtnom ? ` · 🚫 ${nichtnom}` : ""} · ⏳ ${offen} offen</div>`;
   }
   // Auswahl-Optionen (feste Arten + eigene Kategorien) für Termin-Formulare
   function typeOptions(selected) {
@@ -3330,8 +3336,13 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
     const tag = String(evt.start || "").slice(0, 10);
     const abwesend = {};
     (S().abwesenheiten || []).forEach((a) => { if (a.von <= tag && tag <= a.bis) abwesend[a.playerId] = a.grund || "abwesend"; });
-    const count = { yes: 0, no: 0, maybe: 0, open: 0 };
-    roster.forEach((p) => { const st = resp[p.id]; if (st) count[st]++; else count.open++; });
+    const count = { yes: 0, no: 0, maybe: 0, nichtnom: 0, open: 0 };
+    roster.forEach((p) => {
+      const st = resp[p.id];
+      if (st === "x") count.nichtnom++;
+      else if (st) count[st]++;
+      else count.open++;
+    });
 
     box.innerHTML = `
       ${evt.abgesagt ? `<div class="card mb" style="padding:10px 14px;border:1.5px solid #d05050">
@@ -3355,6 +3366,7 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
         ${stat("❌", "Absagen", count.no)}
         ${stat("❔", "Unsicher", count.maybe)}
         ${stat("⏳", "Keine Rückmeldung", count.open)}
+        ${count.nichtnom ? stat("🚫", "Nicht nominiert", count.nichtnom) : ""}
       </div>
       ${Object.keys(gruende).length ? `<div class="card mb">
         <div class="card-head"><h3>💬 Bemerkungen der Spieler:innen</h3><span class="badge">${Object.keys(gruende).length}</span></div>
@@ -3378,6 +3390,7 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
               <button class="rsvp-daumen sm ${st === "yes" ? "aktiv ja" : ""}" data-set="yes" data-pl="${p.id}" title="Zusagen">👍</button>
               <button class="rsvp-daumen sm ${st === "maybe" ? "aktiv viel" : ""}" data-set="maybe" data-pl="${p.id}" title="Unsicher">❓</button>
               <button class="rsvp-daumen sm ${st === "no" ? "aktiv nein" : ""}" data-set="no" data-pl="${p.id}" title="Absagen">👎</button>
+              <button class="rsvp-daumen sm ${st === "x" ? "aktiv nn" : ""}" data-set="x" data-pl="${p.id}" title="Nicht nominiert (Spieler:in kann selbst überschreiben)">🚫</button>
             </td></tr>`;
         }).join("")}</tbody>
       </table></div></div>
@@ -3710,7 +3723,8 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
   }
   function rmBadge(st) {
     return ({ yes: '<span class="badge good">Zugesagt</span>', no: '<span class="badge bad">Abgesagt</span>',
-      maybe: '<span class="badge warn">Unsicher</span>', open: '<span class="badge">offen</span>' })[st] || "";
+      maybe: '<span class="badge warn">Unsicher</span>', x: '<span class="badge">🚫 nicht nominiert</span>',
+      open: '<span class="badge">offen</span>' })[st] || "";
   }
   function setResponse(eventId, playerId, status, grund) {
     // Begründung gehört zu Unsicher/Absage; bei Zusage wird sie gelöscht
@@ -6687,13 +6701,14 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
     const respByEvent = {};
     S().responses.forEach((r) => { (respByEvent[r.eventId] = respByEvent[r.eventId] || {})[r.playerId] = r.status; });
     return roster.map((p) => {
-      let geantwortet = 0, zusagen = 0, absagen = 0, unsicher = 0;
+      let geantwortet = 0, zusagen = 0, absagen = 0, unsicher = 0, n = 0;
       evs.forEach((e) => {
         const st = (respByEvent[e.id] || {})[p.id];
+        if (st === "x") return;  // „nicht nominiert" zählt für diese Person nicht mit
+        n++;
         if (st) geantwortet++;
         if (st === "yes") zusagen++; else if (st === "no") absagen++; else if (st === "maybe") unsicher++;
       });
-      const n = evs.length;
       return { p, termine: n, geantwortet, zusagen, absagen, unsicher,
         antwortQ: n ? Math.round(geantwortet / n * 100) : 0,
         zusageQ: n ? Math.round(zusagen / n * 100) : 0 };
@@ -7428,7 +7443,8 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
       const g = (t.gruende || {})[pid] || "";
       const M = { yes: ['<span class="badge good">✅ zugesagt</span>', ""],
                   maybe: ['<span class="badge warn">❔ unsicher</span>', ""],
-                  no: ['<span class="badge bad">❌ abgesagt</span>', ""] };
+                  no: ['<span class="badge bad">❌ abgesagt</span>', ""],
+                  x: ['<span class="badge">🚫 nicht nominiert</span>', ""] };
       return `<div class="portal-rsvp" style="gap:6px;align-items:center">
         ${st ? M[st][0] : '<span class="badge">⏳ noch keine Rückmeldung</span>'}
         ${st && g ? `<span class="sub">💬 ${esc(g)}</span>` : ""}
@@ -7441,7 +7457,9 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
     const B = (status, symbol, titel) => `<button class="rsvp-daumen ${mein === status ? "aktiv " + MOD[status] : ""}"
       data-rsvp="${t.id}" data-pid="${pid}" data-status="${mein === status ? "" : status}"
       title="${titel}" aria-label="${titel}">${symbol}</button>`;
-    return `<div class="portal-rsvp">
+    return `${mein === "x" ? `<div class="portal-rsvp-zeile"><span class="badge-x">🚫 Du wurdest für diesen Termin nicht nominiert</span>
+      <span class="sub" style="display:block;margin-top:2px">Du kannst dich trotzdem selbst zurückmelden:</span></div>` : ""}
+    <div class="portal-rsvp">
       ${B("yes", "👍", "Ich komme")}${B("maybe", "❓", "Weiß noch nicht")}${B("no", "👎", "Ich kann nicht")}
     </div>
     ${offen ? `<div class="portal-fahrer rsvp-begruendung">
@@ -7866,17 +7884,31 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
           <button class="btn sm">Einlösen</button>
         </form>
       </div>
-      <div class="card"><h3>🔔 Mitteilungen</h3>
-        <p class="soft">Neue Ankündigungen des Trainerteams als Mitteilung aufs Handy.
-        ${istIosOhneApp() ? "<br><strong>iPhone:</strong> zuerst als App installieren (Teilen → „Zum Home-Bildschirm“)." : ""}</p>
-        <div class="portal-fahrer">
+      ${(() => {
+        const b = d.benachrichtigungen || { prefs: {}, emailAdressen: [], mailMoeglich: false };
+        const pr = b.prefs || {};
+        const adr = b.emailAdressen || [];
+        const mailSub = !adr.length ? "Keine E-Mail-Adresse hinterlegt – im Profil oben ergänzen"
+          : !b.mailMoeglich ? "an " + adr.join(", ") + " · Versand wird noch eingerichtet"
+          : "an " + adr.join(", ");
+        const tog = (key, titel, sub) => `<button class="toggle-item ${pr[key] ? "an" : ""}" data-notify="${key}" aria-pressed="${pr[key] ? "true" : "false"}">
+          <span class="check">✓</span>
+          <div class="g"><div class="t">${titel}</div><div class="s">${sub}</div></div></button>`;
+        return `<div class="card"><h3>🔔 Benachrichtigungen</h3>
+        <p class="soft">Push auf dieses Gerät${istIosOhneApp() ? " (am iPhone zuerst als App installieren: Teilen → „Zum Home-Bildschirm“)" : ""}:</p>
+        <div class="portal-fahrer" style="margin-bottom:4px">
           ${P.pushAktiv
-            ? `<span class="badge good">aktiv</span>
+            ? `<span class="badge good">auf diesem Gerät aktiv</span>
                <button class="btn sm ghost" data-pushprobe>Probe senden</button>
-               <button class="btn sm ghost" data-pushaus>Abschalten</button>`
-            : `<button class="btn sm" data-pushan>🔔 Aktivieren</button>`}
+               <button class="btn sm ghost" data-pushaus>Gerät abmelden</button>`
+            : `<button class="btn sm" data-pushan>🔔 Push aktivieren</button>`}
         </div>
-      </div>
+        <div class="menu" style="margin-bottom:0">
+          ${tog("pushAllgemein", "📣 Ankündigungen", "Allgemeine Neuigkeiten des Trainerteams")}
+          ${tog("pushTeilnahme", "📅 Termin-Teilnahme", "Erinnerungen zum Rückmelden &amp; Absagen von Terminen")}
+          ${tog("email", "✉️ Zusätzlich per E-Mail", mailSub)}
+        </div></div>`;
+      })()}
       <div class="card">
         <button class="btn secondary" id="portalAbmelden">Abmelden</button>
         <p class="soft" style="font-size:.78rem;margin:12px 0 0;text-align:center">
@@ -8234,6 +8266,25 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
       render();
     });
     wrap.querySelectorAll("[data-pushprobe]").forEach((b) => b.onclick = pushProbe);
+    // Benachrichtigungs-Schalter: sofort umlegen, im Hintergrund speichern (kein Neuladen)
+    wrap.querySelectorAll("[data-notify]").forEach((b) => b.onclick = async () => {
+      const key = b.dataset.notify;
+      const box = P.daten.benachrichtigungen || (P.daten.benachrichtigungen = { prefs: {} });
+      const pr = box.prefs || (box.prefs = {});
+      const neu = !pr[key];
+      b.classList.toggle("an", neu);
+      b.setAttribute("aria-pressed", neu ? "true" : "false");
+      pr[key] = neu;
+      const res = await api("/api/portal/benachrichtigungen", { [key]: neu });
+      if (!res.ok) {
+        pr[key] = !neu;
+        b.classList.toggle("an", !neu);
+        b.setAttribute("aria-pressed", !neu ? "true" : "false");
+        toast("Konnte nicht gespeichert werden", "bad");
+        return;
+      }
+      if (res.data && res.data.prefs) box.prefs = res.data.prefs;
+    });
     const abmelden = $("#portalAbmelden", wrap);
     if (abmelden) abmelden.onclick = async () => {
       await api("/api/logout", {});
