@@ -1327,9 +1327,9 @@
             <td><span class="badge info">${esc(p.team)}</span></td>
             <td>${rmBadge(st)}${gruende[p.id] ? `<div class="sub" title="Begründung aus dem Portal">💬 ${esc(gruende[p.id])}</div>` : ""}</td>
             <td class="right nowrap">
-              <button class="rsvp-daumen sm ${st === "yes" ? "aktiv" : ""}" data-set="yes" data-pl="${p.id}" title="Zusagen">👍</button>
-              <button class="rsvp-daumen sm ${st === "maybe" ? "aktiv" : ""}" data-set="maybe" data-pl="${p.id}" title="Unsicher">❓</button>
-              <button class="rsvp-daumen sm ${st === "no" ? "aktiv" : ""}" data-set="no" data-pl="${p.id}" title="Absagen">👎</button>
+              <button class="rsvp-daumen sm ${st === "yes" ? "aktiv ja" : ""}" data-set="yes" data-pl="${p.id}" title="Zusagen">👍</button>
+              <button class="rsvp-daumen sm ${st === "maybe" ? "aktiv viel" : ""}" data-set="maybe" data-pl="${p.id}" title="Unsicher">❓</button>
+              <button class="rsvp-daumen sm ${st === "no" ? "aktiv nein" : ""}" data-set="no" data-pl="${p.id}" title="Absagen">👎</button>
             </td></tr>`;
         }).join("")}</tbody>
       </table></div></div>
