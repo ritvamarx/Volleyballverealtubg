@@ -350,6 +350,8 @@
       quizFragen: [],
       // WhatsApp-Gruppen (Portal zeigt je Rolle nur den passenden Link)
       whatsapp: { spieler: "", eltern: "" },
+      // Automatische Trainings-Erinnerung (vom Trainerteam in der App einstellbar)
+      trainingErinnerung: { aktiv: true, zeit: "06:30" },
       // Sportstätten-Verzeichnis (Autovervollständigung bei Terminen)
       sportstaetten: [],
       // Frei definierbare Abzeichen: typ "rueckmeldung" (hat geantwortet) oder

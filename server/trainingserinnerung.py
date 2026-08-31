@@ -49,6 +49,19 @@ def lauf() -> str:
         if row is None:
             return "Kein Datenbestand – nichts zu tun."
         daten = json.loads(row["data"])
+
+        # Vom Trainerteam in der App eingestellt: an/aus + Uhrzeit. Der Cron ist nur
+        # der „Wecker" (läuft oft), gesendet wird erst ab der eingestellten Zeit –
+        # der erinnertTraining-Merker sorgt dann für genau EINEN Versand pro Tag.
+        from zoneinfo import ZoneInfo
+        cfg = daten.get("trainingErinnerung") or {}
+        if cfg.get("aktiv", True) is False:
+            return "Automatische Trainings-Erinnerung ist ausgeschaltet."
+        zeit = str(cfg.get("zeit") or "06:30")[:5]
+        jetzt_lokal = dt.datetime.now(dt.timezone.utc).astimezone(ZoneInfo("Europe/Berlin"))
+        if jetzt_lokal.strftime("%H:%M") < zeit:
+            return f"Noch vor der eingestellten Zeit ({zeit} Uhr) – nichts zu tun."
+
         roster = [p for p in daten.get("players", []) if p.get("membershipStatus") != "inaktiv"]
         players_by_id = {p.get("id"): p for p in daten.get("players", [])}
         # Antworten je Event: Spieler-ID -> Status ("yes"/"no"/"maybe"/"x")

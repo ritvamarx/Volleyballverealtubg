@@ -1236,6 +1236,7 @@
     const upcoming = trainings.filter((e) => daysUntil(e.start) >= -1);
     const sel = training._sel && trainings.find((t) => t.id === training._sel) ? training._sel : (upcoming[0] || trainings[0] || {}).id;
     const evt = Store.byId("events", sel);
+    const ter = S().trainingErinnerung || { aktiv: true, zeit: "06:30" };
 
     // Zähler: bereits durchgeführte Trainings (gesamt + laufende Saison ab 1. Juli),
     // aufgeschlüsselt nach Trainer:in, damit bei mehreren klar ist, wer was übernimmt
@@ -1267,9 +1268,27 @@
           <span class="badge" title="seit Beginn der Aufzeichnung">gesamt: ${vergangene.length}</span>
           ${trainerZeilen ? `<span class="soft" style="font-size:.82rem">·</span> ${trainerZeilen}` : ""}
         </div>
+      </div>
+      <div class="card mt" style="padding:10px 14px">
+        <div class="flex" style="justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+          <div><strong>⏰ Automatische Trainings-Erinnerung</strong>
+            <div class="soft" style="font-size:.82rem">Am Trainingstag werden alle erinnert, die sich noch nicht gemeldet haben (Push/E-Mail je Einstellung). „Nicht nominierte" werden übersprungen.</div></div>
+          <div class="flex" style="gap:8px;flex-wrap:wrap">
+            <label class="flex" style="gap:6px;font-weight:600;font-size:.85rem"><input type="checkbox" id="terAktiv" ${ter.aktiv ? "checked" : ""} style="width:auto"> aktiv</label>
+            <input type="time" id="terZeit" value="${esc(ter.zeit || "06:30")}" style="width:auto;max-width:120px" title="Uhrzeit der Erinnerung (morgens)">
+            <button class="btn sm" data-tersave>Speichern</button>
+          </div>
+        </div>
       </div>`;
 
     $("#tsel", el).onchange = (ev) => { training._sel = ev.target.value; reload(); };
+    $("[data-tersave]", el).onclick = () => {
+      const zeit = ($("#terZeit", el).value || "06:30").slice(0, 5);
+      const aktiv = $("#terAktiv", el).checked;
+      S().trainingErinnerung = { aktiv, zeit };
+      Store.save();
+      toast(aktiv ? `Erinnerung aktiv – täglich um ${zeit} Uhr` : "Automatische Erinnerung ausgeschaltet", "good");
+    };
     renderTrainingBody($("#tbody", el), evt);
   }
 
