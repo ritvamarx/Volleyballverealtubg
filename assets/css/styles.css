@@ -3,8 +3,9 @@
    Design system & layout
    ========================================================================== */
 :root {
-  --accent: #f97316;         /* Volleyball-Orange */
-  --accent-dark: #ea580c;
+  --accent: #F1662A;         /* Logo-/Vereinsorange (SpielerPlus-Optik) */
+  --accent-dark: #d9501a;
+  --accent-weich: #fdece4;   /* zarter Orange-Hintergrund für Icons/Chips */
   --primary: #1e3a8a;        /* Vereinsblau */
   --primary-2: #2563eb;
   --bg: #f1f5f9;
@@ -15,10 +16,22 @@
   --text-soft: #475569;
   --muted: #94a3b8;
   --good: #16a34a;
+  --good-weich: #e7f6ec;
   --warn: #d97706;
   --bad: #dc2626;
-  --radius: 14px;
-  --radius-sm: 9px;
+  --bad-weich: #fdeaea;
+  /* Bottom-Tab-Leiste (Portal) */
+  --tabbar: #ffffff;
+  --tabbar-line: var(--border);
+  --tab-off: #8b95a4;
+  /* Rollen-Punkte */
+  --rollen-trainer: #2563eb;
+  --rollen-betreuer: #16a34a;
+  --rollen-kasse: #e8892b;
+  --rollen-spieler: #cbd3df;
+  --rollen-inaktiv: #9aa4b2;
+  --radius: 16px;
+  --radius-sm: 11px;
   --shadow: 0 1px 2px rgba(15,23,42,.06), 0 8px 24px rgba(15,23,42,.06);
   --sidebar-w: 258px;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -31,6 +44,13 @@
   --text: #e7edf7;
   --text-soft: #a9b6cc;
   --muted: #6b7a99;
+  --accent-weich: #3a2116;
+  --good-weich: #12331f;
+  --bad-weich: #3a1a1a;
+  --tabbar: #0f1622;
+  --tabbar-line: #2a3446;
+  --tab-off: #ced7e4;
+  --rollen-spieler: #3a4457;
   --shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 30px rgba(0,0,0,.35);
 }
 
@@ -131,7 +151,7 @@ p { line-height: 1.55; }
 .card-head .spacer { flex: 1; }
 
 .section-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
-.section-head h2 { font-size: 1.35rem; margin: 0; }
+.section-head h2 { font-size: 1.4rem; margin: 0; font-weight: 800; letter-spacing: -.01em; }
 .section-head p { margin: 2px 0 0; color: var(--text-soft); font-size: .9rem; }
 .section-head .spacer { flex: 1; }
 
@@ -454,47 +474,55 @@ textarea { resize: vertical; min-height: 72px; }
 .portal-nutzer { margin-left: auto; font-size: .85rem; opacity: .9; }
 .portal-inhalt { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column;
   gap: 14px; max-width: 720px; width: 100%; margin: 0 auto; -webkit-overflow-scrolling: touch; }
-.portal-tabs { display: flex; background: #fff; border-top: 1px solid #e2e8f0;
-  padding-bottom: env(safe-area-inset-bottom, 0); }
-.portal-tabs button { flex: 1; border: 0; background: none; padding: 8px 2px 10px; font: inherit;
-  font-size: .68rem; color: #64748b; display: flex; flex-direction: column; align-items: center;
-  gap: 2px; cursor: pointer; }
-.portal-tabs button span { font-size: 1.25rem; }
-.portal-tabs button.aktiv { color: var(--primary); font-weight: 700; }
-.portal-lade { margin: auto; color: #64748b; font-size: 1rem; padding: 40px; text-align: center; }
-.portal-termin { border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; margin: 10px 0; }
+.portal-tabs { display: flex; background: var(--tabbar); border-top: 1.5px solid var(--tabbar-line);
+  padding: 6px 6px calc(6px + env(safe-area-inset-bottom, 0)); }
+.portal-tabs button { flex: 1; border: 0; background: none; padding: 4px 2px; font: inherit;
+  font-size: .62rem; font-weight: 650; color: var(--tab-off); display: flex; flex-direction: column;
+  align-items: center; gap: 3px; cursor: pointer; position: relative; }
+.portal-tabs button span { width: 34px; height: 34px; border-radius: 50%; display: grid;
+  place-items: center; font-size: 1.15rem; transition: background .15s, color .15s; }
+.portal-tabs button.aktiv { color: var(--accent); font-weight: 700; }
+.portal-tabs button.aktiv span { background: var(--accent); color: #fff;
+  box-shadow: 0 4px 10px rgba(241,102,42,.35); }
+.portal-tabs button .tab-dot { position: absolute; top: -1px; right: calc(50% - 17px);
+  width: 8px; height: 8px; border-radius: 50%; background: var(--bad); border: 1.5px solid var(--tabbar); }
+.portal-lade { margin: auto; color: var(--text-soft); font-size: 1rem; padding: 40px; text-align: center; }
+.portal-termin { border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin: 10px 0;
+  background: var(--surface); }
 .portal-termin .title { font-weight: 600; font-size: .92rem; }
-.portal-termin .sub { color: #64748b; font-size: .8rem; margin-top: 2px; }
+.portal-termin .sub { color: var(--text-soft); font-size: .8rem; margin-top: 2px; }
 .portal-rsvp { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .portal-rsvp .btn { flex: 1; min-width: 90px; }
 .portal-rsvp-zeile { margin-top: 6px; }
 .portal-fahrer { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
-.portal-fahrer select, .portal-fahrer input { padding: 8px 10px; border: 1px solid #cbd5e1;
-  border-radius: 8px; font: inherit; font-size: .85rem; flex: 1; min-width: 110px; }
+.portal-fahrer select, .portal-fahrer input { padding: 8px 10px; border: 1px solid var(--border);
+  border-radius: 8px; font: inherit; font-size: .85rem; flex: 1; min-width: 110px;
+  background: var(--surface); color: var(--text); }
 
 /* Portal: Verbandsliga-Tabelle */
 .portal-tabelle { overflow-x: auto; margin: 4px 0 10px; }
 .portal-tabelle table { width: 100%; border-collapse: collapse; font-size: .82rem; }
-.portal-tabelle th { text-align: left; color: #64748b; font-weight: 600; font-size: .72rem;
-  text-transform: uppercase; letter-spacing: .03em; padding: 6px 8px; border-bottom: 2px solid #e2e8f0; }
-.portal-tabelle td { padding: 7px 8px; border-bottom: 1px solid #eef2f7; white-space: nowrap; }
-.portal-tabelle tr.wir td { background: #fff7ed; font-weight: 700; }
+.portal-tabelle th { text-align: left; color: var(--text-soft); font-weight: 600; font-size: .72rem;
+  text-transform: uppercase; letter-spacing: .03em; padding: 6px 8px; border-bottom: 2px solid var(--border); }
+.portal-tabelle td { padding: 7px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.portal-tabelle tr.wir td { background: var(--accent-weich); font-weight: 700; }
 .portal-tabelle tr:last-child td { border-bottom: 0; }
 
 /* Portal: Wiki-Aufklapper */
-.portal-wiki { border: 1px solid #e2e8f0; border-radius: 12px; margin: 10px 0; overflow: hidden; }
+.portal-wiki { border: 1px solid var(--border); border-radius: 12px; margin: 10px 0; overflow: hidden;
+  background: var(--surface); }
 .portal-wiki summary { cursor: pointer; padding: 12px 14px; font-weight: 600; font-size: .92rem;
   list-style: none; display: flex; align-items: center; gap: 6px; }
 .portal-wiki summary::-webkit-details-marker { display: none; }
-.portal-wiki summary::after { content: "›"; margin-left: auto; color: #94a3b8;
+.portal-wiki summary::after { content: "›"; margin-left: auto; color: var(--muted);
   font-size: 1.1rem; transform: rotate(90deg); transition: transform .15s; }
-.portal-wiki[open] summary { color: var(--primary); border-bottom: 1px solid #eef2f7; }
+.portal-wiki[open] summary { color: var(--accent); border-bottom: 1px solid var(--border); }
 .portal-wiki[open] summary::after { transform: rotate(-90deg); }
 .portal-wiki-inhalt { padding: 4px 14px 12px; font-size: .88rem; line-height: 1.55; }
 .portal-wiki-inhalt ul { padding-left: 20px; margin: 8px 0; }
 .portal-wiki-inhalt li { margin: 4px 0; }
 .portal-wiki-inhalt dl.kv dt { font-weight: 700; margin-top: 8px; }
-.portal-wiki-inhalt dl.kv dd { margin: 0 0 4px; color: #475569; }
+.portal-wiki-inhalt dl.kv dd { margin: 0 0 4px; color: var(--text-soft); }
 
 /* Verlinkte Statistik-Kacheln (Dashboard) */
 a.card.stat-link { display: block; text-decoration: none; color: inherit; cursor: pointer;
@@ -503,43 +531,141 @@ a.card.stat-link:hover { box-shadow: 0 4px 14px rgba(30,58,138,.14); transform: 
 
 /* Portal: Quiz-Kapitel-Chips */
 .portal-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
-.portal-chips .chip { font-size: .72rem; cursor: pointer; border: 1px solid #e2e8f0;
-  background: #fff; border-radius: 999px; padding: 5px 10px; }
-.portal-chips .chip.aktiv { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 700; }
+.portal-chips .chip { font-size: .72rem; cursor: pointer; border: 1px solid var(--border);
+  background: var(--surface); border-radius: 999px; padding: 5px 10px; }
+.portal-chips .chip.aktiv { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 700; }
 
 /* Portal: Quiz-Antworten als dezente Chips */
 .quiz-optionen { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.quiz-opt { border: 1px solid #cbd5e1; background: #f8fafc; color: #0f172a; border-radius: 999px;
+.quiz-opt { border: 1px solid var(--border); background: var(--surface-2); color: var(--text); border-radius: 999px;
   padding: 7px 14px; font: inherit; font-size: .85rem; cursor: pointer; transition: border-color .12s, background .12s; }
-button.quiz-opt:hover { border-color: var(--primary); background: #eef2ff; }
+button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-weich); }
 .quiz-opt.falsch { opacity: .45; text-decoration: line-through; cursor: default; }
 
 /* Portal: Profilbild */
-.profil-vorschau { width: 72px; height: 72px; border-radius: 50%; background: #eef2ff;
+.profil-vorschau { width: 72px; height: 72px; border-radius: 50%; background: var(--surface-2);
   display: flex; align-items: center; justify-content: center; font-size: 2rem; overflow: hidden;
-  border: 2px solid #e2e8f0; flex: 0 0 72px; }
+  border: 2px solid var(--border); flex: 0 0 72px; }
 .profil-vorschau img { width: 100%; height: 100%; object-fit: cover; }
 .portal-kopf-avatar { width: 28px; height: 28px; border-radius: 50%; object-fit: cover;
   display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; margin-right: 8px; }
-.quiz-opt.gewaehlt { background: var(--primary); color: #fff; border-color: var(--primary); }
+.quiz-opt.gewaehlt { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-/* Portal: Daumen-Rückmeldung */
-.rsvp-daumen { border: 1.5px solid #e2e8f0; background: #f8fafc; border-radius: 999px;
-  width: 52px; height: 44px; font-size: 1.35rem; cursor: pointer; transition: all .12s;
-  display: inline-flex; align-items: center; justify-content: center; }
-.rsvp-daumen:hover { border-color: var(--primary); }
-.rsvp-daumen.aktiv { background: var(--primary); border-color: var(--primary);
-  transform: scale(1.08); box-shadow: 0 2px 8px rgba(30,58,138,.3); }
-.portal-rsvp { display: flex; gap: 10px; margin-top: 8px; }
+/* Portal: Daumen-Rückmeldung (SpielerPlus-Stil: breit, Ja=grün / Nein=rot) */
+.rsvp-daumen { border: 1.5px solid var(--border); background: var(--surface); border-radius: 12px;
+  flex: 1; min-width: 60px; height: 46px; font-size: 1.3rem; cursor: pointer; transition: all .12s;
+  display: inline-flex; align-items: center; justify-content: center; color: var(--text); }
+.rsvp-daumen:hover { border-color: var(--accent); }
+.rsvp-daumen.aktiv.ja  { background: var(--good); border-color: var(--good); color: #fff; transform: scale(1.03); }
+.rsvp-daumen.aktiv.nein { background: var(--bad);  border-color: var(--bad);  color: #fff; transform: scale(1.03); }
+.rsvp-daumen.aktiv.viel { background: var(--warn); border-color: var(--warn); color: #fff; transform: scale(1.03); }
+.rsvp-daumen.aktiv { background: var(--accent); border-color: var(--accent); color: #fff; transform: scale(1.03);
+  box-shadow: 0 2px 8px rgba(241,102,42,.3); }
+.portal-rsvp { display: flex; gap: 8px; margin-top: 8px; }
 .rsvp-begruendung { margin-top: 8px; }
 
 /* Trainingsplan-Spicker (Handy, große Schrift) */
 .spicker { font-size: 1.05rem; }
 .spicker-kopf { font-weight: 800; color: var(--primary); margin-bottom: 10px; font-size: 1.1rem; }
 .spicker-zeile { display: flex; align-items: baseline; gap: 10px; padding: 9px 4px;
-  border-bottom: 1px dashed #cbd5e1; }
+  border-bottom: 1px dashed var(--border); }
 .spicker-zeit { font-weight: 800; color: var(--accent-dark, #c2410c); min-width: 56px; font-size: 1.15rem; }
 .spicker-name { flex: 1; font-weight: 600; }
-.spicker-dauer { color: #64748b; font-size: .9rem; }
-.spicker-notiz { margin-top: 12px; background: #fff7ed; border-radius: 10px; padding: 10px 12px; font-size: .95rem; }
-.rsvp-daumen.sm { width: 40px; height: 34px; font-size: 1rem; }
+.spicker-dauer { color: var(--text-soft); font-size: .9rem; }
+.spicker-notiz { margin-top: 12px; background: var(--accent-weich); border-radius: 10px; padding: 10px 12px; font-size: .95rem; }
+.rsvp-daumen.sm { min-width: 40px; flex: 0 0 auto; width: 40px; height: 34px; font-size: 1rem; }
+
+/* ==========================================================================
+   SpielerPlus-Komponenten (freigegebener Prototyp) – für Portal + Trainer
+   ========================================================================== */
+/* Große Titel & Abschnitts-Köpfe mit Icon */
+.gross { font-size: 1.7rem; font-weight: 800; letter-spacing: -.02em; margin: 6px 3px 2px; }
+.gross-sub { color: var(--text-soft); font-size: .86rem; margin: 0 3px 14px; }
+.eyebrow { display: flex; align-items: center; gap: 7px; font-size: 1.15rem; font-weight: 800;
+  letter-spacing: -.01em; margin: 16px 3px 10px; }
+.eyebrow .ic { font-size: 1.05rem; }
+.grp { font-size: .74rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--muted); margin: 14px 4px 6px; }
+
+/* Vollbreite-Primäraktion */
+.btn-block { display: block; width: 100%; border: 0; border-radius: 13px; padding: 14px;
+  font: inherit; font-weight: 750; font-size: .96rem; cursor: pointer; text-align: center;
+  background: var(--accent); color: #fff; box-shadow: 0 4px 12px rgba(241,102,42,.28); }
+.btn-block:hover { background: var(--accent-dark); }
+.btn-block.blau { background: var(--primary); box-shadow: 0 4px 12px rgba(30,58,138,.25); }
+.btn-block:disabled { opacity: .55; cursor: not-allowed; box-shadow: none; }
+
+/* Kachel-Raster */
+.kacheln { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; margin-bottom: 12px; }
+.kachel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 14px; box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+.kachel .ic { width: 38px; height: 38px; border-radius: 11px; background: var(--accent-weich);
+  color: var(--accent); display: grid; place-items: center; font-size: 1.15rem; margin-bottom: 10px; }
+.kachel .z { font-size: 1.5rem; font-weight: 800; letter-spacing: -.02em; }
+.kachel .t { font-weight: 700; font-size: .92rem; margin-top: 1px; }
+.kachel .s { color: var(--muted); font-size: .76rem; margin-top: 1px; }
+
+/* Menü-Zeilen (Icon · Titel · Untertitel · Chevron) */
+.menu { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  overflow: hidden; margin-bottom: 12px; }
+.menu-item { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-top: 1px solid var(--border);
+  color: inherit; text-decoration: none; width: 100%; background: none; font: inherit; text-align: left; cursor: pointer; }
+.menu-item:first-child { border-top: 0; }
+.menu-item .ic { width: 30px; text-align: center; font-size: 1.1rem; flex: none; }
+.menu-item .g { flex: 1; min-width: 0; }
+.menu-item .t { font-weight: 700; font-size: .92rem; }
+.menu-item .s { color: var(--muted); font-size: .78rem; }
+.menu-item .chev { color: var(--muted); font-size: 1.1rem; }
+
+/* Toggle-/Schalter-Zeilen (runder Checkmark-Kreis) */
+.toggle-item { display: flex; align-items: flex-start; gap: 12px; padding: 13px 2px; border-top: 1px solid var(--border);
+  background: none; border-left: 0; border-right: 0; border-bottom: 0; width: 100%; font: inherit; text-align: left; cursor: pointer; color: inherit; }
+.toggle-item:first-child { border-top: 0; }
+.toggle-item .check { width: 26px; height: 26px; border-radius: 50%; flex: none; border: 2px solid var(--border);
+  display: grid; place-items: center; color: transparent; font-size: .85rem; margin-top: 1px; transition: all .12s; }
+.toggle-item.an .check { background: var(--accent); border-color: var(--accent); color: #fff; }
+.toggle-item .t { font-weight: 700; font-size: .9rem; }
+.toggle-item .s { color: var(--text-soft); font-size: .8rem; }
+
+/* In-Page-Tabs (Unterstrich) */
+.seg { display: flex; gap: 20px; border-bottom: 1.5px solid var(--border); margin: 4px 3px 14px; padding: 0 1px; }
+.seg button { padding: 8px 1px 10px; font: inherit; font-size: .86rem; font-weight: 650; color: var(--muted);
+  border: 0; border-bottom: 2.5px solid transparent; background: none; margin-bottom: -1.5px; cursor: pointer; }
+.seg button.on { color: var(--text); border-color: var(--accent); }
+
+/* Zu-/Absagen als Zahl-Pillen + Avatar-Reihe */
+.zahlrow { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 4px 10px;
+  font-size: .8rem; font-weight: 700; background: var(--surface-2); border: 1px solid var(--border); color: var(--text-soft); }
+.pill.ja { background: var(--good-weich); color: var(--good); border-color: transparent; }
+.pill.nein { background: var(--bad-weich); color: var(--bad); border-color: transparent; }
+.pill.viel { background: var(--accent-weich); color: var(--accent-dark); border-color: transparent; }
+.dabei { display: flex; align-items: center; gap: 4px; margin-top: 6px; font-size: .8rem; color: var(--text-soft); }
+.dabei .mini { width: 24px; height: 24px; border-radius: 50%; background: var(--primary); color: #fff;
+  display: grid; place-items: center; font-size: .62rem; font-weight: 700; margin-left: -6px; border: 2px solid var(--surface); }
+.dabei .mini:first-of-type { margin-left: 2px; }
+.dabei .n { margin-left: 6px; font-weight: 800; color: var(--text); }
+.badge-x { display: inline-flex; align-items: center; gap: 5px; background: var(--surface-2);
+  color: var(--text-soft); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; font-size: .8rem; font-weight: 700; }
+
+/* Rollen-Punkt */
+.rp { width: 10px; height: 10px; border-radius: 50%; flex: none; display: inline-block; background: var(--rollen-spieler); }
+.rp.trainer { background: var(--rollen-trainer); }
+.rp.betreuer { background: var(--rollen-betreuer); }
+.rp.kasse { background: var(--rollen-kasse); }
+.rp.inaktiv { background: var(--rollen-inaktiv); }
+
+/* Trainer: kompakte Spielerzeile mit Mini-Daumen (inkl. „nicht nominiert") */
+.sp-row { display: flex; align-items: center; gap: 9px; padding: 9px 2px; border-top: 1px solid var(--border); }
+.sp-row:first-child { border-top: 0; }
+.sp-row .g { flex: 1; min-width: 0; }
+.sp-row .nm { font-weight: 650; font-size: .88rem; }
+.sp-row .st { font-size: .74rem; }
+.sp-row .st.ja { color: var(--good); } .sp-row .st.nein { color: var(--bad); } .sp-row .st.nn { color: var(--muted); }
+.mini-daumen { display: flex; gap: 5px; }
+.mini-daumen button { width: 32px; height: 32px; border-radius: 9px; border: 1.5px solid var(--border);
+  background: var(--surface); font-size: .95rem; cursor: pointer; color: var(--text); display: grid; place-items: center; }
+.mini-daumen button.on-ja { background: var(--good); border-color: var(--good); color: #fff; }
+.mini-daumen button.on-nein { background: var(--bad); border-color: var(--bad); color: #fff; }
+.mini-daumen button.on-viel { background: var(--warn); border-color: var(--warn); color: #fff; }
+.mini-daumen button.on-x { background: var(--text-soft); border-color: var(--text-soft); color: #fff; }

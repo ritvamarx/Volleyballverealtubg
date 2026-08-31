@@ -387,7 +387,8 @@
     const mein = (t.meine || {})[pid] || "";
     const grund = (t.gruende || {})[pid] || "";
     const offen = P.rsvpBegr && P.rsvpBegr.eid === t.id && P.rsvpBegr.pid === pid;
-    const B = (status, symbol, titel) => `<button class="rsvp-daumen ${mein === status ? "aktiv" : ""}"
+    const MOD = { yes: "ja", maybe: "viel", no: "nein" };  // Aktiv-Farbe: Ja=grün, Vielleicht=orange, Nein=rot
+    const B = (status, symbol, titel) => `<button class="rsvp-daumen ${mein === status ? "aktiv " + MOD[status] : ""}"
       data-rsvp="${t.id}" data-pid="${pid}" data-status="${mein === status ? "" : status}"
       title="${titel}" aria-label="${titel}">${symbol}</button>`;
     return `<div class="portal-rsvp">
@@ -412,7 +413,7 @@
         <div class="portal-termin">
           <div class="title">${fmtDate(t.start)} · ${fmtTime(t.start)}–${fmtTime(t.end)} Uhr${t.location ? " · " + esc(t.location) : ""}</div>
           ${ortZeile(t)}
-          <div class="sub">${t.zusagen.yes} Zusagen · ${t.zusagen.maybe} Vielleicht · ${t.zusagen.no} Absagen</div>
+          ${zusagenPills(t.zusagen)}
           ${dabeiAvatare(t)}
           ${d.spieler.map((sp) => `
             <div class="portal-rsvp-zeile">${d.spieler.length > 1 || istEltern() ? `<span class="sub">${esc(sp.name)}:</span>` : ""}
@@ -424,7 +425,7 @@
           <div class="title">${s.type === "home" ? "🏟️ Heimspiel" : "🚌 Auswärtsspiel"}${s.opponent ? " gegen " + esc(s.opponent) : ""}</div>
           <div class="sub">${fmtDate(s.start)} · ${fmtTime(s.start)} Uhr${s.location ? " · " + esc(s.location) : ""}</div>
           ${ortZeile(s)}
-          <div class="sub">${(s.zusagen || {}).yes || 0} Zusagen · ${(s.zusagen || {}).maybe || 0} Vielleicht · ${(s.zusagen || {}).no || 0} Absagen</div>
+          ${zusagenPills(s.zusagen)}
           ${dabeiAvatare(s)}
           ${d.spieler.map((sp) => `
             <div class="portal-rsvp-zeile">${d.spieler.length > 1 || istEltern() ? `<span class="sub">${esc(sp.name)}:</span>` : ""}
@@ -531,17 +532,28 @@
 
   // „Wer ist dabei?": Avatare der Zugesagten (nur für Spieler:innen; Name beim
   // Berühren/Hover per title – bewusst OHNE Gründe oder Bemerkungen)
+  // Zu-/Absagen als farbige Zahl-Pillen (SpielerPlus-Muster)
+  function zusagenPills(z) {
+    z = z || {};
+    return `<div class="zahlrow">
+      <span class="pill ja">👍 ${z.yes || 0}</span>
+      <span class="pill viel">❓ ${z.maybe || 0}</span>
+      <span class="pill nein">👎 ${z.no || 0}</span>
+    </div>`;
+  }
+
   function dabeiAvatare(t) {
     if (istEltern() || !(t.dabeiIds || []).length) return "";
     const team = P.daten.team || [];
     const leute = t.dabeiIds.map((id) => team.find((p) => p.id === id)).filter(Boolean);
     if (!leute.length) return "";
     const initialen = (name) => name.split(" ").map((x) => x[0] || "").join("").slice(0, 2).toUpperCase();
-    return `<div class="sub" style="display:flex;align-items:center;gap:3px;flex-wrap:wrap;margin-top:5px">
-      <span style="margin-right:3px">Dabei:</span>
-      ${leute.map((p) => p.foto
-        ? `<img src="${p.foto}" alt="${esc(p.name)}" title="${esc(p.name)}" style="width:26px;height:26px;border-radius:50%;object-fit:cover">`
-        : `<span title="${esc(p.name)}" style="width:26px;height:26px;border-radius:50%;background:#e3e6ee;color:#1e3a8a;display:inline-flex;align-items:center;justify-content:center;font-size:${p.avatarEmoji ? "15px" : "10px"};font-weight:700">${p.avatarEmoji ? esc(p.avatarEmoji) : esc(initialen(p.name))}</span>`).join("")}
+    const zeig = leute.slice(0, 6);  // nur eine Handvoll Avatare, Rest steckt in der Zahl
+    return `<div class="dabei">
+      ${zeig.map((p) => p.foto
+        ? `<img class="mini" src="${p.foto}" alt="" title="${esc(p.name)}" style="object-fit:cover">`
+        : `<span class="mini" title="${esc(p.name)}"${p.avatarEmoji ? ' style="font-size:14px"' : ""}>${p.avatarEmoji ? esc(p.avatarEmoji) : esc(initialen(p.name))}</span>`).join("")}
+      <span class="n">${leute.length} dabei</span>
     </div>`;
   }
 
