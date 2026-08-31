@@ -1802,7 +1802,9 @@ def create_app() -> Flask:
         "Referrer-Policy": "same-origin",
         "Content-Security-Policy": (
             "default-src 'self'; script-src 'self' 'unsafe-inline';"
-            " style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+            # blob: nötig: Foto-Uploads (Einverständnis, Profilbild, Kleidung) laden
+            # die gewählte Datei per URL.createObjectURL() als <img> zum Verkleinern.
+            " style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:;"
             " connect-src 'self' https://openholidaysapi.org https://ferien-api.de;"
             " frame-ancestors 'none'"
         ),

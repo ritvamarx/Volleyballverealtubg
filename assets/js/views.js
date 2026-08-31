@@ -2728,22 +2728,31 @@
       onOpen(m) {
         const fileInput = m.querySelector('input[name="file"]');
         m.querySelector("#fd").onclick = () => fileInput.click();
-        let dataUrl = null, fileName = "";
+        const leseDatei = (f) => new Promise((ok, nein) => {
+          const rd = new FileReader(); rd.onload = () => ok(rd.result); rd.onerror = nein; rd.readAsDataURL(f);
+        });
         fileInput.onchange = () => {
           const f = fileInput.files[0]; if (!f) return;
-          if (f.size > 4 * 1024 * 1024) { toast("Datei zu groß (max. 4 MB)", "bad"); return; }
-          fileName = f.name; m.querySelector("#fdname").textContent = f.name;
-          const rd = new FileReader(); rd.onload = () => dataUrl = rd.result; rd.readAsDataURL(f);
+          if (f.size > 4 * 1024 * 1024) { toast("Datei zu groß (max. 4 MB)", "bad"); fileInput.value = ""; return; }
+          m.querySelector("#fdname").textContent = f.name;
         };
         m.querySelector("[data-x]").onclick = closeModal;
-        m.querySelector("[data-s]").onclick = () => {
-          const d = formData(m.querySelector("#cf"));
-          if (!fileName && !d.signedBy) { toast("Bitte Datei oder Unterschrift angeben", "bad"); return; }
-          Store.add("consents", { playerId: d.playerId, type: d.type, signedBy: d.signedBy || "—",
-            fileName: fileName || "manuell_erfasst.txt", dataUrl,
-            uploadedAt: d.datum ? d.datum + "T12:00:00" : new Date().toISOString() });
-          Store.update("players", d.playerId, { consentOnFile: true });
-          closeModal(); toast("Einverständnis abgelegt", "good"); reload();
+        m.querySelector("[data-s]").onclick = async () => {
+          try {
+            const d = formData(m.querySelector("#cf"));
+            const f = fileInput.files[0];
+            if (!f && !d.signedBy) { toast("Bitte Datei oder Unterschrift angeben", "bad"); return; }
+            // Datei erst beim Speichern lesen und darauf WARTEN – sonst wäre die
+            // Datei bei schnellem Klick noch nicht fertig eingelesen (dataUrl:null).
+            const dataUrl = f ? await leseDatei(f) : null;
+            Store.add("consents", { playerId: d.playerId, type: d.type, signedBy: d.signedBy || "—",
+              fileName: (f && f.name) || "manuell_erfasst.txt", dataUrl,
+              uploadedAt: d.datum ? d.datum + "T12:00:00" : new Date().toISOString() });
+            Store.update("players", d.playerId, { consentOnFile: true });
+            closeModal(); toast("Einverständnis abgelegt", "good"); reload();
+          } catch (e) {
+            toast("Speichern fehlgeschlagen – bitte erneut versuchen", "bad");
+          }
         };
       },
     });

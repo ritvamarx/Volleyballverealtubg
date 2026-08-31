@@ -1110,18 +1110,24 @@
       bild.src = url;
     });
     wrap.querySelectorAll("[data-upsenden]").forEach((b) => b.onclick = async () => {
-      const pid = b.dataset.upsenden;
-      const eingabe = wrap.querySelector(`[data-updatei="${pid}"]`);
-      const datei = eingabe.files && eingabe.files[0];
-      if (!datei) { toast("Bitte zuerst eine PDF- oder Bilddatei auswählen", "bad"); return; }
-      if (datei.size > 15 * 1024 * 1024) { toast("Datei zu groß (max. 15 MB Original)", "bad"); return; }
-      toast("Wird hochgeladen …");
-      let dataUrl;
-      try { dataUrl = await dateiZuDataUrl(datei); }
-      catch (e) { toast("Datei konnte nicht gelesen werden", "bad"); return; }
-      if (dataUrl.length > 5_500_000) { toast("Datei nach Umwandlung zu groß – bitte als Foto (nicht Scan) versuchen", "bad"); return; }
-      aktion("/api/portal/einverstaendnis", { playerId: pid, fileName: datei.name, dataUrl },
-        "Einverständniserklärung hochgeladen – danke! 📝");
+      // Alles absichern: ein stiller Fehler ließe den Knopf scheinbar „nicht
+      // reagieren" – lieber immer eine sichtbare Rückmeldung geben.
+      try {
+        const pid = b.dataset.upsenden;
+        const eingabe = wrap.querySelector(`[data-updatei="${pid}"]`);
+        const datei = eingabe && eingabe.files && eingabe.files[0];
+        if (!datei) { toast("Bitte zuerst eine PDF- oder Bilddatei auswählen", "bad"); return; }
+        if (datei.size > 15 * 1024 * 1024) { toast("Datei zu groß (max. 15 MB Original)", "bad"); return; }
+        toast("Wird hochgeladen …");
+        let dataUrl;
+        try { dataUrl = await dateiZuDataUrl(datei); }
+        catch (e) { toast("Datei konnte nicht gelesen werden", "bad"); return; }
+        if (dataUrl.length > 5_500_000) { toast("Datei nach Umwandlung zu groß – bitte als Foto (nicht Scan) versuchen", "bad"); return; }
+        aktion("/api/portal/einverstaendnis", { playerId: pid, fileName: datei.name, dataUrl },
+          "Einverständniserklärung hochgeladen – danke! 📝");
+      } catch (e) {
+        toast("Hochladen fehlgeschlagen – bitte erneut versuchen", "bad");
+      }
     });
     // Abwesenheit melden / zurücknehmen
     const abwForm = $("#abwForm", wrap);

@@ -214,6 +214,15 @@
           neuGeladen = true;
           location.reload();
         });
+        // Installierte PWAs (v. a. auf dem iPhone) suchen von allein kaum nach
+        // neuen Versionen und bleiben sonst tagelang auf altem Code hängen –
+        // neue Funktionen wirken dann „kaputt". Darum beim Zurückkehren in die
+        // App und stündlich aktiv nachsehen, damit der Update-Hinweis erscheint.
+        function pruefeUpdate() { try { reg.update(); } catch (e) { /* egal */ } }
+        document.addEventListener("visibilitychange", function () {
+          if (document.visibilityState === "visible") pruefeUpdate();
+        });
+        setInterval(pruefeUpdate, 60 * 60 * 1000);
       }).catch(function () { /* Registrierung fehlgeschlagen – App läuft normal weiter */ });
     });
   }
