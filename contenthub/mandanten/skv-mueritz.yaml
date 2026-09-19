@@ -1,0 +1,72 @@
+id: skv-mueritz
+name: SKV Müritz – Volleyball
+typ: verein
+
+design:
+  primaer: "#0B5ED7"        # Platzhalter – Vereinsfarben eintragen
+  sekundaer: "#FFC107"
+  hintergrund: "#FFFFFF"
+  schrift: "Inter"
+  logo: skv-mueritz/logo.png
+
+tonalitaet: >
+  Sportlich, positiv, teamorientiert. Du-Form. Kurz und energisch bei
+  Spieltagen, warm bei Vereinsleben und Nachwuchs. Ergebnisse ehrlich
+  (auch Niederlagen), nie abwertend über Gegner oder Schiedsrichter.
+
+zielgruppen:
+  - Eltern und Familien der Nachwuchsmannschaften
+  - Fans und Volleyball-Interessierte in Waren und der Region
+  - potenzielle neue Spielerinnen und Spieler (U14–U20, Hobby)
+  - Sponsoren
+
+content_saeulen:
+  - Spieltage (Ankündigung, Ergebnis, Tabelle)
+  - Nachwuchs & Training
+  - Verein & Ehrenamt
+  - Sponsoren & Partner
+  - Mitmachen (Probetraining, Helfer)
+
+kanaele:
+  instagram: "@skv.mueritz"          # bitte prüfen
+  facebook: "SKV Müritz"             # Seiten-ID nach Meta-Setup
+  website: "https://www.skv-mueritz.de"
+  app: volleyball-app                # dieses Repo: Ankündigung im Trainer-Cockpit
+
+slots:
+  instagram: ["Do 18:00 (Spieltag-Ankündigung)", "So 20:00 (Ergebnis)"]
+  facebook:  ["+15min nach Instagram"]
+  app:       ["sofort nach Freigabe"]
+
+hashtags: ["#skvmüritz", "#volleyball", "#vvmv", "#verbandsliga", "#waren"]
+
+pflichttexte:
+  impressum: "SKV Müritz e. V. · https://www.skv-mueritz.de/impressum"
+  hinweis_ki_bild: "Grafik mit KI-Unterstützung erstellt."
+
+regeln:
+  auto_publish: false
+  quellenpflicht: false
+  zweite_freigabe: false
+  personen_nur_mit_einwilligung: true       # Spielernamen/-fotos nur mit Einwilligung (Minderjährige!)
+  keine_kinderfotos_ohne_einwilligung: true
+  keine_parteinennung: true
+  ki_bilder_erlaubt: false
+  termine_nur_aus_feed: true                # Ort/Zeit/Gegner nie aus dem Modellgedächtnis
+  max_beitraege_pro_woche: 4
+
+freigeber:
+  - ritva
+  # optional: trainer-Kennung, sobald das Trainerteam selbst freigibt
+
+quellen:
+  - {typ: app_feed, container: volleyball-app}   # Spiele aus dem Kalender, öffentliche Ankündigungen, Tabelle
+  - {typ: upload, pfad: skv-mueritz/eingang}
+
+research_allowlist:
+  - skv-mueritz.de
+  - vvmv.de
+  - vvmv.sams-server.de
+
+learnings: |
+  (noch keine)

@@ -1,0 +1,74 @@
+id: spd-waren
+name: SPD Waren / kommunale Arbeit
+typ: partei
+
+design:
+  primaer: "#E3000F"
+  sekundaer: "#1D1D1B"
+  hintergrund: "#FFFFFF"
+  schrift: "Inter"
+  logo: spd-waren/logo.png
+
+tonalitaet: >
+  Sachlich, klar, respektvoll. Sie-Form gegenüber Bürgerinnen und Bürgern.
+  Erklärt Beschlüsse und Zusammenhänge, statt zu überzeugen. Keine
+  Herabsetzung anderer Fraktionen, keine Wahlkampf-Rhetorik ohne
+  ausdrückliches Briefing. Zahlen immer mit Quelle.
+
+zielgruppen:
+  - Bürgerinnen und Bürger in Waren (Müritz)
+  - Interessierte an Stadtvertretung und Kommunalpolitik
+
+content_saeulen:
+  - Kommunalpolitik
+  - Ratsarbeit
+  - Sachthemen
+  - Veranstaltungen
+  - Informationen zu Beschlüssen
+  - Bürgerfragen
+
+kanaele:
+  facebook: "SPD Waren"              # Seiten-ID nach Meta-Setup
+  instagram: "@spd.waren"            # bitte prüfen
+  website: "https://…"               # bitte eintragen
+
+slots:
+  facebook:  ["Mi 17:00", "Fr 12:00"]
+  instagram: ["Mi 17:15"]
+  website:   ["nach Freigabe, werktags 08:00"]
+
+hashtags: ["#waren", "#müritz", "#kommunalpolitik", "#stadtvertretung"]
+
+pflichttexte:
+  visdp: "V. i. S. d. P.: <Name, Anschrift> – SPD-Ortsverein Waren (Müritz)"
+  impressum: "https://…/impressum"
+  hinweis_ki_bild: "Grafik mit KI-Unterstützung erstellt."
+
+regeln:
+  auto_publish: false
+  quellenpflicht: true               # jede Sachaussage ↔ Fakten-Nr.
+  zweite_freigabe: true              # zwei Personen müssen freigeben
+  personen_nur_mit_einwilligung: true
+  keine_kinderfotos_ohne_einwilligung: true
+  keine_parteinennung: false
+  ki_bilder_erlaubt: false
+  keine_wahlbezuege_ohne_briefing: true
+  max_beitraege_pro_woche: 3
+
+freigeber:
+  - ritva
+  - ov-vorsitz                       # zweiter Freigeber, Kennung in n8n-Credential
+
+quellen:
+  - {typ: rss, url: "https://<ratsinformationssystem>/rss"}    # Sitzungsunterlagen
+  - {typ: mail, adresse: "redaktion-spd@…"}                    # Pressemitteilungen weiterleiten
+  - {typ: upload, pfad: spd-waren/eingang}
+
+research_allowlist:
+  - waren-mueritz.de
+  - landkreis-mecklenburgische-seenplatte.de
+  - nordkurier.de
+  - spd.de
+
+learnings: |
+  (noch keine)

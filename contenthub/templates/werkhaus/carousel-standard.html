@@ -1,0 +1,47 @@
+<!doctype html>
+<!-- Renderer-Vorlage (Stufe 5): eine Carousel-Slide 1080×1350 im WerkHaus-Design.
+     Variablen: daten.nr, daten.gesamt, daten.titel, daten.text, daten.bild (URL, optional),
+     daten.hook (true auf Slide 1), daten.cta (true auf letzter Slide), daten.logo (URL). -->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<style>
+  :root { --primaer:#E0532F; --sekundaer:#2B2B2B; --hintergrund:#FFF8F2; }
+  * { box-sizing:border-box; margin:0; }
+  html,body { width:{{ breite }}px; height:{{ hoehe }}px; background:var(--hintergrund);
+              font-family:"Inter", system-ui, sans-serif; color:var(--sekundaer); }
+  .slide { position:relative; width:100%; height:100%; padding:80px; display:flex; flex-direction:column; }
+  .bild { position:absolute; inset:0; background:center/cover no-repeat; }
+  .bild::after { content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.65)); }
+  .inhalt { position:relative; margin-top:auto; }
+  .hook { font-size:96px; line-height:1.05; font-weight:800; color:#fff; letter-spacing:-.02em; }
+  .titel { font-size:64px; line-height:1.1; font-weight:800; color:var(--primaer); margin-bottom:28px; }
+  .text { font-size:40px; line-height:1.35; }
+  .auf-bild .titel { color:#fff; } .auf-bild .text { color:#fff; }
+  .cta { background:var(--primaer); color:#fff; font-size:44px; font-weight:700; padding:28px 40px; border-radius:24px; display:inline-block; margin-top:40px; }
+  .fuss { position:absolute; left:80px; right:80px; bottom:60px; display:flex; justify-content:space-between; align-items:center; }
+  .zaehler { font-size:28px; font-weight:600; opacity:.8; color:{{ '#fff' if daten.bild else 'var(--sekundaer)' }}; }
+  .logo { height:72px; }
+  .pfeil { font-size:36px; color:var(--primaer); }
+</style>
+</head>
+<body>
+<div class="slide {{ 'auf-bild' if daten.bild }}">
+  {% if daten.bild %}<div class="bild" style="background-image:url('{{ daten.bild }}')"></div>{% endif %}
+  <div class="inhalt">
+    {% if daten.hook %}
+      <div class="hook">{{ daten.titel }}</div>
+    {% else %}
+      <div class="titel">{{ daten.titel }}</div>
+      <div class="text">{{ daten.text }}</div>
+      {% if daten.cta %}<div class="cta">{{ daten.cta_text or 'Komm vorbei!' }}</div>{% endif %}
+    {% endif %}
+  </div>
+  <div class="fuss">
+    <span class="zaehler">{{ daten.nr }} / {{ daten.gesamt }}</span>
+    {% if daten.logo %}<img class="logo" src="{{ daten.logo }}" alt="">{% endif %}
+    {% if not daten.cta %}<span class="pfeil">→</span>{% endif %}
+  </div>
+</div>
+</body>
+</html>
