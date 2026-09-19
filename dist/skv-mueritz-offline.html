@@ -2433,6 +2433,14 @@ textarea { resize: vertical; min-height: 72px; }
     const responses = S().responses.filter((r) => r.eventId === id);
     const drivers = S().drivers.filter((d) => d.eventId === id);
     const jobs = S().jobs.filter((j) => j.eventId === id);
+    const nameOf = (pid) => { const p = Store.byId("players", pid); return p ? `${p.firstName} ${p.lastName}` : "Unbekannt"; };
+    const namesBy = (st) => responses.filter((r) => r.status === st).map((r) => nameOf(r.playerId)).sort((a, b) => a.localeCompare(b));
+    const roster = S().players.filter((p) => p.membershipStatus !== "inaktiv");
+    const answered = new Set(responses.map((r) => r.playerId));
+    const openNames = roster.filter((p) => !answered.has(p.id)).map((p) => `${p.firstName} ${p.lastName}`).sort((a, b) => a.localeCompare(b));
+    const rsvpRow = (icon, label, names) => names.length
+      ? `<div class="mb" style="margin-bottom:8px"><strong>${icon} ${label} (${names.length}):</strong> ${names.map((n) => esc(n)).join(", ")}</div>`
+      : "";
     modal({
       title: e.title,
       wide: true,
@@ -2443,7 +2451,12 @@ textarea { resize: vertical; min-height: 72px; }
           ${e.opponent ? `<dt>Gegner</dt><dd>${esc(e.opponent)}</dd>` : ""}
           ${e.description ? `<dt>Info</dt><dd>${esc(e.description)}</dd>` : ""}
         </dl>
-        ${e.type === "training" ? `<p class="soft">${responses.filter((r) => r.status === "yes").length} Zusagen · ${responses.filter((r) => r.status === "no").length} Absagen. Details unter „Training“.</p>` : ""}
+        ${e.type === "training" ? `
+          ${rsvpRow("✅", "Zugesagt", namesBy("yes"))}
+          ${rsvpRow("❌", "Abgesagt", namesBy("no"))}
+          ${rsvpRow("❔", "Unsicher", namesBy("maybe"))}
+          ${rsvpRow("⏳", "Keine Rückmeldung", openNames)}
+          <p class="soft">Rückmeldungen ändern unter „Training“.</p>` : ""}
         ${e.type === "away" ? `<p class="soft">${drivers.length} Fahrer eingetragen (${drivers.reduce((a, d) => a + d.seats, 0)} Plätze). Details unter „Fahrerplanung“.</p>` : ""}
         ${e.type === "home" ? `<p class="soft">${jobs.filter((j) => j.assignee).length}/${jobs.length} Jobs vergeben. Details unter „Heimspiel-Jobs“.</p>` : ""}`,
       footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn danger" data-del>Löschen</button><button class="btn" data-edit>Bearbeiten</button>`,
