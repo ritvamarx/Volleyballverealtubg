@@ -1,7 +1,0 @@
-# /etc/cron.d/contenthub-backup – tägliche Sicherung des Content-Hubs
-# Ziel an das Muster der bestehenden vereins-backup-Jobs anpassen!
-# Sichert: beide Postgres-Datenbanken (n8n + contenthub), alle n8n-Workflows
-# und Credentials (verschlüsselt), das Medienarchiv und die Mandantenprofile.
-# WICHTIG: N8N_ENCRYPTION_KEY aus /opt/contenthub/.env separat sichern –
-# ohne ihn sind die Credentials nach einem Restore unbrauchbar.
-45 3 * * * root /opt/contenthub/backup.sh >> /var/log/contenthub-backup.log 2>&1

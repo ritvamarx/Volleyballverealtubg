@@ -3,7 +3,3 @@ Thumbs.db
 node_modules/
 *.log
 __pycache__/
-
-# Content-Hub: Laufzeitdaten und Schlüssel bleiben auf dem Server
-contenthub/data/
-contenthub/.env
