@@ -1,14 +1,29 @@
-# Content-Hub – /opt/contenthub/docker-compose.yml
-# Läuft neben den bestehenden nettverwaltet-Diensten hinter dem einen Caddy.
+# Content-Hub – /opt/contenthub/docker-compose.yml  (VM 2 „hub“, eigener Server)
 #
-# Voraussetzung: das externe Docker-Netz, in dem euer Caddy hängt
-# (Name prüfen mit: docker network ls – unten ggf. "caddy" anpassen).
-#
-# Stufe 1: n8n + postgres
-# Stufe 2: zusätzlich nocodb   → Profil "board"    (docker compose --profile board up -d)
-# Stufe 5: zusätzlich renderer → Profil "visuals"  (docker compose --profile visuals up -d)
+# Eigener Caddy auf diesem Server; keine Abhängigkeit zur nettverwaltet-VM.
+# Stufe 1: caddy + n8n + postgres
+# Stufe 2: zusätzlich nocodb   → docker compose --profile board up -d
+# Stufe 5: zusätzlich renderer → docker compose --profile visuals up -d --build
+# Lokale Werkstatt (Mac): docker compose -f docker-compose.yml -f compose.lokal.yml up
 
 services:
+  caddy:
+    image: caddy:2
+    container_name: contenthub-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./data/caddy:/data
+      - ./data/caddy-config:/config
+      - ./data/media:/srv/media:ro          # media.nettverwaltet.de (öffentlich, nur lesen)
+    networks:
+      - web
+    mem_limit: 256m
+
   postgres:
     image: postgres:16-alpine
     container_name: contenthub-postgres
@@ -19,7 +34,6 @@ services:
       POSTGRES_DB: n8n
     volumes:
       - ./data/postgres:/var/lib/postgresql/data
-      # legt beim ersten Start zusätzlich die Hub-Datenbank "contenthub" an
       - ./sql/00-init-databases.sh:/docker-entrypoint-initdb.d/00-init-databases.sh:ro
       - ./sql/schema.sql:/contenthub-schema/schema.sql:ro   # bewusst NICHT in initdb.d (sonst liefe es gegen die n8n-DB)
     networks:
@@ -29,6 +43,7 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
+    mem_limit: 512m
 
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
@@ -39,13 +54,13 @@ services:
         condition: service_healthy
     environment:
       # --- Erreichbarkeit
-      N8N_HOST: n8n.nettverwaltet.de
-      N8N_PROTOCOL: https
+      N8N_HOST: ${N8N_HOST:-n8n.nettverwaltet.de}
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-https}
       N8N_PORT: "5678"
-      WEBHOOK_URL: https://n8n.nettverwaltet.de/
-      N8N_EDITOR_BASE_URL: https://n8n.nettverwaltet.de/
+      WEBHOOK_URL: ${WEBHOOK_URL:-https://n8n.nettverwaltet.de/}
+      N8N_EDITOR_BASE_URL: ${WEBHOOK_URL:-https://n8n.nettverwaltet.de/}
       N8N_PROXY_HOPS: "1"
-      N8N_SECURE_COOKIE: "true"
+      N8N_SECURE_COOKIE: ${N8N_SECURE_COOKIE:-true}
       GENERIC_TIMEZONE: Europe/Berlin
       TZ: Europe/Berlin
       # --- Datenbank
@@ -64,23 +79,28 @@ services:
       EXECUTIONS_DATA_PRUNE_MAX_COUNT: "5000"
       N8N_DIAGNOSTICS_ENABLED: "false"
       N8N_HIRING_BANNER_ENABLED: "false"
-      # --- Zugriff auf Dateien (Medien, Mandantenprofile) innerhalb des Containers
+      # --- Dateien, die Workflows zur Laufzeit lesen (Schichten 1–3, siehe PLAN-INFRASTRUKTUR.md)
       N8N_RESTRICT_FILE_ACCESS_TO: /files
-      # Werte, die Workflows als $env lesen dürfen
       N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
       CONTENTHUB_DB_HOST: postgres
       CONTENTHUB_DB_NAME: contenthub
-      CONTENTHUB_MEDIA_BASE_URL: https://media.nettverwaltet.de
+      CONTENTHUB_MEDIA_BASE_URL: ${MEDIA_BASE_URL:-https://media.nettverwaltet.de}
       CONTENTHUB_RENDERER_URL: http://renderer:8000
+      CONTENTHUB_FEED_BASE: ${FEED_BASE:-}    # z. B. https://mein.werkhauswaren.de – über privates Netz erreichbar
     volumes:
       - ./data/n8n:/home/node/.n8n
       - ./data/media:/files/media
       - ./mandanten:/files/mandanten:ro
+      - ./prompts:/files/prompts:ro
+      - ./templates:/files/templates:ro
+      - ./config:/files/config:ro
+      - ./workflows:/files/workflows          # Export/Import (scripts/workflows-*.sh)
     networks:
       - intern
-      - caddy
+      - web
     expose:
       - "5678"
+    mem_limit: 1536m
 
   # ---------------------------------------------------------------- Stufe 2
   nocodb:
@@ -92,8 +112,6 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      # NocoDB-Metadaten liegen in einer eigenen DB "nocodb" (legt 00-init-databases.sh an);
-      # die Hub-Tabellen werden in NocoDB als "externe Datenquelle" (contenthub) eingebunden.
       NC_DB: "pg://postgres:5432?u=${POSTGRES_USER}&p=${POSTGRES_PASSWORD}&d=nocodb"
       NC_PUBLIC_URL: https://hub.nettverwaltet.de
       NC_AUTH_JWT_SECRET: ${NOCODB_JWT_SECRET}
@@ -102,9 +120,10 @@ services:
       - ./data/nocodb:/usr/app/data
     networks:
       - intern
-      - caddy
+      - web
     expose:
       - "8080"
+    mem_limit: 512m
 
   # ---------------------------------------------------------------- Stufe 5
   renderer:
@@ -121,16 +140,22 @@ services:
       - ./templates:/templates:ro
       - ./data/media:/files/media
     networks:
-      - intern            # bewusst NICHT im Caddy-Netz: nur n8n ruft ihn auf
+      - intern            # nur n8n ruft ihn auf
     expose:
       - "8000"
-    deploy:
-      resources:
-        limits:
-          memory: 1g
+    mem_limit: 1g
+
+  # ---------------------------------------------------------------- Schicht 5: eigene Werkzeuge (Python)
+  # Muster: je Werkzeug ein kleiner HTTP-Dienst unter werkzeuge/<name>/ (siehe werkzeuge/README.md)
+  # werkzeug-slots:
+  #   build: { context: ./werkzeuge/slots }
+  #   profiles: ["werkzeuge"]
+  #   networks: [intern]
+  #   expose: ["8000"]
+  #   mem_limit: 256m
 
 networks:
   intern:
     driver: bridge
-  caddy:
-    external: true
+  web:
+    driver: bridge

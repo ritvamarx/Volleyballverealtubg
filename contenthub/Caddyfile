@@ -1,0 +1,50 @@
+# /opt/contenthub/Caddyfile – eigener Caddy der Hub-VM (VM 2).
+# TLS holt Caddy automatisch, sobald die DNS-Records auf diese VM zeigen.
+
+{
+    email admin@nettverwaltet.de      # Let's-Encrypt-Kontakt, bitte anpassen
+}
+
+# ---------------------------------------------------------------- n8n
+n8n.nettverwaltet.de {
+    encode gzip
+
+    # Öffentlich: Webhooks, Formulare, Wartepunkte („Send and wait“-Links)
+    @offen path /webhook/* /webhook-test/* /webhook-waiting/* /form/* /form-test/* /form-waiting/* /healthz
+    handle @offen {
+        reverse_proxy contenthub-n8n:5678
+    }
+
+    # Oberfläche: nur von erlaubten Adressen.
+    # Eigene IP(s) eintragen – oder Tailscale nutzen und diesen Block ganz auf 404 setzen.
+    @erlaubt remote_ip 203.0.113.10 100.64.0.0/10
+    handle @erlaubt {
+        reverse_proxy contenthub-n8n:5678
+    }
+    handle {
+        respond 404
+    }
+}
+
+# ---------------------------------------------------------------- NocoDB (Stufe 2)
+hub.nettverwaltet.de {
+    encode gzip
+    @erlaubt remote_ip 203.0.113.10 100.64.0.0/10
+    handle @erlaubt {
+        reverse_proxy contenthub-nocodb:8080
+    }
+    handle {
+        respond 404
+    }
+}
+
+# ---------------------------------------------------------------- Medien (Stufe 4/5)
+# Instagram/Facebook laden Bilder und Videos ausschließlich über öffentliche URLs.
+media.nettverwaltet.de {
+    root * /srv/media
+    file_server
+    header Cache-Control "public, max-age=86400"
+    header X-Content-Type-Options nosniff
+    @kein_listing path_regexp ^/[^.]*/?$
+    respond @kein_listing 404
+}

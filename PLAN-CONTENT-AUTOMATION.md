@@ -76,16 +76,23 @@ geändert oder konkretisiert:
 
 ## 3. Der Server heute — und was der Content-Hub zusätzlich braucht
 
+> **Entscheidung (siehe `PLAN-INFRASTRUKTUR.md`):** Der Content-Hub läuft auf
+> einer **eigenen Hetzner-VM („hub“, 8 GB)** mit eigenem Caddy, verbunden mit
+> der bestehenden VM über ein privates Cloud Network. Die bestehende VM bleibt
+> reiner Vereinsbetrieb. Die folgenden Absätze beschreiben, was der Hub
+> braucht; das Speicherbudget bezieht sich jetzt auf die neue VM.
+
 Stand laut `PLAN-HOSTING.md`: Hetzner-Cloud-VM `ubuntu-4gb-fsn1-1` (4 GB RAM),
 Docker Compose, **ein Caddy 2** für alle Domains (nur Caddy hat 80/443),
 Flask/SQLite-Container (`werkhaus`, `kitawabe`, `verein`, `wdb`,
 `mueritzhilft`, `volleyball`) je mit `.env` + `data/`-Volume, Cron-Jobs in
 `/etc/cron.d/`, Deployment per `rsync` + `docker compose up -d --build`.
 
-Der Content-Hub folgt exakt diesem Muster: eigener Ordner **`/opt/contenthub`**,
-eigene `docker-compose.yml`, eigene `.env`, eigenes `data/`, Container im
-externen Caddy-Netz, vHost-Blöcke im vorhandenen Caddyfile, Backup-Cron in
-`/etc/cron.d/`. Kein zweiter Proxy, kein neuer Deploy-Weg.
+Der Content-Hub übernimmt dieses Muster auf der **neuen VM**: Ordner
+**`/opt/contenthub`**, eigene `docker-compose.yml`, `.env`, `data/`, eigener
+Caddy, Backup-Cron in `/etc/cron.d/`. Neu gegenüber der Vereins-VM: Git auf
+dem Server ist erlaubt (Prompts, Vorlagen, Workflows ändern sich laufend)
+und es gibt eine lokale Werkstatt auf dem Mac mit denselben Dateien.
 
 ### Speicherbudget (Richtwerte)
 
@@ -98,15 +105,15 @@ externen Caddy-Netz, vHost-Blöcke im vorhandenen Caddyfile, Backup-Cron in
 | Renderer (Playwright/Chromium, nur bei Bedarf) | 0,5 GB Spitze | 5 |
 | **Summe Vollausbau** | **2,0–2,7 GB** | |
 
-**Entscheidung:** Stufen 1–4 laufen auf der 4-GB-VM (Swap 2 GB aktivieren, falls
-noch nicht). **Vor Stufe 5** (Renderer) die VM auf die nächste Stufe mit 8 GB
-heben (Hetzner-Cloud: Rescale, wenige Minuten Ausfall, Daten bleiben).
+**Entscheidung:** Die Hub-VM wird gleich mit 8 GB angelegt; damit passt der
+Vollausbau ohne späteres Rescale. Die Zeile „Caddy + 6 Gunicorn-Container“
+bleibt auf der Vereins-VM und belastet den Hub nicht.
 
-### Neue Domains (alle auf die vorhandene Server-IP)
+### Neue Domains (alle auf die IP der neuen Hub-VM)
 
 | Domain | Dienst | Zugang |
 |---|---|---|
-| `n8n.nettverwaltet.de` | n8n-Oberfläche + Webhooks | n8n-Login mit 2FA; Oberfläche zusätzlich per Caddy auf deine IP/Basic-Auth beschränkbar, Webhook-Pfade bleiben offen |
+| `n8n.nettverwaltet.de` | n8n-Oberfläche + Webhooks | n8n-Login mit 2FA; Oberfläche nur von deiner IP bzw. über Tailscale (Caddy `remote_ip`), Webhook-Pfade öffentlich |
 | `hub.nettverwaltet.de` | NocoDB Themenboard (Stufe 2) | NocoDB-Login |
 | `media.nettverwaltet.de` | statische Medien (Caddy `file_server` auf `data/media`) | öffentlich lesbar — **Pflicht für Instagram/Facebook**, die Bilder nur per öffentlicher URL annehmen; Dateinamen mit Zufallsanteil, kein Listing |
 
@@ -246,9 +253,11 @@ Kontaktdaten. Da fünf Container aus **einem** Image gebaut werden, reicht ein
 Blueprint einmal für alle; die Volleyball-App bekommt denselben Blueprint in
 `server/`.
 
-**Netz:** n8n hängt im externen Caddy-Docker-Netz, wie alle Apps. Aufrufe
-laufen intern (`http://werkhaus-app:8000/api/content-feed`), nicht über die
-öffentliche Domain — schneller, kein TLS-Aufwand, kein Ratelimit.
+**Netz:** Hub-VM und Vereins-VM hängen im selben privaten Hetzner Cloud
+Network. Der Caddy der Vereins-VM gibt die Feed-/Inbox-Pfade **nur für die
+private IP der Hub-VM** frei (`contenthub/anbindung/Caddyfile-vm1-snippet.txt`);
+von außen antworten sie mit 404. Kein Hub-Dienst hat Zugriff auf Docker,
+Volumes oder Datenbanken der Vereins-Apps.
 
 ### 5.2 Container ↔ Mandant
 
@@ -314,11 +323,11 @@ Bauarbeit.
 | Stufe | Ergebnis | Wer | Aufwand |
 |---|---|---|---|
 | **0** Vorbereitung | Entscheidungen getroffen, Zugänge da, Mandanten inventarisiert | du | 2–3 h |
-| **1** Fundament | n8n + Postgres laufen unter `n8n.nettverwaltet.de`; **Briefing-Formular → Content-Paket per E-Mail** für einen Mandanten | ich (+ du: DNS, API-Key) | 1 Runde |
+| **1** Fundament | Hub-VM steht (`PLAN-INFRASTRUKTUR.md`), n8n + Postgres laufen unter `n8n.nettverwaltet.de`; **Briefing-Formular → Content-Paket per E-Mail** für einen Mandanten | ich (+ du: VM, DNS, API-Key) | 1–2 Runden |
 | **2** Wissensbasis & Board | Mandantenprofile, Research-Faktenblatt, Themenboard (NocoDB), Themen-Agent mit Tagesvorschlag | ich | 1–2 Runden |
 | **3** nettverwaltet-Anbindung | Content-Feed + Inbox in allen Containern; Volleyball-Heimspiel-Ablauf läuft Ende-zu-Ende bis zur Freigabe | ich (+ du: Deploy `/opt/werkhaus`) | 1–2 Runden |
 | **4** Freigabe & Publishing | Telegram-Freigabe mit Buttons; Publishing in Vereins-App, Website, Facebook, Instagram; Slot-Planung | ich (+ du: Meta-Business-Setup) | 2 Runden |
-| **5** Visuals | Renderer, HTML-Vorlagen je Mandant, Medienarchiv mit Einwilligungs-Flag, Alt-Texte | ich (+ du: VM auf 8 GB) | 1–2 Runden |
+| **5** Visuals | Renderer, HTML-Vorlagen je Mandant, Medienarchiv mit Einwilligungs-Flag, Alt-Texte | ich | 1–2 Runden |
 | **6** Analyse & Lernen | Metriken-Abruf, Wochenreport, Learnings im Profil | ich | 1 Runde |
 | **7** Ausbau (optional) | Newsletter-Automation, YouTube/LinkedIn/Mastodon, Foto-Slideshow-Reels, WhatsApp-Freigabe | ich | je 1 Runde |
 
@@ -344,10 +353,12 @@ Bauarbeit.
 
 ### Stufe 1 — Fundament
 
-- `/opt/contenthub` nach Vorlage `contenthub/docker-compose.yml` +
-  `.env.example`; n8n mit Postgres, `GENERIC_TIMEZONE=Europe/Berlin`,
+- **1a Infrastruktur** nach `PLAN-INFRASTRUKTUR.md` Schritte I-1 bis I-4:
+  Hub-VM, Cloud Network, Firewall, Grundinstallation (`scripts/setup-vm.sh`),
+  Repo `contenthub`, lokale Werkstatt, Backup mit Restore-Probe.
+- **1b** `/opt/contenthub` aus dem Repo (`deploy.sh`): eigener Caddy
+  (`contenthub/Caddyfile`), n8n mit Postgres, `GENERIC_TIMEZONE=Europe/Berlin`,
   `N8N_ENCRYPTION_KEY`, Ausführungsdaten-Pruning, Task-Runner aktiv.
-- Caddy-Blöcke aus `contenthub/Caddyfile-snippet.txt` einfügen, Reload.
 - n8n-Owner-Konto + 2FA; Credentials: LLM-API, SMTP.
 - Backup-Cron `contenthub/cron/contenthub-backup` (pg_dump beider DBs +
   `n8n export:workflow --all` + `data/media`), Ziel wie die vereins-backups.
@@ -436,7 +447,6 @@ Veröffentlichungen mit URL im Kalender.
 
 ### Stufe 5 — Visuals
 
-- VM auf 8 GB heben.
 - **Renderer-Container** (`contenthub/docker-compose.yml`, Dienst `renderer`):
   Flask + Playwright, `POST /render {template, mandant, daten, format}` →
   PNG nach `data/media/<mandant>/render/`. Vorlagen `templates/<mandant>/`
@@ -481,7 +491,7 @@ liegt dann schon vor), Sitzungsunterlagen-Ingest für kommunale Themen
 
 | Thema | Umsetzung |
 |---|---|
-| **Deployment** | wie gewohnt: `rsync` → `/opt/contenthub` → `docker compose up -d`; kein Git auf dem Server |
+| **Deployment** | `deploy.sh` (rsync → `docker compose up -d` → Workflow-Import) oder `git pull` auf der Hub-VM; Workflows liegen als JSON im Repo |
 | **Updates** | n8n-Image monatlich heben (`docker compose pull && up -d`), vorher Backup; Postgres-Major-Version fest pinnen |
 | **Backups** | Cron 03:45 täglich: `pg_dump` beider DBs, Workflow-Export, `data/media` → gleiches Ziel wie die vereins-backups (außerhalb der VM!) |
 | **Monitoring** | Healthcheck-Cron wie bei den Apps; n8n-Fehler-Workflow (Error Trigger) schickt Telegram/E-Mail bei jedem Workflow-Fehler |
@@ -491,7 +501,7 @@ liegt dann schon vor), Sitzungsunterlagen-Ingest für kommunale Themen
 
 | Posten | etwa je Monat |
 |---|---|
-| VM-Upgrade 4 → 8 GB (ab Stufe 5) | +5–10 € |
+| eigene Hub-VM 8 GB inkl. Backup-Option | ~8–9 € |
 | LLM-API bei ~40 Paketen/Monat mit Research | 10–30 € |
 | Meta-APIs, Telegram, n8n Community | 0 € |
 | Newsletter-Dienst (falls neu) | 0–20 € |
@@ -532,8 +542,8 @@ liegt dann schon vor), Sitzungsunterlagen-Ingest für kommunale Themen
   starten; bis dahin manuelles Posten aus dem Freigabe-Paket.
 - **Halluzinationen:** Faktenblatt + Qualitäts-Check + Freigabe sind drei
   Netze, aber kein Ersatz für Lesen. Bei SPD/Klinik bleibt jede Zahl Prüfsache.
-- **4 GB RAM** reichen für Stufe 1–4 nur mit Swap und Pruning; Stufe 5 nicht
-  ohne Upgrade.
+- **Zwei Server** bedeuten zwei Mal Betriebssystem-Pflege; auf der Hub-VM
+  übernimmt `unattended-upgrades`, Docker-Images hebst du bewusst.
 - **Stories mit Stickern, Reel-Schnitt, Canva-Autofill** bleiben manuell.
 - **n8n-Updates** ändern gelegentlich Knoten-Verhalten; deshalb Workflow-
   Exporte im Backup und Updates nur nach Backup.
@@ -559,7 +569,12 @@ ab Stufe 4 (oder gleich E-Mail behalten); Website-Systeme je Mandant
 |---|---|
 | `docker-compose.yml` | n8n, Postgres, (NocoDB), (Renderer) — für `/opt/contenthub` |
 | `.env.example` | Vorlage für Schlüssel und Tokens |
-| `Caddyfile-snippet.txt` | vHosts `n8n`, `hub`, `media` |
+| `Caddyfile` | eigener Caddy der Hub-VM: `n8n`, `hub`, `media` |
+| `compose.lokal.yml` | lokale Werkstatt auf dem Mac |
+| `config/modelle.yaml`, `config/kanaele.yaml` | Modell je Schritt, Kanal-Limits (Schicht 1) |
+| `scripts/`, `deploy.sh` | Grundinstallation der VM, Workflow-Export/-Import, Deployment |
+| `werkzeuge/README.md` | Muster für eigene Python-Dienste (Schicht 5) |
+| `anbindung/Caddyfile-vm1-snippet.txt` | Feed-Freigabe auf der Vereins-VM nur für die Hub-IP |
 | `cron/contenthub-backup` | Backup-Cron nach dem Muster der vereins-backups |
 | `sql/schema.sql` | Hub-Datenmodell (Abschnitt 4.3) |
 | `mandanten/README.md`, `mandanten/*.yaml` | Profil-Schema und drei Beispielprofile |

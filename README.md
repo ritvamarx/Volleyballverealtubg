@@ -95,7 +95,9 @@ assets/js/app.js           Router & Initialisierung
 Konzept und Stufenplan für die automatische Content-Erstellung (ein Thema →
 viele Formate → mehrere Kanäle) mit **n8n auf dem Hetzner-Server**, Mandanten
 (WerkHaus, NETT.Waren, SPD, Klinik, Vereine) und Anbindung an die
-nettverwaltet-Container: siehe **`PLAN-CONTENT-AUTOMATION.md`** und das
+nettverwaltet-Container: siehe **`PLAN-CONTENT-AUTOMATION.md`**, die
+Infrastruktur-Entscheidung (eigene Hub-VM, anpassbarer Aufbau in Schichten)
+in **`PLAN-INFRASTRUKTUR.md`** und das
 Deployment-/Konzeptpaket in **`contenthub/`**.
 
 ## 🖥️ Server-Betrieb (volleyball.nettverwaltet.de)

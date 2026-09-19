@@ -1,8 +1,10 @@
 # Anbindung der nettverwaltet-Container: Content-Feed und Inbox
 
-Zwei kleine, token-geschützte Endpunkte je Flask-Container. n8n ruft sie
-**intern** über das gemeinsame Docker-Netz auf (`http://<container>:8000/…`),
-nicht über die öffentliche Domain. Der Feed liefert ausschließlich Inhalte,
+Zwei kleine, token-geschützte Endpunkte je Flask-Container. Der Hub läuft
+auf einer **eigenen VM** (siehe `PLAN-INFRASTRUKTUR.md`); n8n ruft die
+Endpunkte über das **private Hetzner Cloud Network** auf. Der Caddy auf der
+nettverwaltet-VM gibt die Pfade nur für die private IP der Hub-VM frei
+(`Caddyfile-vm1-snippet.txt`), von außen antworten sie mit 404. Der Feed liefert ausschließlich Inhalte,
 die zur Veröffentlichung gedacht sind; der Rückkanal legt nur
 Ankündigungen an.
 
@@ -196,8 +198,8 @@ und Aufruf der vorhandenen `pywebpush`-Funktion bei `push: true`.
 ## n8n-Seite (Workflow W3 „Feed-Sichtung“)
 
 1. Schedule (stündlich) → für jeden Mandanten mit `quellen[].typ = app_feed`:
-   HTTP GET `http://<container>:8000/api/content-feed?since=<letzter Lauf>`
-   mit Header-Auth-Credential.
+   HTTP GET `{{ $env.CONTENTHUB_FEED_BASE }}/api/content-feed?since=<letzter Lauf>`
+   (privates Netz, siehe `Caddyfile-vm1-snippet.txt`) mit Header-Auth-Credential.
 2. Code-Node: Items gegen `feed_items` abgleichen (neu oder `updated_at`
    neuer) → nur diese weiter.
 3. Anlass ableiten: `event` mit `starts_at` in 3–10 Tagen → `termin`;

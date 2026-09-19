@@ -1,0 +1,23 @@
+# VM 1 (nettverwaltet, bestehender Caddy): Feed- und Inbox-Pfade je Vereins-App
+# NUR für die private IP der Hub-VM freigeben (Hetzner Cloud Network).
+# In den bestehenden vHost-Block der jeweiligen App einfügen, z. B. mein.werkhauswaren.de:
+
+    @hub {
+        path /api/content-feed /api/content/*
+        remote_ip 10.0.0.2            # private IP von VM 2 „hub“ – bitte eintragen
+    }
+    @hub_fremd {
+        path /api/content-feed /api/content/*
+        not remote_ip 10.0.0.2
+    }
+    respond @hub_fremd 404
+    # die normale reverse_proxy-Zeile der App bleibt unverändert; @hub läuft darüber
+
+# Voraussetzung: beide VMs im selben Cloud Network; Caddy auf VM 1 lauscht auch
+# auf der privaten Adresse (Standard: alle Interfaces). Aufruf vom Hub aus:
+#   https://mein.werkhauswaren.de/api/content-feed   (DNS zeigt auf die öffentliche IP;
+#   damit der Aufruf über das private Netz läuft, auf VM 2 in /etc/hosts:
+#   10.0.0.1  mein.werkhauswaren.de volleyball.nettverwaltet.de …)
+# Alternativ ohne /etc/hosts: Caddy auf VM 1 zusätzlich einen Block
+#   http://10.0.0.1:8081 { reverse_proxy werkhaus-app:8000 }  usw. je App,
+# dann FEED_BASE=http://10.0.0.1:8081 im Hub – einfacher, kein TLS, nur privat.

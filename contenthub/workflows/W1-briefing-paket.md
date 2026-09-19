@@ -4,7 +4,9 @@ Ziel: Ein Formular ausfüllen → in unter 3 Minuten kommt ein vollständiges
 Content-Paket per E-Mail und liegt in der Hub-DB. Noch kein Publishing.
 Die Anleitung ist bewusst als Liste statt als Workflow-Export geschrieben,
 weil n8n-Exporte an Knoten-Versionen hängen; nach dem Bau wird der
-Workflow exportiert und im Backup (`backup.sh`) mitgesichert.
+Workflow mit `scripts/workflows-export.sh` nach `workflows/` exportiert und
+committet (Schicht 4). Bauen am besten in der lokalen Werkstatt
+(`compose.lokal.yml`), dann `deploy.sh`.
 
 ## Vorbereitung in n8n
 
@@ -41,7 +43,8 @@ Fehlerbehandlung: Workflow-Einstellung „Error Workflow“ = **W0 Fehler**
 | Knoten | Einstellungen |
 |---|---|
 | **Execute Workflow Trigger** | Eingabe-JSON wie in `prompts/<nr>.md` „Eingabe“ |
-| **Basic LLM Chain** (AI Agent nur bei 02) | System-Prompt = Präambel `00-gemeinsam.md` + Datei-Prompt; User-Nachricht = `{{ JSON.stringify($json) }}`; Chat Model = Credential des Anbieters; Temperatur 0,3 (Formate 0,6) |
+| **Read Files** `/files/prompts/00-gemeinsam.md` + `/files/prompts/<nr>.md` → **Code** (System-Block extrahieren) | Prompt kommt aus der Datei, nicht aus dem Knoten (Schicht 2) |
+| **Basic LLM Chain** (AI Agent nur bei 02) | System-Prompt = `{{ $json.praeambel + $json.prompt }}`; Modell und Temperatur aus `config/modelle.yaml` (Schritt-Name); User-Nachricht = `{{ JSON.stringify($json) }}`; Chat Model = Credential des Anbieters; Temperatur 0,3 (Formate 0,6) |
 | **Structured Output Parser** | Schema aus der Datei; „Auto-Fix“ aktiv (zweiter LLM-Aufruf bei Schema-Fehler) |
 | bei 02: **HTTP Request Tool** „seite_lesen“ | Methode GET, URL vom Modell; davor Code-Node prüft Host gegen `research_allowlist`, sonst Fehlertext zurück; Antwort auf 20.000 Zeichen kürzen, HTML zu Text |
 | **Return** | Parser-Ausgabe |

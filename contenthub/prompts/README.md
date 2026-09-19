@@ -3,9 +3,11 @@
 Jede Datei = ein Sub-Workflow in n8n (Basic LLM Chain bzw. AI Agent +
 Structured Output Parser). Aufbau ist immer gleich:
 
-1. **System-Prompt** (Abschnitt „System“) — wird 1:1 in den Knoten kopiert.
-   Platzhalter in `{{ }}` werden per n8n-Expression aus dem Mandantenprofil
-   und den Vorschritten gefüllt.
+1. **System-Prompt** (Abschnitt „System“) — wird **zur Laufzeit aus dieser
+   Datei gelesen** (Read File `/files/prompts/<nr>.md` → Code-Node schneidet
+   den ```-Block unter „System“ heraus → Prompt-Feld des LLM-Knotens). Nichts
+   wird in Knoten kopiert: Datei ändern = Verhalten geändert. Platzhalter in
+   `{{ }}` füllt n8n aus Mandantenprofil und Vorschritten.
 2. **Eingabe** — welches JSON der Knoten als User-Nachricht bekommt.
 3. **Ausgabe-Schema** — JSON-Schema für den Structured Output Parser. Der
    Knoten wiederholt bei Schema-Verstoß (Auto-Fix aktivieren).
