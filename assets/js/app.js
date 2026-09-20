@@ -93,6 +93,14 @@
 
   // ---- Init ----
   function init() {
+    // Testumgebung sichtbar kennzeichnen (volleyball-test.…)
+    if (/^volleyball-test\./i.test(location.hostname)) {
+      const b = document.createElement("div");
+      b.className = "test-banner";
+      b.textContent = "🧪 TESTUMGEBUNG – eigene Daten, unabhängig von der Live-Version";
+      document.body.prepend(b);
+      document.title = "TEST · " + document.title;
+    }
     buildNav();
     initTheme();
     window.addEventListener("hashchange", route);

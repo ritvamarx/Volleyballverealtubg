@@ -1,0 +1,5 @@
+# Automatisches Update der Volleyball-TEST-Instanz vom GitHub-Stand (main).
+# Installation:  cp nach /etc/cron.d/volleyball-test-update
+# Log:           /opt/volleyball-test/data/update.log
+# Die Live-Instanz (/opt/volleyball) wird hiervon nicht berührt.
+*/10 * * * * root flock -n /run/volleyball-test-update.lock /opt/volleyball-test/deploy/auto-update.sh /opt/volleyball-test >> /opt/volleyball-test/data/update.log 2>&1

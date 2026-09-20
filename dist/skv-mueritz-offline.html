@@ -293,6 +293,10 @@ textarea { resize: vertical; min-height: 72px; }
   width: 40px; height: 40px; border-radius: 50%; flex: 0 0 40px;
   display: grid; place-items: center; font-weight: 700; color: #fff; font-size: .85rem;
 }
+.test-banner {
+  background: #f6c343; color: #3a2c00; text-align: center; font-weight: 600;
+  padding: 6px 12px; font-size: .85rem; position: sticky; top: 0; z-index: 80;
+}
 .progress { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
 .progress > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
 
@@ -4424,6 +4428,14 @@ textarea { resize: vertical; min-height: 72px; }
 
   // ---- Init ----
   function init() {
+    // Testumgebung sichtbar kennzeichnen (volleyball-test.…)
+    if (/^volleyball-test\./i.test(location.hostname)) {
+      const b = document.createElement("div");
+      b.className = "test-banner";
+      b.textContent = "🧪 TESTUMGEBUNG – eigene Daten, unabhängig von der Live-Version";
+      document.body.prepend(b);
+      document.title = "TEST · " + document.title;
+    }
     buildNav();
     initTheme();
     window.addEventListener("hashchange", route);
