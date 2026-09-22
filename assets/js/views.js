@@ -3481,7 +3481,7 @@
         ${s.announcements.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).map((a) => `
           <div class="card">
             <div class="flex mb"><h3 style="margin:0">${esc(a.title)}</h3><span class="spacer"></span>
-              <span class="badge ${a.audience === "eltern" ? "info" : "accent"}">${a.audience === "eltern" ? "👪 Eltern" : "👥 Alle"}</span>
+              <span class="badge ${a.audience === "eltern" ? "info" : (a.audience === "oeffentlich" ? "warn" : "accent")}">${a.audience === "eltern" ? "👪 Eltern" : (a.audience === "oeffentlich" ? "📣 Öffentlich (Content-Hub)" : "👥 Alle")}</span>
               <span class="badge">${fmtDateShort(a.date)}</span></div>
             <p style="margin:0" class="soft">${esc(a.body)}</p>
             <div class="flex mt"><span class="spacer"></span>
@@ -3497,7 +3497,7 @@
       title: "Neue Ankündigung",
       body: `<form id="af"><div class="form-grid">
         <div class="field full"><label>Titel</label><input name="title" required></div>
-        <div class="field"><label>Zielgruppe</label><select name="audience"><option value="alle">Alle</option><option value="eltern">Eltern</option></select></div>
+        <div class="field"><label>Zielgruppe</label><select name="audience"><option value="alle">Alle</option><option value="eltern">Eltern</option><option value="oeffentlich">Öffentlich – darf der Content-Hub nach außen tragen</option></select></div>
         <div class="field full"><label>Nachricht</label><textarea name="body" rows="5" required></textarea></div>
       </div></form>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Veröffentlichen</button>`,

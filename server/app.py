@@ -50,6 +50,14 @@ def create_app() -> Flask:
         if d is not None:
             d.close()
 
+    # Content-Hub (Stufe 3): Feed + Inbox, nur mit CONTENT_FEED_TOKEN aktiv (siehe server/content_feed.py)
+    import content_feed
+    try:
+        import push as _push
+    except Exception:  # pragma: no cover – ohne pywebpush läuft die Inbox ohne Push
+        _push = None
+    content_feed.register(app, con, db, _push)
+
     def client_ip() -> str:
         fwd = request.headers.get("X-Forwarded-For", "")
         return (fwd.split(",")[0].strip() if fwd else request.remote_addr) or "?"
@@ -459,7 +467,7 @@ def create_app() -> Flask:
             neue_ank = [a for a in (body["state"].get("announcements") or [])
                         if isinstance(a, dict) and a.get("id") not in alte_ank_ids]
             for a in neue_ank[:5]:
-                rollen = {"alle": ("trainer", "spieler", "eltern"),
+                rollen = {"alle": ("trainer", "spieler", "eltern"), "oeffentlich": ("trainer", "spieler", "eltern"),
                           "eltern": ("eltern",), "spieler": ("spieler",)}.get(a.get("audience"), ())
                 if not rollen:
                     continue
@@ -746,7 +754,7 @@ def create_app() -> Flask:
                      for c in daten.get("eventCategories", [])}
         ank = sorted(
             [{"id": a.get("id"), "title": a.get("title"), "body": a.get("body"), "date": a.get("date")}
-             for a in daten.get("announcements", []) if a.get("audience") in ("alle", rolle)],
+             for a in daten.get("announcements", []) if a.get("audience") in ("alle", "oeffentlich", rolle)],
             key=lambda a: str(a.get("date", "")), reverse=True)[:10]
 
         return jsonify({

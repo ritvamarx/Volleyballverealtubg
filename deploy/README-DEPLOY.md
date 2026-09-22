@@ -110,3 +110,18 @@ docker compose exec volleyball ./manage.py backup /app/data/backups
   (`./manage.py tabelle-sync`; Liga über `VV_TABELLE_LIGA` in `.env`,
   Standard `VerbandsligaMänner`; Saison wird automatisch erkannt).
   Handpflege im Tabellen-Editor wird dabei überschrieben.
+
+## Content-Hub-Anbindung (Stufe 3)
+
+Die App liefert dem Content-Hub (eigene VM, privates Hetzner-Netz) einen Feed
+öffentlicher Termine, Ergebnisse und Ankündigungen mit Zielgruppe „Öffentlich“
+und nimmt freigegebene Meldungen als Ankündigung entgegen (`server/content_feed.py`).
+Aktiv nur mit Token in der `.env` des Containers:
+
+    CONTENT_FEED_TOKEN=<openssl rand -hex 32>      # derselbe Wert steht im Hub (scripts/app-kanal.sh)
+    APP_PUBLIC_URL=https://volleyball.nettverwaltet.de
+
+Caddy auf der Vereins-VM gibt `/api/content-feed` und `/api/content/*` nur für die
+Hub-VM (10.0.0.2) über einen privaten Port frei, siehe `anbindung/Caddyfile-vm1-snippet.txt`
+im Repo `contenthub`. Ohne Token antworten beide Endpunkte mit 404. Es werden nie
+Mitglieder-, Kinder- oder Kontaktdaten ausgeliefert.
