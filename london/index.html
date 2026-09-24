@@ -641,7 +641,7 @@ nav.tabs button.on { color: var(--accent); }
 const SHEET_ID = '1-XBuRIJlECfbVELZru071S7sOIO8NsyPfnWGxKLlkfY';
 // Optional: Web-App-URL des Apps Scripts (siehe Kosten → Einrichtung).
 // Wenn hier eingetragen, können alle direkt in der App Ausgaben speichern.
-const SCRIPT_URL = '';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzoRprRNMeRYJ8oK0FCqMvUBH6iDASHkUfiztcZrzu-9Zpgm2el6Bc9lnH0s3QHygrvVw/exec';
 // Ersatz-Kurs, falls offline und noch nie ein Kurs geladen wurde (1 € = x £)
 const FALLBACK_RATE = 0.86;
 
@@ -1067,7 +1067,7 @@ function tick() {
 }
 
 /* =====================================================================
-   WÄHRUNGSRECHNER (EZB-Kurs über frankfurter.app)
+   WÄHRUNGSRECHNER (EZB-Kurs über frankfurter.dev)
    ===================================================================== */
 let fx = store.get('fx', null); // { rate, date, fetched, manual }
 const rate = () => (fx && fx.rate) || FALLBACK_RATE; // 1 € = rate £
@@ -1085,7 +1085,7 @@ async function loadRate(force) {
   if (fx && fx.manual && !force) return showRate();
   if (fx && !force && Date.now() - fx.fetched < 6 * 3600e3) return showRate();
   try {
-    const r = await fetch('https://api.frankfurter.app/latest?from=EUR&to=GBP');
+    const r = await fetch('https://api.frankfurter.dev/v1/latest?base=EUR&symbols=GBP');
     const j = await r.json();
     if (j && j.rates && j.rates.GBP) { fx = { rate: j.rates.GBP, date: j.date, fetched: Date.now() }; store.set('fx', fx); }
   } catch (e) { if (force) toast('Offline: letzter Kurs wird verwendet'); }
