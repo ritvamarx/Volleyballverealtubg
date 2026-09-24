@@ -1,0 +1,1634 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1d2340">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="London 2026">
+<title>London Girls' Trip</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💂‍♀️</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+/* ===================== Farben & Grundlayout ===================== */
+:root {
+  --bg: #f6f1ec;
+  --card: #ffffff;
+  --ink: #1d2340;
+  --muted: #6b6f85;
+  --line: #e6dfd8;
+  --accent: #c8325a;      /* Himbeer */
+  --accent-soft: #fbe6ec;
+  --navy: #1d2340;
+  --gold: #b88a2e;
+  --ok: #1f8a5b;
+  --ok-soft: #e1f3ea;
+  --warn: #b5611a;
+  --warn-soft: #fcefe0;
+  --shadow: 0 1px 2px rgba(29,35,64,.06), 0 4px 16px rgba(29,35,64,.06);
+  --d1: #c8325a; --d2: #7a4fc2; --d3: #1f7a8c; --d4: #b88a2e; --dx: #6b6f85;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12152a; --card: #1c2040; --ink: #f1ecf4; --muted: #a3a6bf; --line: #2d3257;
+    --accent: #ff6f93; --accent-soft: #3a2140; --navy: #0d1024; --gold: #e0b75a;
+    --ok: #52c792; --ok-soft: #173a30; --warn: #f0a15a; --warn-soft: #3d2b1c;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+    --d1: #ff6f93; --d2: #b394f2; --d3: #4fc1d4; --d4: #e0b75a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12152a; --card: #1c2040; --ink: #f1ecf4; --muted: #a3a6bf; --line: #2d3257;
+  --accent: #ff6f93; --accent-soft: #3a2140; --navy: #0d1024; --gold: #e0b75a;
+  --ok: #52c792; --ok-soft: #173a30; --warn: #f0a15a; --warn-soft: #3d2b1c;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 4px 16px rgba(0,0,0,.25);
+  --d1: #ff6f93; --d2: #b394f2; --d3: #4fc1d4; --d4: #e0b75a;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--ink);
+  font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  padding-bottom: calc(76px + env(safe-area-inset-bottom));
+}
+h1, h2, h3 { font-family: Fraunces, Georgia, serif; font-weight: 700; margin: 0; line-height: 1.2; }
+a { color: var(--accent); }
+button, input, select { font: inherit; color: inherit; }
+.wrap { max-width: 720px; margin: 0 auto; padding: 0 16px; }
+
+/* ===================== Kopfbereich ===================== */
+header.top {
+  background: var(--navy); color: #fff;
+  padding: calc(14px + env(safe-area-inset-top)) 0 18px;
+}
+header.top .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+header.top h1 { font-size: 22px; }
+header.top h1 small { display: block; font: 500 12px/1.4 Inter, sans-serif; opacity: .75; letter-spacing: .06em; text-transform: uppercase; }
+.clocks { display: flex; gap: 10px; font-size: 12px; text-align: right; opacity: .9; }
+.clocks b { display: block; font-size: 16px; font-variant-numeric: tabular-nums; }
+.me-row { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; font-size: 13px; }
+.me-row span { opacity: .75; margin-right: 2px; }
+.chip {
+  border: 1px solid rgba(255,255,255,.28); background: transparent; color: #fff;
+  border-radius: 999px; padding: 4px 11px; font-size: 13px; cursor: pointer;
+}
+.chip.on { background: #fff; color: var(--navy); border-color: #fff; font-weight: 600; }
+
+/* ===================== Karten, Buttons ===================== */
+section.view { display: none; padding: 18px 0 8px; }
+section.view.on { display: block; }
+.card { background: var(--card); border-radius: 16px; box-shadow: var(--shadow); padding: 16px; margin-bottom: 14px; }
+.card h2 { font-size: 19px; margin-bottom: 10px; }
+.card h3 { font-size: 16px; margin-bottom: 6px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px; justify-content: center;
+  border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  border-radius: 10px; padding: 8px 12px; font-size: 14px; font-weight: 500;
+  text-decoration: none; cursor: pointer; min-height: 38px;
+}
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.sm { padding: 5px 9px; min-height: 30px; font-size: 13px; border-radius: 8px; }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 420px) { .grid2 { grid-template-columns: 1fr; } }
+.badge { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 2px 8px; border-radius: 999px; }
+.badge.ok { background: var(--ok-soft); color: var(--ok); }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.acc { background: var(--accent-soft); color: var(--accent); }
+.note { background: var(--warn-soft); color: var(--ink); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+.note.info { background: var(--accent-soft); }
+
+/* ===================== Plan ===================== */
+.next { border-left: 4px solid var(--accent); }
+.next .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
+.daytabs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 12px; scrollbar-width: none; }
+.daytabs button {
+  flex: 0 0 auto; border: 1px solid var(--line); background: var(--card); border-radius: 12px;
+  padding: 8px 12px; cursor: pointer; text-align: left; line-height: 1.25;
+}
+.daytabs button b { display: block; font-size: 14px; }
+.daytabs button span { font-size: 12px; color: var(--muted); }
+.daytabs button.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.daytabs button.on span { color: inherit; opacity: .75; }
+.dayhead { margin: 4px 0 12px; }
+.dayhead h2 { font-size: 22px; }
+.timeline { position: relative; }
+.ev { display: grid; grid-template-columns: 58px 1fr; gap: 10px; position: relative; padding-bottom: 12px; }
+.ev .t { font-weight: 700; font-variant-numeric: tabular-nums; padding-top: 14px; text-align: right; font-size: 15px; }
+.ev .t small { display: block; font-weight: 500; font-size: 10px; color: var(--muted); }
+.ev .card { margin: 0; padding: 12px 14px; }
+.ev.past .card { opacity: .55; }
+.ev.now .card { outline: 2px solid var(--accent); }
+.ev.mine .card { border-left: 4px solid var(--accent); }
+.ev.notmine .card { opacity: .6; }
+.ev h3 { font-size: 16px; }
+.ev p { margin: 4px 0 0; font-size: 14px; }
+.who { display: inline-flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+.who i { font-style: normal; font-size: 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 1px 7px; }
+.ev .btns { margin-top: 8px; }
+.flight { display: grid; grid-template-columns: 1fr; gap: 10px; }
+.fl { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.fl b { font-size: 15px; }
+.fl .leg { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; margin-top: 4px; flex-wrap: wrap; }
+table.simple { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.simple th, table.simple td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--line); }
+table.simple th { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); font-weight: 600; }
+table.simple td.num, table.simple th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ===================== Währung ===================== */
+.conv { display: grid; gap: 10px; }
+.conv label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; font-weight: 500; }
+.money { display: flex; align-items: center; border: 2px solid var(--line); border-radius: 14px; background: var(--bg); padding: 4px 14px; }
+.money:focus-within { border-color: var(--accent); }
+.money span { font-size: 26px; font-weight: 600; color: var(--muted); width: 28px; }
+.money input { border: 0; background: transparent; outline: none; font-size: 30px; font-weight: 700; width: 100%; padding: 8px 0; font-variant-numeric: tabular-nums; }
+.swap { justify-self: center; }
+.quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.quick div { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; text-align: center; font-variant-numeric: tabular-nums; }
+.quick div b { display: block; font-size: 16px; }
+.quick div span { font-size: 13px; color: var(--muted); }
+
+/* ===================== Karte ===================== */
+#map { height: 62vh; min-height: 360px; border-radius: 16px; box-shadow: var(--shadow); z-index: 0; }
+.legend { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.legend button { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 5px 11px; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.legend button.off { opacity: .45; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.pin { width: 28px; height: 28px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.pin b { transform: rotate(45deg); color: #fff; font: 700 12px Inter, sans-serif; }
+.pin.home { background: var(--navy) !important; width: 34px; height: 34px; }
+.pin.home b { font-size: 16px; }
+.leaflet-popup-content { font: 14px/1.4 Inter, sans-serif; }
+.leaflet-popup-content b { font-size: 15px; }
+.leaflet-popup-content .btns { margin-top: 8px; }
+.leaflet-popup-content .btn { color: #1d2340; background: #fff; }
+
+/* ===================== Standorte ===================== */
+.ppin { width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font: 700 16px Inter, sans-serif; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+.ppin.stale { opacity: .55; }
+.ppin.me { outline: 3px solid var(--accent); outline-offset: 1px; }
+.people { display: grid; gap: 6px; margin-top: 12px; }
+.person { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; background: transparent; text-align: left; width: 100%; cursor: pointer; }
+.person:disabled { cursor: default; }
+.person .av { width: 30px; height: 30px; border-radius: 50%; color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.person .nm { font-weight: 600; flex: 1; }
+.person .st { font-size: 12px; color: var(--muted); text-align: right; }
+.switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.switch input { width: 48px; height: 28px; accent-color: var(--accent); }
+
+/* ===================== ÖPNV ===================== */
+.linklist { display: grid; gap: 8px; }
+.linklist a { display: flex; gap: 12px; align-items: center; text-decoration: none; color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.linklist a:hover { border-color: var(--accent); }
+.linklist a .ic { font-size: 22px; width: 30px; text-align: center; }
+.linklist a b { display: block; font-size: 15px; }
+.linklist a span { font-size: 13px; color: var(--muted); }
+.lines { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+@media (max-width: 420px) { .lines { grid-template-columns: 1fr; } }
+.line { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 6px 8px; border-radius: 8px; background: var(--bg); }
+.line .bar { width: 6px; align-self: stretch; border-radius: 3px; }
+.line b { flex: 1; }
+.line .st { font-size: 12px; font-weight: 600; }
+.line .st.good { color: var(--ok); }
+.line .st.bad { color: var(--warn); }
+
+/* ===================== Kosten ===================== */
+.bal { display: grid; gap: 6px; }
+.balrow { display: grid; grid-template-columns: 80px 1fr 92px; gap: 10px; align-items: center; font-size: 14px; }
+.balrow .barwrap { height: 10px; background: var(--bg); border-radius: 5px; position: relative; overflow: hidden; }
+.balrow .barwrap i { position: absolute; top: 0; bottom: 0; border-radius: 5px; }
+.balrow .v { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.pos { color: var(--ok); } .neg { color: var(--accent); }
+.transfer { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 15px; }
+.transfer:last-child { border-bottom: 0; }
+.transfer .arrow { color: var(--muted); }
+.transfer .amt { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+form.exp { display: grid; gap: 10px; }
+form.exp label { font-size: 13px; color: var(--muted); font-weight: 500; display: block; margin-bottom: 4px; }
+form.exp input[type=text], form.exp input[type=number], form.exp input[type=date], form.exp select, .cfg input {
+  width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 16px;
+}
+.amtrow { display: grid; grid-template-columns: 1fr 110px; gap: 8px; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.seg button { flex: 1; border: 0; background: var(--bg); padding: 10px 0; cursor: pointer; font-weight: 600; }
+.seg button.on { background: var(--ink); color: var(--bg); }
+.checks { display: flex; flex-wrap: wrap; gap: 6px; }
+.checks label { display: inline-flex; align-items: center; gap: 5px; margin: 0; border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; font-size: 14px; color: var(--ink); cursor: pointer; }
+.checks input { accent-color: var(--accent); }
+.explist { font-size: 14px; }
+.expitem { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.expitem:last-child { border-bottom: 0; }
+.expitem .a { font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+.expitem .m { font-size: 12px; color: var(--muted); }
+.cfg { display: grid; gap: 8px; }
+details summary { cursor: pointer; font-weight: 600; }
+pre.code { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px; font-size: 11.5px; line-height: 1.45; overflow-x: auto; max-height: 260px; }
+ol.steps { padding-left: 20px; margin: 8px 0; font-size: 14px; }
+ol.steps li { margin-bottom: 4px; }
+
+/* ===================== Infos ===================== */
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; font-size: 14px; }
+.kv > div { padding: 7px 0; border-bottom: 1px solid var(--line); }
+.kv .val { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tips { display: grid; gap: 10px; font-size: 14px; }
+.tips b { display: block; }
+
+/* ===================== Programm-Editor ===================== */
+.ev .card { position: relative; }
+.ev .card h3 { padding-right: 34px; }
+button.edit { position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border-radius: 8px; border: 1px solid transparent; background: transparent; cursor: pointer; font-size: 15px; opacity: .55; }
+button.edit:hover, button.edit:focus-visible { opacity: 1; border-color: var(--line); }
+dialog#evDlg { border: 0; border-radius: 18px; padding: 0; width: min(560px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); background: var(--card); color: var(--ink); box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+dialog#evDlg::backdrop { background: rgba(13,16,36,.55); }
+dialog#evDlg form { display: grid; gap: 10px; padding: 18px 16px 16px; }
+dialog#evDlg label.l { font-size: 13px; color: var(--muted); font-weight: 500; display: block; margin-bottom: 4px; }
+dialog#evDlg input[type=text], dialog#evDlg input[type=time], dialog#evDlg input[type=url], dialog#evDlg select, dialog#evDlg textarea {
+  width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 10px 12px; font-size: 16px; font-family: inherit; color: inherit;
+}
+dialog#evDlg textarea { min-height: 70px; resize: vertical; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.row3 > div, .row2 > div { min-width: 0; }
+.row2 { display: grid; grid-template-columns: 1fr 120px; gap: 8px; }
+.dlgbtns { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; margin-top: 4px; }
+.btn.danger { color: var(--accent); border-color: var(--accent); }
+
+/* ===================== Tab-Leiste ===================== */
+nav.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
+  background: var(--card); border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+nav.tabs .wrap { display: grid; grid-template-columns: repeat(6, 1fr); padding: 0 4px; }
+nav.tabs button {
+  border: 0; background: transparent; padding: 8px 0 9px; cursor: pointer; color: var(--muted);
+  font-size: 11px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+nav.tabs button .i { font-size: 21px; line-height: 1; }
+nav.tabs button.on { color: var(--accent); }
+.toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-size: 14px; z-index: 2000; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.on { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="row">
+      <h1><small>Girls' Trip · 25.–28.09.2026</small>London 💂‍♀️</h1>
+      <div class="clocks">
+        <div>London<b id="clkL">--:--</b></div>
+        <div>Deutschland<b id="clkD">--:--</b></div>
+      </div>
+    </div>
+    <div class="me-row" id="meRow"><span>Ich bin:</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ============================ PLAN ============================ -->
+  <section class="view" id="v-plan">
+    <div class="card next" id="nextCard"></div>
+    <div class="daytabs" id="dayTabs"></div>
+    <div id="dayView"></div>
+
+    <div class="card">
+      <h2>✈️ Flüge – alle gebucht</h2>
+      <div class="flight" id="flights"></div>
+    </div>
+
+    <div class="card">
+      <h2>🧳 Abreise auf einen Blick</h2>
+      <table class="simple">
+        <thead><tr><th>Wer</th><th>Aufbruch</th><th>Flughafen</th><th class="num">Abflug</th></tr></thead>
+        <tbody>
+          <tr><td>Anke &amp; Katja</td><td>12:15</td><td>Heathrow</td><td class="num">14:45</td></tr>
+          <tr><td>Elisa &amp; Jelena</td><td>15:15</td><td>Heathrow</td><td class="num">18:00</td></tr>
+          <tr><td>Ritva &amp; Anna</td><td>17:00</td><td>Stansted</td><td class="num">20:00</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>📝 Noch offen</h2>
+      <div class="tips" id="todos"></div>
+    </div>
+  </section>
+
+  <!-- ============================ WÄHRUNG ============================ -->
+  <section class="view" id="v-fx">
+    <div class="card">
+      <h2>💷 Euro ⇄ Pfund</h2>
+      <div class="conv">
+        <div>
+          <label for="inGBP">Britisches Pfund</label>
+          <div class="money"><span>£</span><input id="inGBP" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+        </div>
+        <div>
+          <label for="inEUR">Euro</label>
+          <div class="money"><span>€</span><input id="inEUR" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+        </div>
+      </div>
+      <p class="small muted" id="rateInfo" style="margin:12px 0 0">Kurs wird geladen …</p>
+      <div class="btns" style="margin-top:10px">
+        <button class="btn sm" id="rateReload">🔄 Kurs aktualisieren</button>
+        <button class="btn sm" id="rateManualBtn">✏️ Kurs selbst eingeben</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Schnell-Übersicht</h3>
+      <div class="quick" id="quickGBP"></div>
+      <h3 style="margin-top:14px">… und andersrum</h3>
+      <div class="quick" id="quickEUR"></div>
+    </div>
+
+    <div class="card">
+      <h3>💡 Beim Bezahlen</h3>
+      <div class="tips">
+        <div><b>Immer in Pfund (GBP) zahlen</b>Fragt das Kartenterminal „Pay in EUR or GBP?“, dann <b style="display:inline">GBP</b> wählen. Die Umrechnung in Euro direkt am Terminal ist fast immer teurer.</div>
+        <div><b>Trinkgeld</b>Meist stehen schon 12,5 % Service Charge auf der Rechnung, dann ist nichts weiter nötig. Sonst sind 10–12 % üblich.</div>
+        <div><b>Bargeld</b>London ist fast bargeldlos, Karte oder Handy reicht überall.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ KARTE ============================ -->
+  <section class="view" id="v-map">
+    <div class="legend" id="legend"></div>
+    <div id="map"></div>
+    <div class="btns" style="margin-top:10px">
+      <button class="btn" id="locBtn">📍 Mein Standort</button>
+      <button class="btn" id="homeBtn">🏠 Zum Apartment</button>
+      <a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=Commercial+Street+London+E1+6BJ">Google Maps öffnen</a>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h2>👭 Wo sind die anderen?</h2>
+      <div id="shareBox"></div>
+      <div class="people" id="peopleList"></div>
+      <p class="small muted" id="shareInfo" style="margin:10px 0 0">Nur wer selbst freigibt, ist auf der Karte zu sehen. Der Standort wird aktualisiert, solange die App geöffnet ist (auf dem iPhone nicht im Hintergrund). Ausschalten löscht den Standort sofort aus der Tabelle.</p>
+    </div>
+    <p class="small muted" id="mapOffline" style="display:none">Die Karte braucht Internet. Ohne Netz funktionieren die Routen-Buttons im Plan trotzdem, sobald wieder Empfang da ist.</p>
+  </section>
+
+  <!-- ============================ ÖPNV ============================ -->
+  <section class="view" id="v-transit">
+    <div class="card">
+      <h2>🚇 Unterwegs</h2>
+      <div class="note info small" style="margin-bottom:12px">
+        <b>Bezahlen:</b> Einfach kontaktlos mit Karte, Apple Pay oder Google Pay an den gelben Leser halten, <b>beim Ein- und Aussteigen</b>. Das Tageslimit greift automatisch. <b>Jede braucht ihre eigene Karte bzw. ihr eigenes Handy.</b>
+      </div>
+      <div class="linklist">
+        <a target="_blank" rel="noopener" href="https://tfl.gov.uk/plan-a-journey/"><div class="ic">🧭</div><div><b>TfL Journey Planner</b><span>Offizielle Routenplanung für Tube, Bus und Bahn</span></div></a>
+        <a target="_blank" rel="noopener" href="https://citymapper.com/london"><div class="ic">📱</div><div><b>Citymapper</b><span>Die beste ÖPNV-App für London, mit Live-Abfahrten</span></div></a>
+        <a target="_blank" rel="noopener" href="https://tfl.gov.uk/tube-dlr-overground/status/"><div class="ic">🚦</div><div><b>Live-Status aller Linien</b><span>Störungen und Sperrungen bei tfl.gov.uk</span></div></a>
+        <a target="_blank" rel="noopener" href="https://tfl.gov.uk/maps/track/tube"><div class="ic">🗺️</div><div><b>Tube-Netzplan</b><span>Offizieller Plan als PDF</span></div></a>
+        <a target="_blank" rel="noopener" href="https://tfl.gov.uk/fares/how-to-pay-and-where-to-buy-tickets-and-oyster/pay-as-you-go/contactless-and-mobile-pay-as-you-go"><div class="ic">💳</div><div><b>Kontaktlos zahlen</b><span>Preise und Tageslimit (Capping)</span></div></a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Linien-Status (live)</h3>
+      <div class="lines" id="lineStatus"><span class="small muted">Wird geladen …</span></div>
+      <p class="small muted" id="lineStatusTime" style="margin:8px 0 0"></p>
+    </div>
+
+    <div class="card">
+      <h2>✈️ Flughafen ⇄ Apartment</h2>
+      <h3 style="margin-top:4px">Heathrow – Elizabeth Line</h3>
+      <p class="small" style="margin:0 0 8px">Heathrow ⇄ <b>Liverpool Street</b> · direkt · ca. 40–45 Min · alle 10–15 Min · ca. £12–13 p.P. · dann 8 Min zu Fuß. Den Schildern <b>„Elizabeth line“</b> folgen, <u>nicht</u> Heathrow Express (teurer) und <u>nicht</u> Piccadilly Line (langsamer).</p>
+      <div class="btns" style="margin-bottom:14px">
+        <a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&origin=Heathrow+Airport&destination=Commercial+Street+London+E1+6BJ&travelmode=transit">🛬 Heathrow → Apartment</a>
+        <a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&origin=Liverpool+Street+Station+London&destination=Heathrow+Airport&travelmode=transit">🛫 Liverpool St → Heathrow</a>
+        <a class="btn sm" target="_blank" rel="noopener" href="https://tfl.gov.uk/modes/elizabeth-line/">Elizabeth Line (TfL)</a>
+      </div>
+      <h3>Stansted – Stansted Express</h3>
+      <p class="small" style="margin:0 0 8px">Stansted ⇄ <b>Liverpool Street</b> · direkt · ca. 50 Min · ca. £20 p.P. Online vorab 10–15 % günstiger.</p>
+      <div class="btns">
+        <a class="btn sm primary" target="_blank" rel="noopener" href="https://www.stanstedexpress.com">Tickets: stanstedexpress.com</a>
+        <a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&origin=Liverpool+Street+Station+London&destination=Stansted+Airport&travelmode=transit">🛫 Liverpool St → Stansted</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🚉 Stationen am Apartment</h3>
+      <div class="linklist">
+        <a target="_blank" rel="noopener" href="https://tfl.gov.uk/hub/stop/HUBLST/liverpool-street/"><div class="ic">🚉</div><div><b>Liverpool Street</b><span>Elizabeth, Central, Circle, Metropolitan, H&amp;C · 8 Min</span></div></a>
+        <a target="_blank" rel="noopener" href="https://tfl.gov.uk/hub/stop/940GZZLUADE/aldgate-east-underground-station/"><div class="ic">🚇</div><div><b>Aldgate East</b><span>District, Hammersmith &amp; City</span></div></a>
+        <a target="_blank" rel="noopener" href="https://tfl.gov.uk/hub/stop/910GSHRDHST/shoreditch-high-street-rail-station/"><div class="ic">🚆</div><div><b>Shoreditch High Street</b><span>London Overground (Windrush line)</span></div></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ KOSTEN ============================ -->
+  <section class="view" id="v-cost">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px">
+        <h2 style="margin:0">💸 Wer bekommt was?</h2>
+        <div class="seg" style="width:96px" id="dispCur"><button data-c="EUR" class="on">€</button><button data-c="GBP">£</button></div>
+      </div>
+      <div id="costStatus" class="small muted" style="margin-bottom:10px">Lade Kostentabelle …</div>
+      <div class="bal" id="balances"></div>
+      <p class="small muted" id="costTotal" style="margin:10px 0 0"></p>
+    </div>
+
+    <div class="card">
+      <h3>🔁 So wird ausgeglichen</h3>
+      <p class="small muted" style="margin:0 0 6px">Mit möglichst wenigen Überweisungen:</p>
+      <div id="transfers"></div>
+    </div>
+
+    <div class="card" id="addCard">
+      <h2>➕ Ausgabe eintragen</h2>
+      <form class="exp" id="expForm" autocomplete="off">
+        <div>
+          <label for="fWas">Was?</label>
+          <input type="text" id="fWas" placeholder="z. B. Dishoom Abendessen" required maxlength="80">
+        </div>
+        <div class="amtrow">
+          <div>
+            <label for="fBetrag">Betrag</label>
+            <input type="text" inputmode="decimal" id="fBetrag" placeholder="0,00" required>
+          </div>
+          <div>
+            <label>Währung</label>
+            <div class="seg" id="fCur"><button type="button" data-c="GBP" class="on">£</button><button type="button" data-c="EUR">€</button></div>
+          </div>
+        </div>
+        <div>
+          <label for="fVon">Bezahlt von</label>
+          <select id="fVon" required></select>
+        </div>
+        <div>
+          <label>Geteilt mit <a href="#" id="fAll" class="small" style="margin-left:6px">alle</a> · <a href="#" id="fNone" class="small">keine</a></label>
+          <div class="checks" id="fMit"></div>
+        </div>
+        <div>
+          <label for="fNotiz">Notiz (optional)</label>
+          <input type="text" id="fNotiz" maxlength="120" placeholder="">
+        </div>
+        <button class="btn primary" type="submit" id="fSubmit">Speichern</button>
+        <p class="small muted" id="fHint" style="margin:0"></p>
+      </form>
+      <div id="noScript" style="display:none">
+        <p class="small" style="margin-top:0">Ausgaben werden direkt in der Google-Tabelle eingetragen: eine Zeile pro Ausgabe. <b>Geteilt mit</b> leer lassen oder „alle“ schreiben, sonst Vornamen mit Komma, z. B. <i>Ritva, Anna</i>.</p>
+      </div>
+      <div class="btns" style="margin-top:10px">
+        <a class="btn" id="openSheet" target="_blank" rel="noopener">📄 Tabelle in Google Sheets öffnen</a>
+        <button class="btn" id="reloadCosts">🔄 Neu laden</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🧾 Alle Ausgaben</h3>
+      <div class="explist" id="expList"><span class="muted small">Noch keine Einträge.</span></div>
+    </div>
+
+    <div class="card">
+      <details id="setup">
+        <summary>⚙️ Einrichtung (Google Drive)</summary>
+        <div style="margin-top:10px" class="small">
+          <p><b>Lesen:</b> Die App liest die Tabelle <i>„London 2026 – Kosten“</i>. Dafür muss sie entweder über <b>Teilen → „Jeder mit dem Link“ → Betrachter</b> freigegeben sein, oder das Apps Script unten muss eingerichtet sein.</p>
+          <p><b>Direkt in der App eintragen und Programm für alle ändern</b> (einmalig, ca. 2 Minuten, macht die Besitzerin der Tabelle). Das Script speichert Ausgaben, Änderungen am Programm und freigegebene Standorte (legt dafür die Tabs „Programm“ und „Standorte“ an). Ohne Script bleiben Programm-Änderungen nur auf dem eigenen Gerät, und Standorte können nicht geteilt werden. <b>Wurde das Script schon früher bereitgestellt:</b> Code ersetzen und unter Bereitstellen → Bereitstellungen verwalten → ✏️ → Version „Neue Version“ aktualisieren.</p>
+          <ol class="steps">
+            <li>Tabelle öffnen → Menü <b>Erweiterungen → Apps Script</b></li>
+            <li>Den vorhandenen Code löschen und den Code unten einfügen → 💾 speichern</li>
+            <li><b>Bereitstellen → Neue Bereitstellung</b> → Zahnrad ⚙️ → Typ <b>Web-App</b></li>
+            <li>Ausführen als: <b>Ich</b> · Zugriff: <b>Jeder</b> → Bereitstellen → Zugriff autorisieren</li>
+            <li>Die <b>Web-App-URL</b> (endet auf <code>/exec</code>) kopieren und hier einfügen. Oder, damit alle sie automatisch haben: oben in dieser HTML-Datei bei <code>SCRIPT_URL</code> eintragen und die Datei neu verschicken.</li>
+          </ol>
+          <div class="btns" style="margin-bottom:8px"><button class="btn sm" id="copyScript">📋 Code kopieren</button></div>
+          <pre class="code" id="scriptCode"></pre>
+          <div class="cfg">
+            <label for="cfgScript" class="muted">Web-App-URL (Apps Script)</label>
+            <input id="cfgScript" placeholder="https://script.google.com/macros/s/…/exec">
+            <label for="cfgSheet" class="muted">Tabellen-ID oder -Link</label>
+            <input id="cfgSheet">
+            <div class="btns"><button class="btn sm primary" id="cfgSave">Übernehmen</button><button class="btn sm" id="cfgReset">Zurücksetzen</button></div>
+          </div>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============================ INFOS ============================ -->
+  <section class="view" id="v-info">
+    <div class="card">
+      <h2>🏠 Unterkunft</h2>
+      <p style="margin:0"><b>City Stay: 3BR Apt</b><br>Commercial Street, London E1 6BJ</p>
+      <p class="small muted" style="margin:6px 0 0">Check-in Fr 25.09. ab 14:00 · Check-out Mo 28.09. bis 12:00 (Late Check-out, bezahlt)<br>Spitalfields Market 2 Min · Brick Lane 5 Min · Liverpool Street 8 Min</p>
+      <div class="btns" style="margin-top:10px">
+        <a class="btn sm primary" href="tel:+442046034447">📞 Host Jonathan Hugh</a>
+        <a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=Commercial+Street+London+E1+6BJ&travelmode=transit">🧭 Nach Hause</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🔑 Nummern &amp; Codes</h2>
+      <div class="kv" id="codes"></div>
+    </div>
+
+    <div class="card">
+      <h2>🆘 Notfall</h2>
+      <div class="kv">
+        <div>Notruf UK (Polizei/Feuer/Arzt)</div><div class="val"><a href="tel:999">999</a></div>
+        <div>Ärztlicher Rat, nicht dringend</div><div class="val"><a href="tel:111">111</a></div>
+        <div>Deutsche Botschaft London</div><div class="val"><a href="tel:+442078241300">+44 20 7824 1300</a></div>
+        <div>Kartensperrung (DE)</div><div class="val"><a href="tel:+49116116">+49 116 116</a></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>☂️ Gut zu wissen</h2>
+      <div class="tips">
+        <div><b>Dokumente</b>Reisepass ist Pflicht, der Personalausweis wird nicht akzeptiert. Die UK ETA liegt für alle sechs vor und ist digital mit dem Pass verknüpft.</div>
+        <div><b>Bezahlen</b>Karte oder Handy reicht überall, auch in Bus, Tube und auf Märkten. Etwas Bargeld nur zur Sicherheit.</div>
+        <div><b>Strom</b>UK-Adapter (Typ G, Dreipol) mitnehmen, lieber zwei oder drei.</div>
+        <div><b>Wetter</b>Ende September 13–18 °C, Regen jederzeit möglich: Schichten, bequeme Schuhe, kleiner Schirm.</div>
+        <div><b>Verkehr</b>Links schauen! Auf der Straße steht oft „Look right“, daran halten.</div>
+        <div><b>Trinkgeld</b>Meist sind 12,5 % Service Charge auf der Rechnung. Wenn nicht: 10–12 %.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>💶 Budget pro Person</h2>
+      <table class="simple">
+        <tbody>
+          <tr><td>Flug (je nach Abflugort)</td><td class="num">99 – 140 €</td></tr>
+          <tr><td>Unterkunft (Anteil 1/6)</td><td class="num">190 €</td></tr>
+          <tr><td>Bahn zum/vom Flughafen</td><td class="num">30 – 50 €</td></tr>
+          <tr><td>Ironmonger Row Baths</td><td class="num">ca. 50 €</td></tr>
+          <tr><td>Afternoon Tea</td><td class="num">90 – 110 €</td></tr>
+          <tr><td>Essen &amp; Trinken</td><td class="num">150 – 200 €</td></tr>
+          <tr><td>Tate Modern &amp; National Gallery</td><td class="num">kostenlos</td></tr>
+          <tr><th>Zusammen, ohne Shopping</th><th class="num">ca. 610 – 740 €</th></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="btns">
+        <button class="btn sm" id="themeBtn">🌓 Hell/Dunkel</button>
+      </div>
+      <p class="small muted" style="margin:10px 0 0">Auf ein wundervolles Wochenende, viel Spaß, ihr sechs! 💕</p>
+    </div>
+  </section>
+</main>
+
+<dialog id="evDlg" aria-labelledby="evDlgTitle">
+  <form id="evForm" method="dialog" autocomplete="off">
+    <h2 id="evDlgTitle" style="font-size:20px">Programmpunkt</h2>
+    <div>
+      <label class="l" for="eDate">Tag</label>
+      <select id="eDate"></select>
+    </div>
+    <div class="row3">
+      <div><label class="l" for="eFrom">Von</label><input type="time" id="eFrom" required></div>
+      <div><label class="l" for="eTo">Bis (optional)</label><input type="time" id="eTo"></div>
+    </div>
+    <div><label class="l" for="eTz">Uhrzeit gilt für</label><select id="eTz"><option value="">London (Ortszeit)</option><option value="DE">Deutschland (1 Std. später)</option></select></div>
+    <div><label class="l" for="eTitle">Titel</label><input type="text" id="eTitle" maxlength="80" required></div>
+    <div><label class="l" for="eText">Beschreibung</label><textarea id="eText" maxlength="400"></textarea></div>
+    <div><label class="l">Wer ist dabei?</label><div class="checks" id="eWho"></div></div>
+    <div>
+      <label class="l" for="ePlace">Ort</label>
+      <select id="ePlace"></select>
+      <div id="eOrtWrap" style="margin-top:6px"><input type="text" id="eOrt" maxlength="120" placeholder="Name oder Adresse, z. B. Hyde Park Corner"></div>
+    </div>
+    <div class="row2">
+      <div><label class="l" for="eBadge">Hinweis (optional)</label><input type="text" id="eBadge" maxlength="80" placeholder="z. B. Reserviert · 6 Pers."></div>
+      <div><label class="l" for="eBadgeType">Art</label><select id="eBadgeType"><option value="ok">✓ Erledigt</option><option value="warn">! To do</option><option value="acc">ℹ Info</option></select></div>
+    </div>
+    <div><label class="l" for="eUrl">Link (optional)</label><input type="url" id="eUrl" placeholder="https://…"></div>
+    <div class="dlgbtns">
+      <button type="button" class="btn danger" id="eDelete">🗑️ Löschen</button>
+      <span class="btns">
+        <button type="button" class="btn" id="eCancel">Abbrechen</button>
+        <button type="submit" class="btn primary">Speichern</button>
+      </span>
+    </div>
+  </form>
+</dialog>
+
+<nav class="tabs">
+  <div class="wrap">
+    <button data-v="plan"><span class="i">🗓️</span>Plan</button>
+    <button data-v="fx"><span class="i">💷</span>€ ⇄ £</button>
+    <button data-v="map"><span class="i">🗺️</span>Karte</button>
+    <button data-v="transit"><span class="i">🚇</span>ÖPNV</button>
+    <button data-v="cost"><span class="i">💸</span>Kosten</button>
+    <button data-v="info"><span class="i">ℹ️</span>Infos</button>
+  </div>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+/* =====================================================================
+   KONFIGURATION – hier bei Bedarf anpassen
+   ===================================================================== */
+// Google-Tabelle „London 2026 – Kosten“ (Google Drive)
+const SHEET_ID = '1-XBuRIJlECfbVELZru071S7sOIO8NsyPfnWGxKLlkfY';
+// Optional: Web-App-URL des Apps Scripts (siehe Kosten → Einrichtung).
+// Wenn hier eingetragen, können alle direkt in der App Ausgaben speichern.
+const SCRIPT_URL = '';
+// Ersatz-Kurs, falls offline und noch nie ein Kurs geladen wurde (1 € = x £)
+const FALLBACK_RATE = 0.86;
+
+const PEOPLE = ['Ritva', 'Anna', 'Anke', 'Katja', 'Elisa', 'Jelena'];
+const FULLNAMES = { Ritva: 'Ritva Marx', Anna: 'Anna Gleu', Anke: 'Anke Münter', Katja: 'Katja Münter', Elisa: 'Elisa Gleu', Jelena: 'Jelena Gleu' };
+const RA = ['Ritva', 'Anna'], AK = ['Anke', 'Katja'], EJ = ['Elisa', 'Jelena'];
+
+/* =====================================================================
+   ORTE (für Karte und Routen)
+   ===================================================================== */
+const PLACES = {
+  home:      { name: 'Apartment · Commercial Street', lat: 51.5203, lng: -0.0738, q: 'Commercial Street, London E1 6BJ' },
+  borough:   { name: 'Borough Market', lat: 51.5055, lng: -0.0910 },
+  lst:       { name: 'Liverpool Street Station', lat: 51.5178, lng: -0.0823 },
+  bricklane: { name: 'Brick Lane & Spitalfields Market', lat: 51.5212, lng: -0.0722, q: 'Brick Lane, London' },
+  shoreditch:{ name: 'Shoreditch High Street', lat: 51.5243, lng: -0.0776, q: 'Shoreditch High Street, London' },
+  dishoom:   { name: 'Dishoom Shoreditch', lat: 51.5245, lng: -0.0768, q: 'Dishoom Shoreditch, 7 Boundary St, London' },
+  tate:      { name: 'Tate Modern', lat: 51.5076, lng: -0.0994 },
+  baths:     { name: 'Ironmonger Row Baths', lat: 51.5263, lng: -0.0962, q: 'Ironmonger Row Baths, London EC1V' },
+  kensington:{ name: 'Kensington Palace', lat: 51.5058, lng: -0.1877, q: 'Kensington Palace, London W8' },
+  tea:       { name: 'Afternoon Tea (Ort offen)', q: 'Afternoon Tea London' },
+  florattica:{ name: 'Florattica Rooftop Bar', q: 'Florattica Rooftop Bar London' },
+  natgal:    { name: 'National Gallery', lat: 51.5089, lng: -0.1283, q: 'National Gallery, Trafalgar Square, London' },
+  covent:    { name: 'Covent Garden', lat: 51.5117, lng: -0.1240, q: 'Covent Garden Market, London' },
+  sevendials:{ name: 'Seven Dials', lat: 51.5139, lng: -0.1269, q: 'Seven Dials, London' },
+  blacklock: { name: 'Blacklock Shoreditch', lat: 51.5264, lng: -0.0800, q: 'Blacklock Shoreditch, 28 Rivington St, London' },
+  tower:     { name: 'Tower Bridge & Tower of London', lat: 51.5055, lng: -0.0754, q: 'Tower Bridge, London' },
+  stpauls:   { name: "St. Paul's Cathedral & Millennium Bridge", lat: 51.5138, lng: -0.0984, q: "St Paul's Cathedral, London" },
+  southbank: { name: "Southbank · Shakespeare's Globe", lat: 51.5081, lng: -0.0972, q: "Shakespeare's Globe, London" },
+  storage:   { name: 'Kuhauge Storage', q: 'Kuhauge Storage London' },
+  lhr:       { name: 'Heathrow Airport', q: 'Heathrow Airport' },
+  stn:       { name: 'Stansted Airport', q: 'Stansted Airport' },
+  ber:       { name: 'Flughafen BER', q: 'Flughafen Berlin Brandenburg' },
+};
+
+/* =====================================================================
+   REISEPLAN (Zeiten = Ortszeit; tz:'DE' = deutsche Zeit, 1 Std. später als London)
+   ===================================================================== */
+const DAYS = [
+  { date: '2026-09-25', short: 'Fr 25.', title: 'Freitag, 25. September', sub: 'Ankunft · gestaffelt · Shoreditch', color: 'var(--d1)', items: [
+    { t: '04:45', tz: 'DE', who: RA, title: 'Losfahren ab Europaviertel', text: 'Taxi zum BER, vorbestellt. Fahrzeit 35–45 Min. Spätestens 05:35 am BER sein. Bordkarte in der Ryanair-App!', place: 'ber' },
+    { t: '07:35', tz: 'DE', who: RA, title: 'Abflug BER → Stansted', text: 'Ryanair FR177 · Ankunft 08:25 (London). Dann Stansted Express → Liverpool Street (ca. 50 Min).' },
+    { t: '09:30', who: RA, title: 'Borough Market · Frühstück', text: 'Londons ältester Markt: frische Scones, Kaffee, Käse, Streetfood aus aller Welt. Der perfekte erste Moment, während die anderen noch in der Luft sind.', place: 'borough' },
+    { t: '11:30', tz: 'DE', who: AK, title: 'Abflug Düsseldorf', text: 'Eurowings · DUS 11:30 → Heathrow ca. 12:55' },
+    { t: '11:50', tz: 'DE', who: EJ, title: 'Abflug Hannover', text: 'British Airways BA0889 · HAJ 11:50 → Heathrow 12:35' },
+    { t: '13:45', who: [...AK, ...EJ], title: 'Elizabeth Line → Liverpool Street', text: 'Die vier aus Heathrow kommen an. Direkt, ohne Umsteigen, dann 8 Min zu Fuß. Kontaktlos beim Ein- und Aussteigen einchecken.', place: 'lst', from: 'lhr' },
+    { t: '14:00', title: 'Check-in: alle sechs zusammen! 🎉', text: 'Commercial Street E1 6BJ. Gepäck verstauen, frisch machen, kurz durchatmen. Airbnb HMYZJDPPBY · Host Jonathan Hugh', place: 'home', tel: '+442046034447' },
+    { t: '15:30', title: 'Brick Lane & Spitalfields Market', text: 'Londons Open-Air-Galerie mit weltbekannter Street Art. Daneben der viktorianische Markt mit Mode, Vintage und Essen. Direkt vor der Haustür.', place: 'bricklane' },
+    { t: '18:30', title: 'Freie Zeit · Shoreditch-Bars', text: 'Ein Aperitif in einer der Bars an der Shoreditch High Street, oder eine Pause im Apartment nach dem frühen Start.', place: 'shoreditch' },
+    { t: '21:00', title: 'Abendessen: Dishoom Shoreditch', text: 'Bombay der 1920er Jahre, 24 Stunden gekochter schwarzer Dal, legendäre Lamb Chops. 7 Min zu Fuß.', badge: ['ok', 'Reserviert · #94D3XS38LTER · 6 Pers.'], place: 'dishoom' },
+  ]},
+  { date: '2026-09-26', short: 'Sa 26.', title: 'Samstag, 26. September', sub: 'Kunst · Wellness · Afternoon Tea', color: 'var(--d2)', items: [
+    { t: '10:00', title: 'Tate Modern', text: 'Umgebaute Kraftwerkshalle an der Themse: Picasso, Warhol, Rothko, Hockney. Im 10. Stock der beste kostenlose Ausblick Londons.', badge: ['ok', 'Eintritt frei'], place: 'tate', url: 'https://www.tate.org.uk/visit/tate-modern' },
+    { t: '13:00', title: 'Ironmonger Row Baths', text: 'Art-déco-Bad von 1931: türkisches Bad, Dampfräume, Sauna, Eisbecken. Ca. £44 p.P., 10 Min vom Apartment.', badge: ['warn', 'Vorab prüfen: Samstag Frauentag?'], place: 'baths', url: 'https://www.better.org.uk/leisure-centre/london/islington/ironmonger-row-baths' },
+    { t: '15:30', end: '17:00', title: 'Tea Time im Kensington Palace', text: 'Tea Time im Kensington Palace, dem Zuhause von Queen Victoria und Prinzessin Diana, mitten in den Kensington Gardens. 90 Minuten.', place: 'kensington', url: 'https://www.hrp.org.uk/kensington-palace/' },
+    { t: '16:30', title: 'Afternoon Tea', text: 'Fingersandwiches, warme Scones mit Clotted Cream und Erdbeermarmelade, Petit Fours auf der Etagère.', badge: ['warn', "Ort offen: Claridge's / Savoy / Brown's / Dorchester"], place: 'tea' },
+    { t: '19:30', title: 'Florattica Rooftop Bar', text: 'Cocktails auf dem Dach, umgeben von Blumeninstallationen, mit der Skyline der City. Der schönste Schlusspunkt.', place: 'florattica' },
+  ]},
+  { date: '2026-09-27', short: 'So 27.', title: 'Sonntag, 27. September', sub: 'Alte Meister · Shopping · Steak', color: 'var(--d3)', items: [
+    { t: '10:00', title: 'National Gallery', text: 'Van Goghs Sonnenblumen, da Vinci, Monet, Rembrandt, Velázquez, direkt am Trafalgar Square.', badge: ['ok', 'Eintritt frei'], place: 'natgal', url: 'https://www.nationalgallery.org.uk' },
+    { t: '12:30', title: 'Covent Garden', text: 'Markthalle aus dem 17. Jh., Pflasterstraßen, Straßenkünstler und Live-Musik. Shopping mit Seele.', place: 'covent' },
+    { t: '14:30', title: 'Seven Dials', text: 'Sieben Straßen, eine Säule: Indie-Labels, Vintage-Shops und Designerboutiquen. 3 Min zu Fuß von Covent Garden.', place: 'sevendials' },
+    { t: '20:30', title: 'Abendessen: Blacklock Shoreditch', text: 'Umgebaute Fabrikhalle, Kerzenlicht, offene Grills, das beste Dry-Aged-Steak der Stadt.', badge: ['warn', 'Noch zu reservieren · Tisch für 6'], place: 'blacklock', url: 'https://theblacklock.com' },
+  ]},
+  { date: '2026-09-28', short: 'Mo 28.', title: 'Montag, 28. September', sub: 'Sightseeing · gestaffelte Abreise', color: 'var(--d4)', items: [
+    { t: '08:00', title: 'Tower Bridge & Tower of London', text: 'Das ikonischste Bild Londons im Morgenlicht. Vom Apartment 15 Min zu Fuß. Tower of London optional ca. £33, öffnet 09:00.', place: 'tower' },
+    { t: '10:00', title: "St. Paul's Cathedral & Millennium Bridge", text: 'Wrens goldene Kuppel. Von der Tower Bridge 15 Min zu Fuß über die Millennium Bridge.', place: 'stpauls' },
+    { t: '11:00', title: 'Southbank-Promenade', text: "Shakespeare's Globe, Straßenkünstler, Kaffee mit Flussblick. Noch einmal alle sechs zusammen.", place: 'southbank' },
+    { t: '12:00', title: 'Check-out & Gepäck zu Kuhauge Storage', text: 'Late Check-out bis 12:00 ist bezahlt. Koffer zur Storage bringen, ca. £8–12 pro Koffer.', place: 'storage' },
+    { t: '12:15', who: AK, title: 'Anke & Katja: Aufbruch nach Heathrow', text: 'Elizabeth Line ab Liverpool Street, ca. 45 Min. Am Flughafen ca. 13:15. Eurowings LHR 14:45 → DUS ca. 16:10', place: 'lhr', from: 'lst' },
+    { t: '15:15', who: EJ, title: 'Elisa & Jelena: Gepäck holen & Aufbruch', text: 'Elizabeth Line ab Liverpool Street. Am Flughafen ca. 16:15. BA0894 · LHR 18:00 → HAJ 20:35', place: 'lhr', from: 'lst' },
+    { t: '17:00', who: RA, title: 'Ritva & Anna: Gepäck holen & Stansted Express', text: 'Ab Liverpool Street, ca. 50 Min. Am Flughafen ca. 18:20. Ryanair FR176 · STN 20:00 → BER 22:45', place: 'stn', from: 'lst', url: 'https://www.stanstedexpress.com' },
+  ]},
+];
+
+const FLIGHTS = [
+  { who: 'Ritva & Anna · ab Berlin', legs: [['HIN Fr 25.09.', 'Ryanair FR177', 'BER 07:35 → STN 08:25'], ['RÜCK Mo 28.09.', 'Ryanair FR176', 'STN 20:00 → BER 22:45']], note: 'Reservierung C3Q78A · Bordkarte NUR in der Ryanair-App!' },
+  { who: 'Anke & Katja · ab Düsseldorf', legs: [['HIN Fr 25.09.', 'Eurowings', 'DUS 11:30 → LHR ca. 12:55'], ['RÜCK Mo 28.09.', 'Eurowings', 'LHR 14:45 → DUS ca. 16:10']] },
+  { who: 'Elisa & Jelena · ab Hannover', legs: [['HIN Fr 25.09.', 'British Airways BA0889', 'HAJ 11:50 → LHR 12:35'], ['RÜCK Mo 28.09.', 'British Airways BA0894', 'LHR 18:00 → HAJ 20:35']] },
+];
+
+const CODES = [
+  ['Airbnb-Bestätigungscode', 'HMYZJDPPBY'],
+  ['Host Jonathan Hugh', '+44 20 4603 4447', 'tel:+442046034447'],
+  ['Ryanair-Reservierung', 'C3Q78A'],
+  ['Dishoom-Reservierung', '#94D3XS38LTER'],
+];
+
+/* =====================================================================
+   HILFSFUNKTIONEN
+   ===================================================================== */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('ldn26_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('ldn26_' + k, JSON.stringify(v)); } catch (e) {} },
+};
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 2200); }
+function copy(text) {
+  (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => toast('Kopiert ✓')).catch(() => {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('Kopiert ✓'); } catch (e) {} ta.remove();
+  });
+}
+function parseNum(s) {
+  if (typeof s === 'number') return s;
+  s = String(s ?? '').replace(/[^\d.,\-]/g, '');
+  if (!s) return NaN;
+  if (s.includes(',') && s.includes('.')) s = s.lastIndexOf(',') > s.lastIndexOf('.') ? s.replace(/\./g, '').replace(',', '.') : s.replace(/,/g, '');
+  else s = s.replace(',', '.');
+  return parseFloat(s);
+}
+const fmt = (n, cur) => new Intl.NumberFormat('de-DE', { style: 'currency', currency: cur, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+const fmtNum = (n, d = 2) => new Intl.NumberFormat('de-DE', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
+
+// Aktuelle Uhrzeit in London / Deutschland als "YYYY-MM-DD HH:MM"
+function zoneNow(tz) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date()).map(x => [x.type, x.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
+}
+// Termin in Londoner Zeit umrechnen (deutsche Zeit = London + 1 Std.)
+function londonKey(day, it) {
+  let [h, m] = it.t.split(':').map(Number);
+  if (it.tz === 'DE') h = Math.max(0, h - 1);
+  return `${day.date} ${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+function routeUrl(p, fromKey) {
+  const dest = p.lat != null ? `${p.lat},${p.lng}` : encodeURIComponent(p.q || p.name);
+  let u = `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=transit`;
+  if (fromKey) { const f = PLACES[fromKey]; u += `&origin=${f.lat != null ? f.lat + ',' + f.lng : encodeURIComponent(f.q || f.name)}`; }
+  return u;
+}
+function mapsUrl(p) { return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.q || p.name)}`; }
+function cmUrl(p) { return p.lat != null ? `https://citymapper.com/directions?endcoord=${p.lat},${p.lng}&endname=${encodeURIComponent(p.name)}` : null; }
+
+/* =====================================================================
+   „ICH BIN“-AUSWAHL
+   ===================================================================== */
+let ME = store.get('me', '');
+function renderMe() {
+  const row = $('#meRow');
+  row.innerHTML = '<span>Ich bin:</span>' + PEOPLE.map(p => `<button class="chip ${p === ME ? 'on' : ''}" data-p="${p}">${p}</button>`).join('');
+  row.querySelectorAll('button').forEach(b => b.onclick = () => {
+    const next = ME === b.dataset.p ? '' : b.dataset.p;
+    if (sharing && ME && next !== ME) setSharing(false);
+    ME = next; store.set('me', ME); renderMe(); renderPlan(); fillForm(); renderShareBox();
+  });
+}
+
+/* =====================================================================
+   PLAN – Daten
+   Programm = Originalplan (DAYS) + Änderungen aus dem Google Sheet (Tab
+   „Programm“, für alle) + Änderungen auf diesem Gerät (noch nicht
+   übertragen bzw. ohne Apps Script nur lokal). Jede Änderung ersetzt einen
+   Programmpunkt komplett über seine ID; Löschen = Eintrag mit deleted.
+   ===================================================================== */
+const BUILTIN = DAYS.flatMap(d => {
+  const seen = {};
+  return d.items.map(it => {
+    let id = `${d.date}_${it.t}`;
+    seen[id] = (seen[id] || 0) + 1;
+    if (seen[id] > 1) id += '_' + seen[id];
+    return { ...it, id, date: d.date };
+  });
+});
+let progSheet = store.get('progSheet', {});   // id -> Programmpunkt (aus Google Sheets)
+let progLocal = store.get('progLocal', {});   // id -> Programmpunkt (dieses Gerät)
+function effectiveItems() {
+  const map = new Map(BUILTIN.map(i => [i.id, i]));
+  for (const src of [progSheet, progLocal]) {
+    for (const [id, o] of Object.entries(src)) {
+      const base = BUILTIN.find(b => b.id === id) || {};
+      map.set(id, { ...base, ...o, id });
+    }
+  }
+  return [...map.values()].filter(i => !i.deleted && DAYS.some(d => d.date === i.date));
+}
+function planDays() {
+  const items = effectiveItems();
+  return DAYS.map(d => ({ ...d, items: items.filter(i => i.date === d.date).sort((x, y) => londonKey(d, x).localeCompare(londonKey(d, y))) }));
+}
+function placeOf(it) {
+  if (it.place && PLACES[it.place]) return PLACES[it.place];
+  if (it.ort) return { name: it.ort, q: it.ort };
+  return null;
+}
+const safeUrl = u => /^https?:\/\//i.test(String(u || '').trim()) ? String(u).trim() : '';
+
+/* =====================================================================
+   PLAN – Anzeige
+   ===================================================================== */
+let curDay = null;
+function allEvents(days) { return days.flatMap((d, di) => d.items.map(it => ({ d, di, it, key: londonKey(d, it) }))); }
+const timeLabel = it => `${it.t}${it.end ? '–' + it.end : ''}${it.tz === 'DE' ? ' (dt. Zeit)' : ''}`;
+function renderPlan() {
+  const days = planDays();
+  const now = zoneNow('Europe/London'), nowKey = `${now.date} ${now.time}`;
+  if (curDay === null) {
+    const idx = days.findIndex(d => d.date === now.date);
+    curDay = idx >= 0 ? idx : (now.date > days[days.length - 1].date ? days.length - 1 : 0);
+  }
+  // Als Nächstes
+  const evs = allEvents(days).filter(e => !ME || !e.it.who || e.it.who.includes(ME));
+  const nxt = evs.find(e => e.key >= nowKey);
+  const nc = $('#nextCard');
+  const start = new Date('2026-09-25T00:00:00+02:00');
+  if (now.date < '2026-09-25') {
+    const n = Math.ceil((start - new Date()) / 86400000);
+    nc.innerHTML = `<div class="lbl">Countdown</div><h2 style="margin:4px 0">${n <= 1 ? 'Morgen geht’s los! ✈️' : `Noch ${n} Tage bis London ✈️`}</h2>
+      ${nxt ? `<p class="small muted" style="margin:0">Erster Termin${ME ? ' für ' + esc(ME) : ''}: <b>${esc(nxt.it.title)}</b> · ${esc(nxt.d.short)} ${timeLabel(nxt.it)}</p>` : ''}
+      <p class="small" style="margin:8px 0 0">🛂 Reisepass · 🔌 UK-Adapter · ☂️ Schirm · 📱 Ryanair-App</p>`;
+  } else if (nxt) {
+    nc.innerHTML = `<div class="lbl">Als Nächstes · ${esc(nxt.d.short)} ${timeLabel(nxt.it)}</div><h2 style="margin:4px 0">${esc(nxt.it.title)}</h2>
+      <p class="small muted" style="margin:0">${esc(nxt.it.text)}</p>${placeOf(nxt.it) ? `<div class="btns" style="margin-top:8px">${placeBtns(nxt.it)}</div>` : ''}`;
+  } else {
+    nc.innerHTML = `<div class="lbl">Reise vorbei</div><h2 style="margin:4px 0">Schön war’s! 💕</h2><p class="small muted" style="margin:0">Nicht vergessen: im Tab <b>Kosten</b> abrechnen.</p>`;
+  }
+  // Tagestabs
+  $('#dayTabs').innerHTML = days.map((d, i) => `<button class="${i === curDay ? 'on' : ''}" data-i="${i}"><b>Tag ${i + 1}${d.date === now.date ? ' · heute' : ''}</b><span>${d.short} · ${d.sub.split(' · ')[0]}</span></button>`).join('');
+  $('#dayTabs').querySelectorAll('button').forEach(b => b.onclick = () => { curDay = +b.dataset.i; renderPlan(); });
+  // Tag
+  const d = days[curDay];
+  const items = d.items.map((it, i) => {
+    const k = londonKey(d, it);
+    const endK = it.end ? londonKey(d, { t: it.end, tz: it.tz }) : (i + 1 < d.items.length ? londonKey(d, d.items[i + 1]) : `${d.date} 23:59`);
+    const cls = [k <= nowKey && endK > nowKey ? 'now' : (endK <= nowKey ? 'past' : '')];
+    if (ME && it.who) cls.push(it.who.includes(ME) ? 'mine' : 'notmine');
+    const pending = progLocal[it.id] && cfg.script;
+    return `<div class="ev ${cls.join(' ')}">
+      <div class="t">${it.t}${it.end ? `<small>bis ${it.end}</small>` : ''}${it.tz === 'DE' ? '<small>dt. Zeit</small>' : ''}</div>
+      <div class="card">
+        <button class="edit" data-id="${esc(it.id)}" aria-label="Bearbeiten" title="Bearbeiten">✏️</button>
+        <h3>${esc(it.title)}</h3>
+        ${it.badge ? `<span class="badge ${esc(it.badge[0])}" style="margin-top:4px">${esc(it.badge[1])}</span>` : ''}
+        ${pending ? ' <span class="badge warn">⏳ wird gesendet</span>' : ''}
+        ${it.text ? `<p class="muted">${esc(it.text)}</p>` : ''}
+        ${it.who ? `<div class="who">${it.who.map(w => `<i>${esc(w)}</i>`).join('')}</div>` : ''}
+        ${(placeOf(it) || it.url || it.tel) ? `<div class="btns">${placeBtns(it)}</div>` : ''}
+      </div></div>`;
+  }).join('');
+  const localOnly = !cfg.script && Object.keys(progLocal).length;
+  $('#dayView').innerHTML = `<div class="dayhead"><span class="badge acc">Tag ${curDay + 1}</span><h2 style="margin-top:6px">${d.title}</h2><div class="muted small">${d.sub}</div></div>
+    ${localOnly ? `<div class="note small" style="margin-bottom:12px">📱 Deine Änderungen am Programm sind <b>nur auf diesem Gerät</b> gespeichert. Damit alle sie sehen, muss das Apps Script eingerichtet sein (Kosten → Einrichtung). <a href="#" id="dropLocal">Änderungen verwerfen</a></div>` : ''}
+    <div class="timeline">${items || '<p class="muted small">Noch keine Programmpunkte.</p>'}</div>
+    <button class="btn" id="addEv" style="width:100%;margin-bottom:14px">➕ Programmpunkt hinzufügen</button>`;
+  // Noch offen: alle Programmpunkte mit „To do“-Hinweis
+  const todos = days.flatMap(dd => dd.items.filter(it => it.badge && it.badge[0] === 'warn').map(it => ({ dd, it })));
+  $('#todos').innerHTML = todos.length ? todos.map(({ dd, it }) => `<div><span class="badge warn">To do</span> <b style="display:inline">${esc(it.title)}</b> · ${esc(dd.short)} ${esc(timeLabel(it))}<br><span class="muted">${esc(it.badge[1])}</span>${safeUrl(it.url) ? ` · <a href="${esc(safeUrl(it.url))}" target="_blank" rel="noopener">Website</a>` : ''}</div>`).join('')
+    : '<p class="small muted" style="margin:0">Alles erledigt 🎉</p>';
+  $('#dayView').querySelectorAll('button.edit').forEach(b => b.onclick = () => openEditor(b.dataset.id));
+  $('#addEv').onclick = () => openEditor(null, d.date);
+  const dl = $('#dropLocal');
+  if (dl) dl.onclick = e => { e.preventDefault(); if (confirm('Alle Änderungen am Programm auf diesem Gerät verwerfen?')) { progLocal = {}; store.set('progLocal', progLocal); planChanged(); } };
+}
+function placeBtns(it) {
+  const out = [];
+  const p = placeOf(it);
+  if (p) {
+    out.push(`<a class="btn sm" target="_blank" rel="noopener" href="${esc(routeUrl(p, it.from))}">🧭 Route</a>`);
+    const cm = cmUrl(p); if (cm) out.push(`<a class="btn sm" target="_blank" rel="noopener" href="${esc(cm)}">Citymapper</a>`);
+    if (p.lat != null) out.push(`<button class="btn sm" onclick="showOnMap('${esc(it.place)}')">🗺️ Karte</button>`);
+    else out.push(`<a class="btn sm" target="_blank" rel="noopener" href="${esc(mapsUrl(p))}">🔎 Suchen</a>`);
+  }
+  if (it.tel) out.push(`<a class="btn sm" href="tel:${esc(it.tel)}">📞 Host</a>`);
+  if (safeUrl(it.url)) out.push(`<a class="btn sm" target="_blank" rel="noopener" href="${esc(safeUrl(it.url))}">🌐 Website</a>`);
+  return out.join('');
+}
+function planChanged() {
+  renderPlan();
+  if (map) buildDayMarkers();
+}
+
+/* =====================================================================
+   PLAN – Bearbeiten, Hinzufügen, Löschen
+   ===================================================================== */
+let editing = null;
+function openEditor(id, date) {
+  const it = id ? effectiveItems().find(i => i.id === id) : { id: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), date, t: '', title: '', text: '', isNew: true };
+  if (!it) return;
+  editing = it;
+  $('#evDlgTitle').textContent = it.isNew ? 'Programmpunkt hinzufügen' : 'Programmpunkt bearbeiten';
+  $('#eDate').innerHTML = DAYS.map(d => `<option value="${d.date}" ${d.date === it.date ? 'selected' : ''}>${d.title}</option>`).join('');
+  $('#eFrom').value = it.t || ''; $('#eTo').value = it.end || '';
+  $('#eTz').value = it.tz === 'DE' ? 'DE' : '';
+  $('#eTitle').value = it.title || ''; $('#eText').value = it.text || '';
+  $('#eWho').innerHTML = PEOPLE.map(p => `<label><input type="checkbox" value="${p}" ${!it.who || it.who.includes(p) ? 'checked' : ''}> ${p}</label>`).join('');
+  const known = it.place && PLACES[it.place];
+  $('#ePlace').innerHTML = `<option value="">– kein Ort –</option>` + Object.entries(PLACES).map(([k, p]) => `<option value="${k}" ${k === it.place ? 'selected' : ''}>${esc(p.name)}</option>`).join('') + `<option value="__custom" ${!known && it.ort ? 'selected' : ''}>Eigener Ort / Adresse …</option>`;
+  $('#eOrt').value = known ? '' : (it.ort || '');
+  $('#eOrtWrap').style.display = $('#ePlace').value === '__custom' ? '' : 'none';
+  $('#eBadge').value = it.badge ? it.badge[1] : '';
+  $('#eBadgeType').value = it.badge ? it.badge[0] : 'warn';
+  $('#eUrl').value = it.url || '';
+  $('#eDelete').style.display = it.isNew ? 'none' : '';
+  const dlg = $('#evDlg');
+  if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+}
+function closeEditor() { const dlg = $('#evDlg'); if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); editing = null; }
+function saveProgItem(item) {
+  item.stamp = Date.now(); item.by = ME || '';
+  delete item.isNew;
+  progLocal[item.id] = item; store.set('progLocal', progLocal);
+  curDay = DAYS.findIndex(d => d.date === item.date);
+  planChanged();
+  flushProg();
+}
+function submitEditor(e) {
+  e.preventDefault();
+  const t = normTime($('#eFrom').value), end = normTime($('#eTo').value);
+  const title = $('#eTitle').value.trim();
+  if (!t) return toast('Bitte eine Startzeit angeben');
+  if (!title) return toast('Bitte einen Titel angeben');
+  if (end && end <= t) return toast('„Bis“ muss nach „Von“ liegen');
+  const who = [...document.querySelectorAll('#eWho input:checked')].map(c => c.value);
+  if (!who.length) return toast('Wer ist dabei?');
+  const pv = $('#ePlace').value, ort = $('#eOrt').value.trim();
+  const badge = $('#eBadge').value.trim();
+  saveProgItem({
+    id: editing.id, date: $('#eDate').value, t, end: end || '', tz: $('#eTz').value || '',
+    title, text: $('#eText').value.trim(), who: who.length === PEOPLE.length ? null : who,
+    place: pv && pv !== '__custom' ? pv : null, ort: pv === '__custom' ? ort : '',
+    badge: badge ? [$('#eBadgeType').value, badge] : null, url: safeUrl($('#eUrl').value),
+  });
+  closeEditor(); toast('Gespeichert ✓');
+}
+function deleteEditing() {
+  if (!editing || !confirm(`„${editing.title}“ wirklich löschen?`)) return;
+  saveProgItem({ id: editing.id, date: editing.date, deleted: true });
+  closeEditor(); toast('Gelöscht');
+}
+function normTime(v) {
+  const m = String(v || '').match(/(\d{1,2})[:.](\d{2})/);
+  if (!m || +m[1] > 23 || +m[2] > 59) return '';
+  return `${m[1].padStart(2, '0')}:${m[2]}`;
+}
+
+/* ---------- Programm ⇄ Google Sheets (Tab „Programm“) ---------- */
+const PROG_HEAD = ['ID', 'Gelöscht', 'Datum', 'Von', 'Bis', 'Zeitzone', 'Titel', 'Beschreibung', 'Wer', 'Ort', 'Hinweis', 'Hinweis-Typ', 'Link', 'Geändert von', 'Stand'];
+function progToRow(it) {
+  return [it.id, it.deleted ? 'x' : '', it.date, it.t || '', it.end || '', it.tz || '', it.title || '', it.text || '',
+    it.who ? it.who.join(', ') : 'alle', it.place || it.ort || '', it.badge ? it.badge[1] : '', it.badge ? it.badge[0] : '',
+    it.url || '', it.by || '', String(it.stamp || '')];
+}
+function normDate(v) {
+  v = String(v || '').trim();
+  let m = v.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = v.match(/^Date\((\d{4}),(\d{1,2}),(\d{1,2})/); if (m) return `${m[1]}-${String(+m[2] + 1).padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = v.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/); if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+  return v;
+}
+function rowsToProg(rows) {
+  if (!rows || !rows.length) return {};
+  const head = rows[0].map(h => String(h).trim().toLowerCase());
+  const ix = n => head.indexOf(n.toLowerCase());
+  if (ix('ID') < 0 || ix('Titel') < 0) return {};   // kein Programm-Tab
+  const g = (r, n) => { const i = ix(n); return i >= 0 ? String(r[i] ?? '').trim() : ''; };
+  const out = {};
+  rows.slice(1).forEach(r => {
+    const id = g(r, 'ID'); if (!id) return;
+    const date = normDate(g(r, 'Datum'));
+    if (g(r, 'Gelöscht')) { out[id] = { id, date, deleted: true, stamp: +g(r, 'Stand') || 0 }; return; }
+    const ortV = g(r, 'Ort'), whoV = g(r, 'Wer'), badge = g(r, 'Hinweis');
+    const who = /^(alle.*)?$/i.test(whoV) ? null : [...new Set(whoV.split(/[,;&+\/]|\s+und\s+|\s+/).map(matchPerson).filter(Boolean))];
+    out[id] = {
+      id, date, t: normTime(g(r, 'Von')), end: normTime(g(r, 'Bis')), tz: /^de/i.test(g(r, 'Zeitzone')) ? 'DE' : '',
+      title: g(r, 'Titel'), text: g(r, 'Beschreibung'), who: who && who.length && who.length < PEOPLE.length ? who : null,
+      place: PLACES[ortV] ? ortV : null, ort: PLACES[ortV] ? '' : ortV,
+      badge: badge ? [['ok', 'warn', 'acc'].includes(g(r, 'Hinweis-Typ')) ? g(r, 'Hinweis-Typ') : 'warn', badge] : null,
+      url: safeUrl(g(r, 'Link')), by: g(r, 'Geändert von'), stamp: +g(r, 'Stand') || 0,
+    };
+    if (!out[id].t) delete out[id];
+  });
+  return out;
+}
+async function loadProgram(afterFlush) {
+  try {
+    let rows;
+    if (cfg.script) {
+      const r = await fetch(cfg.script + (cfg.script.includes('?') ? '&' : '?') + 'tab=Programm&t=' + Date.now());
+      rows = (await r.json()).rows;
+    } else {
+      rows = await gvizRows(cfg.sheet, 'Programm');
+    }
+    progSheet = rowsToProg(rows);
+    store.set('progSheet', progSheet);
+    // Lokale Änderungen, die im Sheet angekommen sind, entfernen
+    if (cfg.script) {
+      let changed = false;
+      for (const [id, it] of Object.entries(progLocal)) {
+        if (progSheet[id] && progSheet[id].stamp >= it.stamp) { delete progLocal[id]; changed = true; }
+      }
+      if (changed) store.set('progLocal', progLocal);
+    }
+  } catch (e) { /* offline oder Tab fehlt: letzter Stand bleibt */ }
+  planChanged();
+  if (!afterFlush && cfg.script && Object.keys(progLocal).length) flushProg();
+}
+async function flushProg() {
+  if (!cfg.script || flushProg.busy || !Object.keys(progLocal).length) return;
+  flushProg.busy = true;
+  let sent = 0;
+  for (const it of Object.values(progLocal)) {
+    try {
+      await fetch(cfg.script, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'prog', row: progToRow(it) }) });
+      sent++;
+    } catch (e) { break; }
+  }
+  flushProg.busy = false;
+  if (sent) setTimeout(() => loadProgram(true), 1500);
+}
+function renderFlights() {
+  $('#flights').innerHTML = FLIGHTS.map(f => `<div class="fl"><b>${esc(f.who)}</b>
+    ${f.legs.map(l => `<div class="leg"><span class="muted">${l[0]} · ${l[1]}</span><span><b>${l[2]}</b></span></div>`).join('')}
+    ${f.note ? `<div class="small" style="margin-top:6px"><span class="badge warn">${esc(f.note)}</span></div>` : ''}</div>`).join('');
+}
+
+/* =====================================================================
+   UHREN
+   ===================================================================== */
+function tick() {
+  $('#clkL').textContent = zoneNow('Europe/London').time;
+  $('#clkD').textContent = zoneNow('Europe/Berlin').time;
+}
+
+/* =====================================================================
+   WÄHRUNGSRECHNER (EZB-Kurs über frankfurter.app)
+   ===================================================================== */
+let fx = store.get('fx', null); // { rate, date, fetched, manual }
+const rate = () => (fx && fx.rate) || FALLBACK_RATE; // 1 € = rate £
+function showRate() {
+  const r = rate();
+  let src = fx ? (fx.manual ? 'selbst eingegeben' : `EZB-Referenzkurs vom ${new Date(fx.date).toLocaleDateString('de-DE')}`) : 'Ersatzwert (noch nicht geladen)';
+  $('#rateInfo').innerHTML = `<b>1 € = ${fmtNum(r, 4)} £</b> · 1 £ = ${fmtNum(1 / r, 4)} € <br>${src}`;
+  const q1 = [1, 5, 10, 20, 50, 100], q2 = [5, 10, 20, 50, 100, 200];
+  $('#quickGBP').innerHTML = q1.map(v => `<div><b>£${v}</b><span>${fmt(v / r, 'EUR')}</span></div>`).join('');
+  $('#quickEUR').innerHTML = q2.map(v => `<div><b>${v} €</b><span>${fmt(v * r, 'GBP')}</span></div>`).join('');
+  convert(lastEdited);
+  if (window.renderCosts) renderCosts();
+}
+async function loadRate(force) {
+  if (fx && fx.manual && !force) return showRate();
+  if (fx && !force && Date.now() - fx.fetched < 6 * 3600e3) return showRate();
+  try {
+    const r = await fetch('https://api.frankfurter.app/latest?from=EUR&to=GBP');
+    const j = await r.json();
+    if (j && j.rates && j.rates.GBP) { fx = { rate: j.rates.GBP, date: j.date, fetched: Date.now() }; store.set('fx', fx); }
+  } catch (e) { if (force) toast('Offline: letzter Kurs wird verwendet'); }
+  showRate();
+}
+let lastEdited = 'gbp';
+function convert(src) {
+  const g = $('#inGBP'), e = $('#inEUR'), r = rate();
+  if (src === 'gbp') { const v = parseNum(g.value); e.value = isNaN(v) ? '' : fmtNum(v / r); }
+  else { const v = parseNum(e.value); g.value = isNaN(v) ? '' : fmtNum(v * r); }
+}
+
+/* =====================================================================
+   KARTE (Leaflet + OpenStreetMap)
+   ===================================================================== */
+let map, markers = {}, dayLayers = [], homeLayer, hiddenDays = new Set();
+function mapMarker(p, color, label, cls, info) {
+  const icon = L.divIcon({ className: '', html: `<div class="pin ${cls || ''}" style="background:${color}"><b>${label}</b></div>`, iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -26] });
+  const cm = cmUrl(p);
+  return L.marker([p.lat, p.lng], { icon }).bindPopup(`<b>${esc(p.name)}</b>${info ? `<br><span style="color:#6b6f85">${info}</span>` : ''}
+    <div class="btns"><a class="btn sm" target="_blank" rel="noopener" href="${esc(routeUrl(p))}">🧭 Route</a>${cm ? `<a class="btn sm" target="_blank" rel="noopener" href="${esc(cm)}">Citymapper</a>` : ''}</div>`);
+}
+function initMap() {
+  if (map || !window.L) { if (!window.L) $('#mapOffline').style.display = 'block'; return; }
+  map = L.map('map', { zoomControl: true }).setView([51.513, -0.11], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
+  markers.home = mapMarker(PLACES.home, 'var(--navy)', '🏠', 'home', 'Unser Apartment · Check-in Fr ab 14:00');
+  markers.lst = mapMarker(PLACES.lst, '#6950a1', 'LS', '', 'Elizabeth Line · Stansted Express');
+  homeLayer = L.layerGroup([markers.home, markers.lst]).addTo(map);
+  buildDayMarkers();
+  map.on('locationfound', e => {
+    if (map._me) map.removeLayer(map._me);
+    map._me = L.circleMarker(e.latlng, { radius: 8, color: '#fff', weight: 3, fillColor: '#2f7cf6', fillOpacity: 1 }).addTo(map).bindPopup('Du bist hier').openPopup();
+  });
+  map.on('locationerror', () => toast('Standort nicht verfügbar'));
+}
+// Pins aus dem aktuellen (ggf. bearbeiteten) Programm neu aufbauen
+function buildDayMarkers() {
+  dayLayers.forEach(g => map.removeLayer(g));
+  dayLayers = [];
+  Object.keys(markers).forEach(k => { if (k !== 'home' && k !== 'lst') delete markers[k]; });
+  planDays().forEach((d, di) => {
+    const color = getComputedStyle(document.documentElement).getPropertyValue(['--d1', '--d2', '--d3', '--d4'][di]).trim();
+    const grp = L.layerGroup();
+    d.items.forEach(it => {
+      if (!it.place || it.place === 'home' || it.place === 'lst' || markers[it.place]) return;
+      const p = PLACES[it.place]; if (!p || p.lat == null) return;
+      const m = mapMarker(p, color, `${di + 1}`, '', `${d.short} ${esc(timeLabel(it))} · ${esc(it.title)}`);
+      markers[it.place] = m; grp.addLayer(m);
+    });
+    if (!hiddenDays.has(di)) grp.addTo(map);
+    dayLayers.push(grp);
+  });
+  const leg = $('#legend');
+  leg.innerHTML = DAYS.map((d, i) => `<button data-i="${i}" class="${hiddenDays.has(i) ? 'off' : ''}"><span class="dot" style="background:${d.color}"></span>Tag ${i + 1} · ${d.short}</button>`).join('');
+  leg.querySelectorAll('button').forEach(b => b.onclick = () => {
+    const i = +b.dataset.i, g = dayLayers[i];
+    if (hiddenDays.has(i)) { hiddenDays.delete(i); g.addTo(map); b.classList.remove('off'); }
+    else { hiddenDays.add(i); map.removeLayer(g); b.classList.add('off'); }
+  });
+}
+function showOnMap(key) {
+  switchView('map');
+  setTimeout(() => {
+    const m = markers[key]; if (!m) return;
+    dayLayers.forEach((g, i) => { if (g.hasLayer(m) && hiddenDays.has(i)) { hiddenDays.delete(i); buildDayMarkers(); } });
+    map.setView(m.getLatLng(), 16); markers[key].openPopup();
+  }, 120);
+}
+
+/* =====================================================================
+   STANDORTE TEILEN (über Apps Script, Tab „Standorte“)
+   ===================================================================== */
+const PCOLORS = { Ritva: '#c8325a', Anna: '#7a4fc2', Anke: '#1f7a8c', Katja: '#d9822b', Elisa: '#2f7cf6', Jelena: '#1f8a5b' };
+let sharing = store.get('sharing', false);
+let locs = {};                 // Name -> { lat, lng, acc, stamp }
+let locWatch = null, lastSent = null, locPoll = null, peopleLayer = null, peopleMarkers = {};
+const agoText = ms => { const m = Math.round((Date.now() - ms) / 60000); return m < 1 ? 'gerade eben' : m < 60 ? `vor ${m} Min` : m < 1440 ? `vor ${Math.floor(m / 60)} Std` : 'vor über einem Tag'; };
+function distM(a, b) { const R = 6371e3, r = x => x * Math.PI / 180, dLa = r(b.lat - a.lat), dLo = r(b.lng - a.lng); const h = Math.sin(dLa / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); }
+async function sendLoc(pos) {
+  if (!cfg.script || !ME) return;
+  const body = pos ? { action: 'loc', name: ME, lat: +pos.lat.toFixed(5), lng: +pos.lng.toFixed(5), acc: pos.acc } : { action: 'loc', name: ME, lat: null, lng: null };
+  try { await fetch(cfg.script, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) }); } catch (e) {}
+}
+function startSharing() {
+  if (!navigator.geolocation) return toast('Standort wird von diesem Browser nicht unterstützt');
+  if (locWatch !== null) return;
+  locWatch = navigator.geolocation.watchPosition(p => {
+    const pos = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy, t: Date.now() };
+    locs[ME] = { ...pos, stamp: pos.t };
+    renderPeople();
+    // Höchstens alle 60 s senden oder wenn mehr als 40 m bewegt
+    if (!lastSent || Date.now() - lastSent.t > 60000 || distM(lastSent, pos) > 40) { lastSent = pos; sendLoc(pos); }
+  }, err => {
+    toast(err.code === 1 ? 'Standortzugriff wurde nicht erlaubt' : 'Standort nicht verfügbar');
+    if (err.code === 1) setSharing(false);
+  }, { enableHighAccuracy: true, maximumAge: 20000, timeout: 30000 });
+}
+function stopSharing() {
+  if (locWatch !== null) navigator.geolocation.clearWatch(locWatch);
+  locWatch = null; lastSent = null;
+}
+function setSharing(on) {
+  sharing = on; store.set('sharing', on);
+  if (on) { startSharing(); toast('Dein Standort wird geteilt'); }
+  else { stopSharing(); if (ME) { delete locs[ME]; sendLoc(null); } toast('Standort-Freigabe beendet'); }
+  renderShareBox(); renderPeople();
+}
+function renderShareBox() {
+  const box = $('#shareBox');
+  if (!cfg.script) {
+    box.innerHTML = `<div class="note small">Zum Teilen der Standorte muss einmalig das Apps Script eingerichtet sein. <a href="#" id="toSetup">Zur Einrichtung</a></div>`;
+    $('#toSetup').onclick = e => { e.preventDefault(); switchView('cost'); $('#setup').open = true; setTimeout(() => $('#setup').scrollIntoView(), 50); };
+    return;
+  }
+  if (!ME) { box.innerHTML = `<div class="note small">Bitte oben bei <b>„Ich bin“</b> deinen Namen antippen, dann kannst du deinen Standort freigeben.</div>`; return; }
+  box.innerHTML = `<label class="switch"><span><b>Meinen Standort teilen</b><br><span class="small muted">als ${esc(ME)} · ${sharing ? 'wird geteilt' : 'aus'}</span></span><input type="checkbox" id="shareToggle" ${sharing ? 'checked' : ''}></label>`;
+  $('#shareToggle').onchange = e => setSharing(e.target.checked);
+}
+async function loadLocs() {
+  if (!cfg.script) return renderPeople();
+  try {
+    const r = await fetch(cfg.script + (cfg.script.includes('?') ? '&' : '?') + 'tab=Standorte&t=' + Date.now());
+    const rows = (await r.json()).rows || [];
+    const fresh = {};
+    rows.slice(1).forEach(([name, lat, lng, acc, stamp]) => {
+      const n = matchPerson(name), la = parseNum(lat), lo = parseNum(lng);
+      if (!n || isNaN(la) || isNaN(lo)) return;
+      if (Date.now() - (+stamp || 0) > 24 * 3600e3) return;   // älter als 1 Tag: ausblenden
+      fresh[n] = { lat: la, lng: lo, acc: +acc || 0, stamp: +stamp || 0 };
+    });
+    if (sharing && locs[ME] && (!fresh[ME] || fresh[ME].stamp < locs[ME].stamp)) fresh[ME] = locs[ME];
+    locs = fresh;
+  } catch (e) { /* offline: letzter Stand bleibt */ }
+  renderPeople();
+}
+function renderPeople() {
+  $('#peopleList').innerHTML = PEOPLE.map(p => {
+    const l = locs[p];
+    const st = l ? `${agoText(l.stamp)}${l.acc ? ` · ±${Math.round(l.acc)} m` : ''}` : 'teilt nicht';
+    return `<button class="person" data-p="${p}" ${l ? '' : 'disabled'}><span class="av" style="background:${PCOLORS[p]};${l ? '' : 'opacity:.35'}">${p[0]}</span><span class="nm">${p}${p === ME ? ' (ich)' : ''}</span><span class="st">${st}</span></button>`;
+  }).join('');
+  $('#peopleList').querySelectorAll('.person').forEach(b => b.onclick = () => {
+    const m = peopleMarkers[b.dataset.p]; if (!m || !map) return;
+    map.setView(m.getLatLng(), 16); m.openPopup(); $('#map').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  if (!map || !window.L) return;
+  if (!peopleLayer) peopleLayer = L.layerGroup().addTo(map);
+  peopleLayer.clearLayers(); peopleMarkers = {};
+  PEOPLE.forEach(p => {
+    const l = locs[p]; if (!l) return;
+    const stale = Date.now() - l.stamp > 30 * 60000;
+    const icon = L.divIcon({ className: '', html: `<div class="ppin ${stale ? 'stale' : ''} ${p === ME ? 'me' : ''}" style="background:${PCOLORS[p]}">${p[0]}</div>`, iconSize: [34, 34], iconAnchor: [17, 17], popupAnchor: [0, -16] });
+    const m = L.marker([l.lat, l.lng], { icon, zIndexOffset: 1000, title: p })
+      .bindPopup(`<b>${p}</b><br><span style="color:#6b6f85">${agoText(l.stamp)}${l.acc ? ` · ±${Math.round(l.acc)} m` : ''}</span>
+        <div class="btns"><a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${l.lat},${l.lng}&travelmode=walking">🚶 Zu ${p}</a></div>`);
+    peopleLayer.addLayer(m); peopleMarkers[p] = m;
+  });
+}
+function mapVisible(on) {
+  clearInterval(locPoll); locPoll = null;
+  if (on) { renderShareBox(); loadLocs(); locPoll = setInterval(loadLocs, 30000); }
+}
+
+/* =====================================================================
+   ÖPNV-LIVE-STATUS (TfL Unified API)
+   ===================================================================== */
+const LINE_COLORS = { bakerloo: '#B36305', central: '#E32017', circle: '#FFD300', district: '#00782A', 'hammersmith-city': '#F3A9BB', jubilee: '#A0A5A9', metropolitan: '#9B0056', northern: '#000000', piccadilly: '#003688', victoria: '#0098D4', 'waterloo-city': '#95CDBA', elizabeth: '#6950a1', windrush: '#EF4D5E', dlr: '#00A4A7' };
+async function loadLines() {
+  try {
+    const r = await fetch('https://api.tfl.gov.uk/Line/Mode/tube,elizabeth-line,overground,dlr/Status');
+    const j = await r.json();
+    const order = ['elizabeth', 'central', 'circle', 'hammersmith-city', 'metropolitan', 'district', 'windrush'];
+    j.sort((a, b) => ((order.indexOf(a.id) + 1) || 99) - ((order.indexOf(b.id) + 1) || 99));
+    $('#lineStatus').innerHTML = j.map(l => {
+      const s = (l.lineStatuses && l.lineStatuses[0]) || {};
+      const good = s.statusSeverity === 10;
+      return `<div class="line" title="${esc(s.reason || '')}"><span class="bar" style="background:${LINE_COLORS[l.id] || '#888'}"></span><b>${esc(l.name)}</b><span class="st ${good ? 'good' : 'bad'}">${esc(s.statusSeverityDescription || '?')}</span></div>`;
+    }).join('');
+    $('#lineStatusTime').textContent = 'Stand: ' + zoneNow('Europe/London').time + ' Uhr (London). Tippen/halten zeigt Details.';
+  } catch (e) {
+    $('#lineStatus').innerHTML = '<span class="small muted">Live-Status gerade nicht abrufbar. Bitte den Link „Live-Status aller Linien“ oben nutzen.</span>';
+  }
+}
+
+/* =====================================================================
+   KOSTEN (Google Sheets)
+   ===================================================================== */
+let cfg = Object.assign({ script: SCRIPT_URL, sheet: SHEET_ID }, store.get('cfg', {}));
+if (SCRIPT_URL && !store.get('cfg', {}).script) cfg.script = SCRIPT_URL;
+let expenses = store.get('expCache', []);   // zuletzt geladene Einträge
+let queue = store.get('queue', []);         // noch nicht übertragene Einträge
+let costsLoaded = store.get('expCacheTime', 0);
+let dispCur = store.get('dispCur', 'EUR');
+let formCur = 'GBP';
+
+const APPS_SCRIPT = `// Apps Script für „London 2026 – Kosten“
+// Bereitstellen als Web-App: Ausführen als „Ich“, Zugriff „Jeder“.
+const HEAD = ['Datum','Was','Betrag','Währung','Bezahlt von','Geteilt mit','Notiz','ID'];
+
+function sheet_() {
+  const sh = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+  if (sh.getRange(1, 8).getValue() === '') sh.getRange(1, 1, 1, 8).setValues([HEAD]);
+  return sh;
+}
+
+const PHEAD = ['ID','Gelöscht','Datum','Von','Bis','Zeitzone','Titel','Beschreibung','Wer','Ort','Hinweis','Hinweis-Typ','Link','Geändert von','Stand'];
+
+function prog_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName('Programm');
+  if (!sh) {
+    sh = ss.insertSheet('Programm');
+    sh.getRange(1, 1, 1000, PHEAD.length).setNumberFormat('@');
+    sh.getRange(1, 1, 1, PHEAD.length).setValues([PHEAD]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+const PEOPLE = ['Ritva','Anna','Anke','Katja','Elisa','Jelena'];
+const LHEAD = ['Name','Lat','Lng','Genauigkeit','Stand'];
+
+function loc_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName('Standorte');
+  if (!sh) {
+    sh = ss.insertSheet('Standorte');
+    sh.getRange(1, 1, 1, LHEAD.length).setValues([LHEAD]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function doGet(e) {
+  const tab = e && e.parameter.tab;
+  if (tab === 'Standorte') return out_({ ok: true, rows: loc_().getDataRange().getValues() });
+  const sh = tab === 'Programm' ? prog_() : sheet_();
+  return out_({ ok: true, rows: sh.getDataRange().getDisplayValues() });
+}
+
+function doPost(e) {
+  const d = JSON.parse(e.postData.contents);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+  try {
+    if (d.action === 'loc') {
+      // Standort teilen (lat leer = Freigabe beendet, Standort wird gelöscht)
+      if (PEOPLE.indexOf(d.name) < 0) return out_({ ok: false });
+      const sh = loc_();
+      const last = sh.getLastRow();
+      const names = last > 1 ? sh.getRange(2, 1, last - 1, 1).getValues().flat() : [];
+      const i = names.indexOf(d.name);
+      const on = typeof d.lat === 'number' && typeof d.lng === 'number';
+      const row = [d.name, on ? d.lat : '', on ? d.lng : '', on ? Math.round(d.acc || 0) : '', Date.now()];
+      sh.getRange(i >= 0 ? i + 2 : last + 1, 1, 1, row.length).setValues([row]);
+      return out_({ ok: true });
+    }
+    if (d.action === 'prog') {
+      // Programmpunkt anlegen/ändern/löschen (eine Zeile pro ID, neuester Stand gewinnt)
+      const sh = prog_();
+      const row = d.row.slice(0, PHEAD.length).map(String);
+      const last = sh.getLastRow();
+      const ids = last > 1 ? sh.getRange(2, 1, last - 1, 1).getValues().flat().map(String) : [];
+      const i = ids.indexOf(row[0]);
+      if (i >= 0) {
+        const cur = Number(sh.getRange(i + 2, PHEAD.length).getValue()) || 0;
+        if (cur > Number(row[PHEAD.length - 1])) return out_({ ok: true, stale: true });
+        sh.getRange(i + 2, 1, 1, row.length).setValues([row]);
+      } else {
+        sh.getRange(last + 1, 1, 1, row.length).setNumberFormat('@').setValues([row]);
+      }
+      return out_({ ok: true });
+    }
+    const sh = sheet_();
+    const last = sh.getLastRow();
+    if (d.id && last > 1) {
+      const ids = sh.getRange(2, 8, last - 1, 1).getValues().flat();
+      if (ids.indexOf(d.id) >= 0) return out_({ ok: true, dup: true });
+    }
+    sh.appendRow([d.datum || '', String(d.was || '').slice(0, 80), Number(d.betrag) || 0,
+      d.waehrung === 'EUR' ? 'EUR' : 'GBP', d.von || '', d.mit || 'alle',
+      String(d.notiz || '').slice(0, 120), d.id || '']);
+    return out_({ ok: true });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function out_(o) {
+  return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
+}`;
+
+function sheetIdFrom(s) { const m = String(s || '').match(/\/d\/([\w-]{20,})/); return m ? m[1] : String(s || '').trim(); }
+function sheetUrl() { return `https://docs.google.com/spreadsheets/d/${cfg.sheet}/edit`; }
+
+// Tabelle per JSONP lesen: funktioniert auch, wenn die HTML-Datei lokal (file://)
+// geöffnet wird. Dort blockiert Google den normalen Abruf (CORS).
+function gvizRows(id, sheetName) {
+  return new Promise((resolve, reject) => {
+    const cb = '__gviz' + Date.now();
+    const s = document.createElement('script');
+    const done = err => { clearTimeout(timer); delete window[cb]; s.remove(); err ? reject(err) : 0; };
+    const timer = setTimeout(() => done(new Error('Zeitüberschreitung')), 12000);
+    window[cb] = res => {
+      if (!res || res.status === 'error' || !res.table) return done(new Error('Tabelle nicht lesbar'));
+      const cell = c => c == null ? '' : typeof c.v === 'number' ? String(c.v) : String(c.f ?? c.v ?? '');
+      const rows = [res.table.cols.map(c => c.label || '')].concat(res.table.rows.map(r => res.table.cols.map((_, i) => cell(r.c && r.c[i]))));
+      done(); resolve(rows);
+    };
+    s.onerror = () => done(new Error('nicht erreichbar oder nicht freigegeben'));
+    s.src = `https://docs.google.com/spreadsheets/d/${encodeURIComponent(id)}/gviz/tq?headers=1${sheetName ? '&sheet=' + encodeURIComponent(sheetName) : ''}&tqx=out:json;responseHandler:${cb}&t=${Date.now()}`;
+    document.head.appendChild(s);
+  });
+}
+function rowsToExpenses(rows) {
+  if (!rows.length) return [];
+  const head = rows[0].map(h => h.trim().toLowerCase());
+  const col = (...names) => { for (const n of names) { const i = head.findIndex(h => h.startsWith(n)); if (i >= 0) return i; } return -1; };
+  const iD = col('datum'), iW = col('was'), iB = col('betrag'), iC = col('währung', 'waehrung'), iV = col('bezahlt'), iM = col('geteilt'), iN = col('notiz'), iI = col('id');
+  return rows.slice(1).map(r => ({
+    datum: r[iD] || '', was: r[iW] || '', betrag: parseNum(r[iB]), cur: /eur|€/i.test(r[iC] || '') ? 'EUR' : 'GBP',
+    von: r[iV] || '', mit: r[iM] || '', notiz: iN >= 0 ? r[iN] || '' : '', id: iI >= 0 ? r[iI] || '' : '',
+  })).filter(x => x.was || !isNaN(x.betrag));
+}
+// Namen aus freiem Text erkennen („Ritva, Anna“, „alle“, „alle außer Anke“)
+function matchPerson(s) {
+  s = String(s || '').trim().toLowerCase(); if (!s) return null;
+  return PEOPLE.find(p => p.toLowerCase() === s) || PEOPLE.find(p => p.toLowerCase().startsWith(s) || s.startsWith(p.toLowerCase())) || null;
+}
+function sharers(mit) {
+  const s = String(mit || '').trim().toLowerCase();
+  if (!s || /^alle$|^all$|^alle 6|^alle sechs/.test(s)) return [...PEOPLE];
+  const ex = s.match(/(außer|ausser|ohne)\s+(.*)/);
+  if (ex) { const out = ex[2].split(/[,;&+\/]|\s+und\s+|\s+/).map(matchPerson).filter(Boolean); return PEOPLE.filter(p => !out.includes(p)); }
+  const list = [...new Set(s.split(/[,;&+\/]|\s+und\s+|\s+/).map(matchPerson).filter(Boolean))];
+  return list.length ? list : [...PEOPLE];
+}
+
+async function loadCosts(quiet) {
+  const st = $('#costStatus');
+  if (!quiet) st.textContent = 'Lade Kostentabelle …';
+  try {
+    let rows;
+    if (cfg.script) {
+      const r = await fetch(cfg.script + (cfg.script.includes('?') ? '&' : '?') + 't=' + Date.now());
+      const j = await r.json();
+      rows = j.rows;
+    } else {
+      rows = await gvizRows(cfg.sheet);
+    }
+    expenses = rowsToExpenses(rows);
+    costsLoaded = Date.now();
+    store.set('expCache', expenses); store.set('expCacheTime', costsLoaded);
+    // Bereits angekommene Einträge aus der Warteschlange entfernen
+    const ids = new Set(expenses.map(e => e.id).filter(Boolean));
+    const before = queue.length;
+    queue = queue.filter(q => !ids.has(q.id)); store.set('queue', queue);
+    if (before && !queue.length) toast('Alle Einträge gespeichert ✓');
+    st.innerHTML = `Stand: ${new Date(costsLoaded).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} Uhr · ${expenses.length} Einträge aus Google Sheets`;
+  } catch (e) {
+    st.innerHTML = costsLoaded
+      ? `⚠️ Offline oder kein Zugriff: zeige letzten Stand von ${new Date(costsLoaded).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`
+      : `⚠️ Tabelle konnte nicht geladen werden. Ist sie für „Jeder mit dem Link“ freigegeben? Siehe <a href="#" onclick="document.getElementById('setup').open=true;document.getElementById('setup').scrollIntoView();return false">Einrichtung</a>.`;
+  }
+  renderCosts();
+  if (queue.length) flushQueue();
+}
+
+function renderCosts() {
+  const r = rate();
+  const toEUR = x => x.cur === 'EUR' ? x.betrag : x.betrag / r;
+  const show = eur => dispCur === 'EUR' ? fmt(eur, 'EUR') : fmt(eur * r, 'GBP');
+  const all = [...expenses.map(e => ({ ...e, pending: false })), ...queue.map(q => ({ datum: q.datum, was: q.was, betrag: q.betrag, cur: q.waehrung, von: q.von, mit: q.mit, notiz: q.notiz, id: q.id, pending: true }))];
+  const bal = Object.fromEntries(PEOPLE.map(p => [p, 0]));
+  const paid = Object.fromEntries(PEOPLE.map(p => [p, 0]));
+  let total = 0; const problems = [];
+  all.forEach(x => {
+    if (isNaN(x.betrag)) return;
+    const eur = toEUR(x), payer = matchPerson(x.von), sh = sharers(x.mit);
+    if (!payer) { problems.push(x); return; }
+    total += eur; paid[payer] += eur; bal[payer] += eur;
+    sh.forEach(p => bal[p] -= eur / sh.length);
+  });
+  const maxAbs = Math.max(1, ...Object.values(bal).map(Math.abs));
+  $('#balances').innerHTML = PEOPLE.map(p => {
+    const v = bal[p], w = Math.abs(v) / maxAbs * 50;
+    return `<div class="balrow"><b>${p}${p === ME ? ' ⭐' : ''}</b>
+      <div class="barwrap"><i style="left:${v >= 0 ? 50 : 50 - w}%;width:${w}%;background:${v >= 0 ? 'var(--ok)' : 'var(--accent)'}"></i><i style="left:50%;width:1px;background:var(--line)"></i></div>
+      <div class="v ${Math.abs(v) < 0.005 ? '' : v > 0 ? 'pos' : 'neg'}">${v > 0.004 ? '+' : ''}${show(v)}</div></div>`;
+  }).join('') + `<p class="small muted" style="margin:6px 0 0"><span class="pos">+ bekommt Geld</span> · <span class="neg">− muss zahlen</span></p>`;
+  $('#costTotal').innerHTML = all.length ? `Gesamt ausgelegt: <b>${show(total)}</b> · pro Person Ø ${show(total / PEOPLE.length)}${dispCur === 'GBP' ? '' : ` · £-Beträge umgerechnet mit 1 € = ${fmtNum(r, 4)} £`}${problems.length ? `<br><span class="neg">⚠️ ${problems.length} Eintrag/Einträge ohne gültigen Namen bei „Bezahlt von“ werden ignoriert.</span>` : ''}` : '';
+  // Ausgleich: größte Schuldnerin zahlt an größte Gläubigerin
+  const cred = PEOPLE.filter(p => bal[p] > 0.005).map(p => [p, bal[p]]).sort((a, b) => b[1] - a[1]);
+  const debt = PEOPLE.filter(p => bal[p] < -0.005).map(p => [p, -bal[p]]).sort((a, b) => b[1] - a[1]);
+  const tr = [];
+  let i = 0, j = 0;
+  while (i < debt.length && j < cred.length) {
+    const a = Math.min(debt[i][1], cred[j][1]);
+    if (a > 0.005) tr.push([debt[i][0], cred[j][0], a]);
+    debt[i][1] -= a; cred[j][1] -= a;
+    if (debt[i][1] < 0.005) i++;
+    if (cred[j][1] < 0.005) j++;
+  }
+  $('#transfers').innerHTML = tr.length ? tr.map(([f, t, a]) => `<div class="transfer"><b>${f}</b><span class="arrow">→</span><b>${t}</b><span class="amt">${show(a)}</span></div>`).join('')
+    : '<p class="small muted" style="margin:0">Alles ausgeglichen 🎉</p>';
+  // Liste
+  $('#expList').innerHTML = all.length ? all.slice().reverse().map(x => {
+    const sh = sharers(x.mit);
+    return `<div class="expitem"><div><b>${esc(x.was || '—')}</b>${x.pending ? ' <span class="badge warn">⏳ wird gesendet</span>' : ''}<div class="m">${esc(x.datum)}${x.datum ? ' · ' : ''}bezahlt von ${esc(matchPerson(x.von) || x.von || '?')} · ${sh.length === PEOPLE.length ? 'alle 6' : esc(sh.join(', '))}${x.notiz ? ' · ' + esc(x.notiz) : ''}</div></div>
+      <div class="a">${isNaN(x.betrag) ? '?' : fmt(x.betrag, x.cur)}${x.cur !== dispCur && !isNaN(x.betrag) ? `<div class="m">≈ ${show(toEUR(x))}</div>` : ''}</div></div>`;
+  }).join('') : '<span class="muted small">Noch keine Einträge.</span>';
+}
+window.renderCosts = renderCosts;
+
+function fillForm() {
+  $('#fVon').innerHTML = PEOPLE.map(p => `<option ${p === ME ? 'selected' : ''}>${p}</option>`).join('');
+  if (!$('#fMit').children.length) $('#fMit').innerHTML = PEOPLE.map(p => `<label><input type="checkbox" value="${p}" checked> ${p}</label>`).join('');
+}
+function setupCosts() {
+  $('#openSheet').href = sheetUrl();
+  const hasScript = !!cfg.script;
+  $('#expForm').style.display = hasScript ? '' : 'none';
+  $('#noScript').style.display = hasScript ? 'none' : '';
+  $('#openSheet').textContent = hasScript ? '📄 Tabelle in Google Sheets öffnen' : '✏️ In Google Sheets eintragen';
+  $('#openSheet').classList.toggle('primary', !hasScript);
+  $('#cfgScript').value = cfg.script || '';
+  $('#cfgSheet').value = cfg.sheet || '';
+  $('#scriptCode').textContent = APPS_SCRIPT;
+  fillForm();
+}
+async function flushQueue() {
+  if (!cfg.script || !queue.length || flushQueue.busy) return;
+  flushQueue.busy = true;
+  let sent = 0;
+  for (const q of queue) {
+    try {
+      // no-cors: Google leitet weiter; Doppel-Einträge verhindert das Script über die ID
+      await fetch(cfg.script, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(q) });
+      sent++;
+    } catch (e) { break; }
+  }
+  flushQueue.busy = false;
+  if (sent) setTimeout(() => loadCosts(true), 1500);
+  else $('#fHint').textContent = 'Keine Verbindung: Einträge werden automatisch gesendet, sobald wieder Netz da ist.';
+}
+
+/* =====================================================================
+   NAVIGATION & START
+   ===================================================================== */
+function switchView(v) {
+  document.querySelectorAll('section.view').forEach(s => s.classList.toggle('on', s.id === 'v-' + v));
+  document.querySelectorAll('nav.tabs button').forEach(b => b.classList.toggle('on', b.dataset.v === v));
+  store.set('view', v);
+  window.scrollTo(0, 0);
+  if (v === 'map') { initMap(); setTimeout(() => map && map.invalidateSize(), 60); }
+  mapVisible(v === 'map');
+  if (v === 'transit') loadLines();
+  if (v === 'cost') loadCosts(true);
+  if (v === 'plan' && switchView.started) loadProgram();
+  switchView.started = true;
+}
+window.showOnMap = showOnMap;
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Theme
+  const th = store.get('theme', '');
+  if (th) document.documentElement.dataset.theme = th;
+  $('#themeBtn').onclick = () => {
+    const dark = document.documentElement.dataset.theme ? document.documentElement.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.dataset.theme = dark ? 'light' : 'dark'; store.set('theme', document.documentElement.dataset.theme);
+  };
+
+  renderMe(); renderFlights(); renderPlan(); tick();
+  setInterval(() => { tick(); }, 15000);
+  setInterval(() => { if ($('#v-plan').classList.contains('on')) renderPlan(); }, 60000);
+
+  // Infos
+  $('#codes').innerHTML = CODES.map(([k, v, href]) => `<div>${k}</div><div class="val">${href ? `<a href="${href}">${v}</a>` : `<button class="btn sm" data-copy="${esc(v)}">${esc(v)} 📋</button>`}</div>`).join('');
+  $('#codes').querySelectorAll('[data-copy]').forEach(b => b.onclick = () => copy(b.dataset.copy));
+
+  // Währung
+  $('#inGBP').addEventListener('input', () => { lastEdited = 'gbp'; convert('gbp'); });
+  $('#inEUR').addEventListener('input', () => { lastEdited = 'eur'; convert('eur'); });
+  $('#rateReload').onclick = () => { if (fx) fx.manual = false; loadRate(true); };
+  $('#rateManualBtn').onclick = () => {
+    const v = parseNum(prompt('Kurs eingeben: 1 € = ? £', fmtNum(rate(), 4)));
+    if (v > 0.3 && v < 3) { fx = { rate: v, date: new Date().toISOString(), fetched: Date.now(), manual: true }; store.set('fx', fx); showRate(); toast('Kurs gespeichert'); }
+  };
+  showRate(); loadRate(false);
+
+  // Kosten
+  setupCosts(); renderCosts();
+  document.querySelectorAll('#dispCur button').forEach(b => {
+    b.classList.toggle('on', b.dataset.c === dispCur);
+    b.onclick = () => { dispCur = b.dataset.c; store.set('dispCur', dispCur); document.querySelectorAll('#dispCur button').forEach(x => x.classList.toggle('on', x === b)); renderCosts(); };
+  });
+  document.querySelectorAll('#fCur button').forEach(b => b.onclick = () => { formCur = b.dataset.c; document.querySelectorAll('#fCur button').forEach(x => x.classList.toggle('on', x === b)); });
+  $('#fAll').onclick = e => { e.preventDefault(); document.querySelectorAll('#fMit input').forEach(c => c.checked = true); };
+  $('#fNone').onclick = e => { e.preventDefault(); document.querySelectorAll('#fMit input').forEach(c => c.checked = false); };
+  $('#expForm').onsubmit = e => {
+    e.preventDefault();
+    const betrag = parseNum($('#fBetrag').value);
+    const mit = [...document.querySelectorAll('#fMit input:checked')].map(c => c.value);
+    if (!(betrag > 0)) return toast('Bitte einen Betrag eingeben');
+    if (!mit.length) return toast('Mit wem wird geteilt?');
+    const d = zoneNow('Europe/London').date.split('-');
+    queue.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      datum: `${d[2]}.${d[1]}.${d[0]}`, was: $('#fWas').value.trim(), betrag: Math.round(betrag * 100) / 100, waehrung: formCur,
+      von: $('#fVon').value, mit: mit.length === PEOPLE.length ? 'alle' : mit.join(', '), notiz: $('#fNotiz').value.trim(),
+    });
+    store.set('queue', queue);
+    $('#fWas').value = ''; $('#fBetrag').value = ''; $('#fNotiz').value = ''; $('#fHint').textContent = '';
+    document.querySelectorAll('#fMit input').forEach(c => c.checked = true);
+    renderCosts(); toast('Gespeichert, wird übertragen …'); flushQueue();
+  };
+  $('#reloadCosts').onclick = () => loadCosts(false);
+  $('#copyScript').onclick = () => copy(APPS_SCRIPT);
+  $('#cfgSave').onclick = () => {
+    cfg.script = $('#cfgScript').value.trim(); cfg.sheet = sheetIdFrom($('#cfgSheet').value) || SHEET_ID;
+    store.set('cfg', { script: cfg.script, sheet: cfg.sheet }); setupCosts(); loadCosts(false); toast('Übernommen');
+  };
+  $('#cfgReset').onclick = () => { store.set('cfg', {}); cfg = { script: SCRIPT_URL, sheet: SHEET_ID }; setupCosts(); loadCosts(false); };
+  window.addEventListener('online', () => { flushQueue(); loadCosts(true); loadProgram(); });
+
+  // Karte
+  $('#locBtn').onclick = () => { initMap(); if (map) map.locate({ setView: true, maxZoom: 16 }); };
+  $('#homeBtn').onclick = () => showOnMap('home');
+
+  // Programm-Editor
+  $('#evForm').onsubmit = submitEditor;
+  $('#eCancel').onclick = closeEditor;
+  $('#eDelete').onclick = deleteEditing;
+  $('#ePlace').onchange = () => { $('#eOrtWrap').style.display = $('#ePlace').value === '__custom' ? '' : 'none'; };
+  loadProgram();
+  if (sharing && ME && cfg.script) startSharing(); else if (sharing) { sharing = false; store.set('sharing', false); }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && $('#v-map').classList.contains('on')) loadLocs(); });
+
+  // Tabs
+  document.querySelectorAll('nav.tabs button').forEach(b => b.onclick = () => switchView(b.dataset.v));
+  switchView(store.get('view', 'plan'));
+});
+</script>
+</body>
+</html>
