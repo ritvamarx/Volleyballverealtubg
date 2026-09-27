@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#1d2340">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://docs.google.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://*.tile.openstreetmap.org https://cdnjs.cloudflare.com; connect-src https://script.google.com https://script.googleusercontent.com https://api.frankfurter.dev https://api.tfl.gov.uk; frame-src 'none'; object-src 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://docs.google.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://*.tile.openstreetmap.org https://cdnjs.cloudflare.com; connect-src https://script.google.com https://script.googleusercontent.com https://api.frankfurter.dev https://api.tfl.gov.uk; frame-src 'none'; object-src 'none'; base-uri 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="London 2026">
@@ -265,16 +265,39 @@ dialog#evDlg textarea { min-height: 70px; resize: vertical; }
 .dlgbtns { display: flex; gap: 8px; justify-content: space-between; flex-wrap: wrap; margin-top: 4px; }
 .btn.danger { color: var(--accent); border-color: var(--accent); }
 
+/* ===================== Erinnerungen ===================== */
+.pgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+@media (min-width: 560px) { .pgrid { grid-template-columns: repeat(4, 1fr); } }
+.pgrid button { position: relative; aspect-ratio: 1; border: 0; padding: 0; border-radius: 8px; overflow: hidden; background: var(--line); cursor: pointer; }
+.pgrid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pgrid .pm { position: absolute; left: 0; right: 0; bottom: 0; padding: 14px 5px 3px; font-size: 11px; color: #fff; text-align: left; background: linear-gradient(transparent, rgba(0,0,0,.65)); display: flex; justify-content: space-between; }
+.pgrid .pav { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; border-radius: 50%; color: #fff; font: 700 11px Inter, sans-serif; display: flex; align-items: center; justify-content: center; border: 2px solid #fff; }
+.pday { margin: 16px 0 8px; font-family: Fraunces, Georgia, serif; font-size: 18px; font-weight: 700; }
+.upl { display: grid; gap: 10px; margin-top: 12px; }
+.upli { display: grid; grid-template-columns: 72px 1fr; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 8px; }
+.upli img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; }
+.upli input, .upli select { width: 100%; border: 1px solid var(--line); background: var(--bg); border-radius: 8px; padding: 6px 8px; font-size: 14px; margin-bottom: 5px; color: inherit; }
+.upli .src { font-size: 11px; color: var(--muted); }
+.ppmark { width: 38px; height: 38px; border-radius: 10px; border: 3px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.4); background: #555 center/cover; display: flex; align-items: center; justify-content: center; font-size: 17px; }
+dialog#photoDlg { border: 0; padding: 0; background: #000; color: #fff; width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; }
+dialog#photoDlg::backdrop { background: #000; }
+#photoDlg .wrapi { display: flex; flex-direction: column; height: 100%; }
+#photoDlg .imgbox { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
+#photoDlg img { max-width: 100%; max-height: 100%; object-fit: contain; }
+#photoDlg .meta { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: #111; font-size: 14px; }
+#photoDlg .meta .btn { background: #222; color: #fff; border-color: #444; }
+#photoDlg .close { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 12px; width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.18); color: #fff; font-size: 20px; cursor: pointer; }
+
 /* ===================== Tab-Leiste ===================== */
 nav.tabs {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
   background: var(--card); border-top: 1px solid var(--line);
   padding-bottom: env(safe-area-inset-bottom);
 }
-nav.tabs .wrap { display: grid; grid-template-columns: repeat(6, 1fr); padding: 0 4px; }
+nav.tabs .wrap { display: grid; grid-template-columns: repeat(7, 1fr); padding: 0 2px; }
 nav.tabs button {
   border: 0; background: transparent; padding: 8px 0 9px; cursor: pointer; color: var(--muted);
-  font-size: 11px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-size: 10.5px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 2px;
 }
 nav.tabs button .i { font-size: 21px; line-height: 1; }
 nav.tabs button.on { color: var(--accent); }
@@ -502,7 +525,7 @@ nav.tabs button.on { color: var(--accent); }
         <summary>⚙️ Einrichtung (Google Drive)</summary>
         <div style="margin-top:10px" class="small">
           <p><b>Lesen:</b> Die App liest die Tabelle <i>„London 2026 – Kosten“</i>. Dafür muss sie entweder über <b>Teilen → „Jeder mit dem Link“ → Betrachter</b> freigegeben sein, oder das Apps Script unten muss eingerichtet sein.</p>
-          <p><b>Direkt in der App eintragen und Programm für alle ändern</b> (einmalig, ca. 2 Minuten, macht die Besitzerin der Tabelle). Das Script speichert Ausgaben, Änderungen am Programm und freigegebene Standorte (legt dafür die Tabs „Programm“ und „Standorte“ an). Ohne Script bleiben Programm-Änderungen nur auf dem eigenen Gerät, und Standorte können nicht geteilt werden. <b>Wurde das Script schon früher bereitgestellt:</b> Code ersetzen und unter Bereitstellen → Bereitstellungen verwalten → ✏️ → Version „Neue Version“ aktualisieren.</p>
+          <p><b>Direkt in der App eintragen und Programm für alle ändern</b> (einmalig, ca. 2 Minuten, macht die Besitzerin der Tabelle). Das Script speichert Ausgaben, Änderungen am Programm und freigegebene Standorte (legt dafür die Tabs „Programm“, „Standorte“ und „Fotos“ sowie den Drive-Ordner „London 2026 – Erinnerungen“ an). Ohne Script bleiben Programm-Änderungen nur auf dem eigenen Gerät, und Standorte können nicht geteilt werden. <b>Wurde das Script schon früher bereitgestellt:</b> Code ersetzen und unter Bereitstellen → Bereitstellungen verwalten → ✏️ → Version „Neue Version“ aktualisieren.</p>
           <ol class="steps">
             <li>Tabelle öffnen → Menü <b>Erweiterungen → Apps Script</b></li>
             <li>Den vorhandenen Code löschen und den Code unten einfügen → 💾 speichern</li>
@@ -525,6 +548,23 @@ nav.tabs button.on { color: var(--accent); }
   </section>
 
   <!-- ============================ INFOS ============================ -->
+  <section class="view" id="v-photos">
+    <div class="card">
+      <h2>📸 Erinnerungen</h2>
+      <p class="small muted" style="margin:0 0 10px">Eure Fotos landen im gemeinsamen Ordner „London 2026 – Erinnerungen“ (Google Drive). Sie werden nach Aufnahmezeit sortiert und über den Ort auf der Karte verlinkt.</p>
+      <div id="photoLock"></div>
+      <label class="btn primary" id="pickBtn" style="width:100%">➕ Fotos hinzufügen<input type="file" id="photoInput" accept="image/*" multiple hidden></label>
+      <div class="upl" id="uplList"></div>
+      <div class="btns" id="uplBtns" style="display:none;margin-top:10px">
+        <button class="btn primary" id="uplGo">⬆️ Hochladen</button>
+        <button class="btn" id="uplCancel">Abbrechen</button>
+      </div>
+      <p class="small muted" id="uplStatus" style="margin:8px 0 0"></p>
+    </div>
+    <div id="gallery"></div>
+    <p class="small muted" id="galStatus" style="text-align:center"></p>
+  </section>
+
   <section class="view" id="v-info">
     <div class="card">
       <h2>🏠 Unterkunft</h2>
@@ -589,6 +629,21 @@ nav.tabs button.on { color: var(--accent); }
   </section>
 </main>
 
+<dialog id="photoDlg" aria-label="Foto">
+  <div class="wrapi">
+    <button class="close" id="pdClose" aria-label="Schließen">✕</button>
+    <div class="imgbox"><img id="pdImg" alt=""></div>
+    <div class="meta">
+      <div id="pdMeta"></div>
+      <div class="btns" style="margin-top:8px">
+        <button class="btn sm" id="pdMap">🗺️ Auf der Karte</button>
+        <a class="btn sm" id="pdSave" download>⬇️ Speichern</a>
+        <button class="btn sm" id="pdDel">🗑️ Löschen</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+
 <dialog id="evDlg" aria-labelledby="evDlgTitle">
   <form id="evForm" method="dialog" autocomplete="off">
     <h2 id="evDlgTitle" style="font-size:20px">Programmpunkt</h2>
@@ -631,6 +686,7 @@ nav.tabs button.on { color: var(--accent); }
     <button data-v="map"><span class="i">🗺️</span>Karte</button>
     <button data-v="transit"><span class="i">🚇</span>ÖPNV</button>
     <button data-v="cost"><span class="i">💸</span>Kosten</button>
+    <button data-v="photos"><span class="i">📸</span>Fotos</button>
     <button data-v="info"><span class="i">ℹ️</span>Infos</button>
   </div>
 </nav>
@@ -815,11 +871,13 @@ function lockDevice() {
   if (!confirm('Gruppen-Code und gespeicherte Daten (Kosten, Standorte) von diesem Gerät entfernen?')) return;
   if (sharing) setSharing(false);
   ['gc', 'expCache', 'expCacheTime', 'progSheet', 'queue', 'progLocal'].forEach(k => { try { localStorage.removeItem('ldn26_' + k); } catch (e) {} });
+  photos = []; thumbCache.clear(); pending = []; renderPending();
   GROUP_CODE = ''; SECRETS = null; expenses = []; queue = []; progSheet = {}; progLocal = {}; locs = {}; costsLoaded = 0;
   afterUnlockChange(); toast('Gerät gesperrt 🔒');
 }
 function afterUnlockChange() {
-  renderMe(); renderFlights(); renderCodes(); planChanged(); renderShareBox(); renderPeople(); renderCosts();
+  renderMe(); renderFlights(); renderCodes(); planChanged(); renderShareBox(); renderPeople(); renderCosts(); renderGallery(); buildPhotoMarkers();
+  if (!locked() && $('#v-photos').classList.contains('on')) loadPhotos();
   if (!locked()) { loadProgram(); loadCosts(true); if ($('#v-map').classList.contains('on')) loadLocs(); }
 }
 // Zugriff aufs Apps Script – immer mit Gruppen-Code
@@ -1190,6 +1248,7 @@ function initMap() {
   markers.lst = mapMarker(PLACES.lst, '#6950a1', 'LS', '', 'Elizabeth Line · Stansted Express');
   homeLayer = L.layerGroup([markers.home, markers.lst]).addTo(map);
   buildDayMarkers();
+  buildPhotoMarkers();
   map.on('locationfound', e => {
     if (map._me) map.removeLayer(map._me);
     map._me = L.circleMarker(e.latlng, { radius: 8, color: '#fff', weight: 3, fillColor: '#2f7cf6', fillOpacity: 1 }).addTo(map).bindPopup('Du bist hier').openPopup();
@@ -1215,7 +1274,9 @@ function buildDayMarkers() {
   });
   const leg = $('#legend');
   leg.innerHTML = DAYS.map((d, i) => `<button data-i="${i}" class="${hiddenDays.has(i) ? 'off' : ''}"><span class="dot" style="background:${d.color}"></span>Tag ${i + 1} · ${d.short}</button>`).join('');
-  leg.querySelectorAll('button').forEach(b => b.onclick = () => {
+  leg.insertAdjacentHTML('beforeend', `<button data-ph="1" class="${photosHidden ? 'off' : ''}">📷 Fotos</button>`);
+  leg.querySelector('[data-ph]').onclick = e => { photosHidden = !photosHidden; e.currentTarget.classList.toggle('off', photosHidden); buildPhotoMarkers(); };
+  leg.querySelectorAll('button[data-i]').forEach(b => b.onclick = () => {
     const i = +b.dataset.i, g = dayLayers[i];
     if (hiddenDays.has(i)) { hiddenDays.delete(i); g.addTo(map); b.classList.remove('off'); }
     else { hiddenDays.add(i); map.removeLayer(g); b.classList.add('off'); }
@@ -1325,6 +1386,238 @@ function mapVisible(on) {
 }
 
 /* =====================================================================
+   ERINNERUNGEN (Fotos → Google-Drive-Ordner über Apps Script)
+   ===================================================================== */
+let photos = [];                 // Metadaten aus Tab „Fotos“
+const thumbCache = new Map();    // ID -> data:-URL
+let pending = [];                // ausgewählte, noch nicht hochgeladene Fotos
+let photoLayer = null, photoMarkers = {}, photosHidden = false, photosLoaded = false;
+
+// Minimaler EXIF-Leser für JPEG: Aufnahmezeit und GPS
+function readExif(buf) {
+  const v = new DataView(buf);
+  if (v.byteLength < 4 || v.getUint16(0) !== 0xFFD8) return {};
+  let o = 2;
+  while (o + 4 < v.byteLength) {
+    const m = v.getUint16(o), len = v.getUint16(o + 2);
+    if (m === 0xFFE1 && v.getUint32(o + 4) === 0x45786966) return parseTiff(v, o + 10);
+    if ((m & 0xFF00) !== 0xFF00) break;
+    o += 2 + len;
+  }
+  return {};
+}
+function parseTiff(v, t) {
+  const le = v.getUint16(t) === 0x4949;
+  const u16 = x => v.getUint16(x, le), u32 = x => v.getUint32(x, le);
+  const ifd = off => { const out = {}; const n = u16(t + off); for (let i = 0; i < n; i++) { const e = t + off + 2 + i * 12; out[u16(e)] = { type: u16(e + 2), count: u32(e + 4), at: e + 8 }; } return out; };
+  const ascii = en => { const p = en.count > 4 ? t + u32(en.at) : en.at; let s = ''; for (let i = 0; i < en.count - 1; i++) s += String.fromCharCode(v.getUint8(p + i)); return s; };
+  const rats = en => { const p = t + u32(en.at); const r = []; for (let i = 0; i < en.count; i++) r.push(u32(p + i * 8) / (u32(p + i * 8 + 4) || 1)); return r; };
+  const res = {};
+  try {
+    const i0 = ifd(u32(t + 4));
+    let dt = i0[0x0132] && ascii(i0[0x0132]);
+    if (i0[0x8769]) { const ex = ifd(u32(i0[0x8769].at)); if (ex[0x9003]) dt = ascii(ex[0x9003]); }
+    const m = dt && dt.match(/^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2})/);
+    if (m) res.date = `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}`;
+    if (i0[0x8825]) {
+      const g = ifd(u32(i0[0x8825].at));
+      if (g[2] && g[4]) {
+        const dms = a => a[0] + a[1] / 60 + a[2] / 3600;
+        let lat = dms(rats(g[2])), lng = dms(rats(g[4]));
+        if (g[1] && String.fromCharCode(v.getUint8(g[1].at)) === 'S') lat = -lat;
+        if (g[3] && String.fromCharCode(v.getUint8(g[3].at)) === 'W') lng = -lng;
+        if (isFinite(lat) && isFinite(lng) && (lat || lng)) { res.lat = +lat.toFixed(5); res.lng = +lng.toFixed(5); }
+      }
+    }
+  } catch (e) {}
+  return res;
+}
+// Bild verkleinern (Ausrichtung übernimmt der Browser) → JPEG als Base64
+async function shrink(file, max, q) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image(); img.src = url; await img.decode();
+    const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', q);
+  } finally { URL.revokeObjectURL(url); }
+}
+// Programmpunkt zur Aufnahmezeit → dessen Ort
+function itemAt(dt) {
+  if (!dt) return null;
+  const [date, time] = dt.split('T'); const day = planDays().find(d => d.date === date); if (!day) return null;
+  let hit = null;
+  day.items.forEach((it, i) => {
+    const k = londonKey(day, it), end = it.end ? londonKey(day, { t: it.end, tz: it.tz }) : (day.items[i + 1] ? londonKey(day, day.items[i + 1]) : `${date} 23:59`);
+    if (k <= `${date} ${time}` && `${date} ${time}` < end) hit = it;
+  });
+  return hit;
+}
+const placeOptions = () => Object.entries(PLACES).filter(([, p]) => p.lat != null).map(([k, p]) => `<option value="${k}">${esc(p.name)}</option>`).join('');
+function nowLocal() { const n = zoneNow('Europe/London'); return `${n.date}T${n.time}`; }
+
+async function pickPhotos(files) {
+  if (locked()) return askCode();
+  if (!ME) return toast('Bitte oben bei „Ich bin“ deinen Namen antippen');
+  $('#uplStatus').textContent = 'Fotos werden vorbereitet …';
+  for (const f of files) {
+    try {
+      const ex = readExif(await f.slice(0, 256 * 1024).arrayBuffer());
+      const full = await shrink(f, 2048, 0.85), thumb = await shrink(f, 480, 0.75);
+      const date = ex.date || nowLocal();
+      const it = itemAt(date), itPlace = it && it.place && PLACES[it.place] && PLACES[it.place].lat != null ? it.place : '';
+      pending.push({ id: 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), full, thumb, date, gps: ex.lat != null ? { lat: ex.lat, lng: ex.lng } : null,
+        loc: ex.lat != null ? 'gps' : (itPlace || 'none'), note: it ? it.title : '' });
+    } catch (e) { toast(`${f.name}: Format wird nicht unterstützt`); }
+  }
+  $('#uplStatus').textContent = '';
+  renderPending();
+}
+function renderPending() {
+  $('#uplList').innerHTML = pending.map((p, i) => `<div class="upli" data-i="${i}">
+      <img src="${p.thumb}" alt="">
+      <div>
+        <input type="datetime-local" class="pDate" value="${esc(p.date)}">
+        <select class="pLoc">
+          ${p.gps ? `<option value="gps">📍 Ort aus dem Foto (GPS)</option>` : ''}
+          <option value="here">📡 Mein aktueller Standort</option>
+          <optgroup label="Orte aus dem Programm">${placeOptions()}</optgroup>
+          <option value="none">– ohne Ort –</option>
+        </select>
+        <input type="text" class="pNote" maxlength="120" placeholder="Beschreibung (optional)" value="${esc(p.note)}">
+        <div class="src">${p.gps ? 'GPS im Foto gefunden' : 'Kein GPS im Foto: Ort aus dem Programm vorgeschlagen'}</div>
+      </div></div>`).join('');
+  $('#uplList').querySelectorAll('.upli').forEach(el => {
+    const p = pending[+el.dataset.i];
+    el.querySelector('.pLoc').value = p.loc;
+    el.querySelector('.pDate').onchange = e => { p.date = e.target.value; };
+    el.querySelector('.pLoc').onchange = e => { p.loc = e.target.value; };
+    el.querySelector('.pNote').oninput = e => { p.note = e.target.value; };
+  });
+  $('#uplBtns').style.display = pending.length ? '' : 'none';
+  $('#uplGo').textContent = `⬆️ ${pending.length} Foto${pending.length === 1 ? '' : 's'} hochladen`;
+}
+function herePos() {
+  return new Promise(res => navigator.geolocation ? navigator.geolocation.getCurrentPosition(p => res({ lat: +p.coords.latitude.toFixed(5), lng: +p.coords.longitude.toFixed(5) }), () => res(null), { timeout: 15000, maximumAge: 60000 }) : res(null));
+}
+async function uploadPending() {
+  if (locked()) return askCode();
+  const list = pending.slice(); if (!list.length) return;
+  $('#uplGo').disabled = true;
+  let here = null;
+  if (list.some(p => p.loc === 'here')) here = await herePos();
+  let n = 0;
+  for (const p of list) {
+    n++; $('#uplStatus').textContent = `Lade ${n}/${list.length} hoch …`;
+    let lat = '', lng = '', ort = '';
+    if (p.loc === 'gps' && p.gps) ({ lat, lng } = p.gps);
+    else if (p.loc === 'here' && here) ({ lat, lng } = here);
+    else if (PLACES[p.loc]) { lat = PLACES[p.loc].lat; lng = PLACES[p.loc].lng; ort = PLACES[p.loc].name; }
+    try {
+      await apiPost({ action: 'foto', id: p.id, von: ME, taken: p.date, lat, lng, ort, note: p.note.trim(), full: p.full.split(',')[1], thumb: p.thumb.split(',')[1] });
+      thumbCache.set(p.id, p.thumb);
+      pending = pending.filter(x => x !== p);
+    } catch (e) { $('#uplStatus').textContent = 'Keine Verbindung: bitte später erneut hochladen.'; break; }
+  }
+  $('#uplGo').disabled = false;
+  renderPending();
+  if (!pending.length) { $('#uplStatus').textContent = 'Hochgeladen ✓ Galerie wird aktualisiert …'; setTimeout(() => loadPhotos(), 1500); }
+}
+
+async function loadPhotos() {
+  if (!cfg.script || locked()) { photos = []; renderGallery(); return; }
+  $('#galStatus').textContent = 'Lade Erinnerungen …';
+  try {
+    const rows = await apiGet('tab=Fotos');
+    const head = (rows[0] || []).map(String);
+    if (head[0] !== 'ID' || head[1] !== 'Datei') throw new Error('script');   // altes Script ohne Fotos
+    photos = rows.slice(1).filter(r => r[0] && !r[10]).map(r => ({
+      id: String(r[0]), taken: String(r[3]), von: String(r[4]), lat: parseNum(r[5]), lng: parseNum(r[6]), ort: String(r[7] || ''), note: String(r[8] || ''),
+    })).sort((a, b) => a.taken.localeCompare(b.taken));
+    photosLoaded = true;
+    $('#galStatus').textContent = photos.length ? '' : 'Noch keine Fotos. Legt los! 📷';
+    if ($('#uplStatus').textContent.startsWith('Hochgeladen')) $('#uplStatus').textContent = 'Hochgeladen ✓';
+  } catch (e) {
+    $('#galStatus').textContent = e.message === 'script' ? '⚠️ Das Apps Script ist noch nicht auf dem neuesten Stand (Fotos fehlen).' : e.message === 'auth' ? '🔒 Gruppen-Code fehlt oder falsch.' : '⚠️ Erinnerungen konnten nicht geladen werden.';
+  }
+  renderGallery(); buildPhotoMarkers();
+}
+async function thumb(id) {
+  if (thumbCache.has(id)) return thumbCache.get(id);
+  const j = await apiGetRaw('img=' + encodeURIComponent(id) + '&s=t');
+  const url = 'data:image/jpeg;base64,' + j.data; thumbCache.set(id, url); return url;
+}
+async function apiGetRaw(params) {
+  const r = await fetch(cfg.script + (cfg.script.includes('?') ? '&' : '?') + params + '&k=' + encodeURIComponent(GROUP_CODE));
+  const j = await r.json(); if (!j || !j.ok) throw new Error(j && j.error || 'fehler'); return j;
+}
+function renderGallery() {
+  $('#photoLock').innerHTML = locked() ? `<div class="note small" style="margin-bottom:10px">🔒 Die Erinnerungen sind geschützt. <a href="#" onclick="askCode();return false">Gruppen-Code eingeben</a></div>` : '';
+  const groups = {};
+  photos.forEach(p => { (groups[p.taken.slice(0, 10)] = groups[p.taken.slice(0, 10)] || []).push(p); });
+  $('#gallery').innerHTML = Object.keys(groups).sort().map(date => {
+    const d = DAYS.find(x => x.date === date);
+    const title = d ? `${d.title}` : new Date(date + 'T12:00').toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
+    return `<div class="pday">${esc(title)} <span class="small muted">· ${groups[date].length}</span></div><div class="pgrid">${groups[date].map(p => `
+      <button data-id="${esc(p.id)}" aria-label="Foto von ${esc(p.von)}"><img alt="" data-thumb="${esc(p.id)}">
+        <span class="pav" style="background:${PCOLORS[p.von] || '#888'}">${esc((p.von || '?')[0])}</span>
+        <span class="pm"><span>${esc(p.taken.slice(11, 16))}</span><span>${isNaN(p.lat) ? '' : '📍'}</span></span></button>`).join('')}</div>`;
+  }).join('');
+  $('#gallery').querySelectorAll('button[data-id]').forEach(b => b.onclick = () => openPhoto(b.dataset.id));
+  // Vorschaubilder nachladen (4 parallel)
+  const imgs = [...$('#gallery').querySelectorAll('img[data-thumb]')];
+  let i = 0;
+  const next = async () => { while (i < imgs.length) { const el = imgs[i++]; try { el.src = await thumb(el.dataset.thumb); const m = photoMarkers[el.dataset.thumb]; if (m) m.setIcon(photoIcon(el.dataset.thumb)); } catch (e) {} } };
+  for (let k = 0; k < 4; k++) next();
+}
+let openId = null;
+async function openPhoto(id) {
+  const p = photos.find(x => x.id === id); if (!p) return;
+  openId = id;
+  const dlg = $('#photoDlg');
+  $('#pdImg').src = thumbCache.get(id) || '';
+  const d = new Date(p.taken + ':00');
+  $('#pdMeta').innerHTML = `<b>${esc(p.note || p.ort || 'Erinnerung')}</b><br><span style="opacity:.75">${isNaN(d) ? '' : d.toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · von ${esc(p.von)}${p.ort ? ' · ' + esc(p.ort) : ''}</span>`;
+  $('#pdMap').style.display = isNaN(p.lat) ? 'none' : '';
+  $('#pdDel').style.display = p.von === ME ? '' : 'none';
+  $('#pdSave').removeAttribute('href');
+  if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  try {
+    const j = await apiGetRaw('img=' + encodeURIComponent(id) + '&s=f');
+    if (openId === id) { const url = 'data:image/jpeg;base64,' + j.data; $('#pdImg').src = url; $('#pdSave').href = url; $('#pdSave').download = `London-${p.taken.replace(/[:T]/g, '-')}-${p.von}.jpg`; }
+  } catch (e) {}
+}
+function closePhoto() { const dlg = $('#photoDlg'); if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); openId = null; }
+async function deletePhoto() {
+  const p = photos.find(x => x.id === openId); if (!p || !confirm('Dieses Foto für alle löschen?')) return;
+  try { await apiPost({ action: 'fotodel', id: p.id, name: ME }); } catch (e) { return toast('Keine Verbindung'); }
+  photos = photos.filter(x => x !== p); closePhoto(); renderGallery(); buildPhotoMarkers(); toast('Gelöscht');
+  setTimeout(() => loadPhotos(), 1500);
+}
+function photoIcon(id) {
+  const t = thumbCache.get(id);
+  return L.divIcon({ className: '', html: `<div class="ppmark" style="${t ? `background-image:url('${t}')` : ''}">${t ? '' : '📷'}</div>`, iconSize: [38, 38], iconAnchor: [19, 19], popupAnchor: [0, -18] });
+}
+function buildPhotoMarkers() {
+  if (!map || !window.L) return;
+  if (!photoLayer) photoLayer = L.layerGroup();
+  photoLayer.clearLayers(); photoMarkers = {};
+  photos.forEach(p => {
+    if (isNaN(p.lat) || isNaN(p.lng)) return;
+    const m = L.marker([p.lat, p.lng], { icon: photoIcon(p.id), zIndexOffset: 500 });
+    m.on('click', () => openPhoto(p.id));
+    photoLayer.addLayer(m); photoMarkers[p.id] = m;
+  });
+  if (photosHidden || locked()) map.removeLayer(photoLayer); else photoLayer.addTo(map);
+}
+function showPhotoOnMap() {
+  const p = photos.find(x => x.id === openId); if (!p) return;
+  closePhoto(); switchView('map');
+  setTimeout(() => { photosHidden = false; buildDayMarkers(); buildPhotoMarkers(); map.setView([p.lat, p.lng], 17); }, 150);
+}
+
+/* =====================================================================
    ÖPNV-LIVE-STATUS (TfL Unified API)
    ===================================================================== */
 const LINE_COLORS = { bakerloo: '#B36305', central: '#E32017', circle: '#FFD300', district: '#00782A', 'hammersmith-city': '#F3A9BB', jubilee: '#A0A5A9', metropolitan: '#9B0056', northern: '#000000', piccadilly: '#003688', victoria: '#0098D4', 'waterloo-city': '#95CDBA', elizabeth: '#6950a1', windrush: '#EF4D5E', dlr: '#00A4A7' };
@@ -1366,6 +1659,8 @@ const PHEAD = ['ID','Gelöscht','Datum','Von','Bis','Zeitzone','Titel','Beschrei
 const LHEAD = ['Name','Lat','Lng','Genauigkeit','Stand'];
 const PEOPLE = ['Ritva','Anna','Anke','Katja','Elisa','Jelena'];
 const DATES = ['2026-09-25','2026-09-26','2026-09-27','2026-09-28'];
+const FHEAD = ['ID','Datei','Vorschau','Aufgenommen','Von','Lat','Lng','Ort','Beschreibung','Hochgeladen','Gelöscht'];
+const FOLDER_NAME = 'London 2026 – Erinnerungen';
 
 // Text kürzen und Formel-Einschleusung verhindern (=, +, -, @ am Anfang)
 function clean_(v, max) {
@@ -1401,9 +1696,47 @@ function loc_() {
   return sh;
 }
 
+// Fotos: Tabellenblatt „Fotos“ + privater Drive-Ordner (mit Unterordner für Vorschaubilder)
+function fotos_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName('Fotos');
+  if (!sh) {
+    sh = ss.insertSheet('Fotos');
+    sh.getRange(1, 1, 1000, FHEAD.length).setNumberFormat('@');
+    sh.getRange(1, 1, 1, FHEAD.length).setValues([FHEAD]);
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function folder_(sub) {
+  const props = PropertiesService.getScriptProperties();
+  const key = sub ? 'FOLDER_THUMBS' : 'FOLDER';
+  const id = props.getProperty(key);
+  if (id) { try { return DriveApp.getFolderById(id); } catch (err) {} }
+  const f = sub ? folder_(false).createFolder('Vorschaubilder') : DriveApp.createFolder(FOLDER_NAME);
+  props.setProperty(key, f.getId());
+  return f;
+}
+function fotoRow_(id) {
+  const sh = fotos_();
+  const last = sh.getLastRow();
+  if (last < 2) return null;
+  const rows = sh.getRange(2, 1, last - 1, FHEAD.length).getValues();
+  for (let i = 0; i < rows.length; i++) if (String(rows[i][0]) === String(id)) return { r: i + 2, v: rows[i] };
+  return null;
+}
+
 function doGet(e) {
   const p = (e && e.parameter) || {};
   if (!authOk_(p.k)) return out_({ ok: false, error: 'auth' });
+  if (p.img) {
+    // Nur Bilder ausliefern, die in der Foto-Liste stehen (nie beliebige Drive-Dateien)
+    const f = fotoRow_(p.img);
+    if (!f || f.v[10]) return out_({ ok: false, error: 'notfound' });
+    const blob = DriveApp.getFileById(p.s === 'f' ? f.v[1] : f.v[2]).getBlob();
+    return out_({ ok: true, data: Utilities.base64Encode(blob.getBytes()) });
+  }
+  if (p.tab === 'Fotos') return out_({ ok: true, rows: fotos_().getDataRange().getDisplayValues() });
   if (p.tab === 'Standorte') return out_({ ok: true, rows: loc_().getDataRange().getValues() });
   const sh = p.tab === 'Programm' ? prog_() : sheet_();
   return out_({ ok: true, rows: sh.getDataRange().getDisplayValues() });
@@ -1426,6 +1759,26 @@ function doPost(e) {
       const i = names.indexOf(d.name);
       const row = [d.name, on ? d.lat : '', on ? d.lng : '', on ? Math.min(99999, Math.round(Number(d.acc) || 0)) : '', Date.now()];
       sh.getRange(i >= 0 ? i + 2 : last + 1, 1, 1, row.length).setValues([row]);
+      return out_({ ok: true });
+    }
+    if (d.action === 'foto') {
+      if (PEOPLE.indexOf(d.von) < 0 || !/^[\\w-]{4,40}$/.test(String(d.id))) return out_({ ok: false });
+      if (typeof d.full !== 'string' || typeof d.thumb !== 'string' || d.full.length > 12000000 || d.thumb.length > 600000) return out_({ ok: false, error: 'size' });
+      if (fotoRow_(d.id)) return out_({ ok: true, dup: true });
+      const taken = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$/.test(String(d.taken)) ? d.taken : '';
+      const num = x => (typeof x === 'number' && isFinite(x)) ? String(x) : '';
+      const name = (taken ? taken.replace('T', '_').replace(':', '') : 'ohne-Datum') + '_' + d.von + '_' + d.id + '.jpg';
+      const full = folder_(false).createFile(Utilities.newBlob(Utilities.base64Decode(d.full), 'image/jpeg', name));
+      const thumb = folder_(true).createFile(Utilities.newBlob(Utilities.base64Decode(d.thumb), 'image/jpeg', name));
+      fotos_().appendRow([d.id, full.getId(), thumb.getId(), taken, d.von, num(d.lat), num(d.lng),
+        clean_(d.ort, 80), clean_(d.note, 120), new Date().toISOString(), '']);
+      return out_({ ok: true });
+    }
+    if (d.action === 'fotodel') {
+      const f = fotoRow_(d.id);
+      if (!f || String(f.v[4]) !== String(d.name)) return out_({ ok: false });   // nur eigene Fotos
+      try { DriveApp.getFileById(f.v[1]).setTrashed(true); DriveApp.getFileById(f.v[2]).setTrashed(true); } catch (err) {}
+      fotos_().getRange(f.r, 11).setValue('x');
       return out_({ ok: true });
     }
     if (d.action === 'prog') {
@@ -1635,6 +1988,8 @@ function switchView(v) {
   mapVisible(v === 'map');
   if (v === 'transit') loadLines();
   if (v === 'cost') loadCosts(true);
+  if (v === 'photos') loadPhotos();
+  if (v === 'map' && !photosLoaded && !locked()) loadPhotos();
   if (v === 'plan' && switchView.started) loadProgram();
   switchView.started = true;
 }
@@ -1708,6 +2063,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Karte
   $('#locBtn').onclick = () => { initMap(); if (map) map.locate({ setView: true, maxZoom: 16 }); };
   $('#homeBtn').onclick = () => showOnMap('home');
+
+  // Erinnerungen
+  $('#photoInput').onchange = e => { const f = [...e.target.files]; e.target.value = ''; if (f.length) pickPhotos(f); };
+  $('#pickBtn').addEventListener('click', e => { if (locked()) { e.preventDefault(); askCode(); } else if (!ME) { e.preventDefault(); toast('Bitte oben bei „Ich bin“ deinen Namen antippen'); } });
+  $('#uplGo').onclick = uploadPending;
+  $('#uplCancel').onclick = () => { pending = []; renderPending(); $('#uplStatus').textContent = ''; };
+  $('#pdClose').onclick = closePhoto;
+  $('#pdDel').onclick = deletePhoto;
+  $('#pdMap').onclick = showPhotoOnMap;
 
   // Programm-Editor
   $('#evForm').onsubmit = submitEditor;
