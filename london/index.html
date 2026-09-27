@@ -282,7 +282,11 @@ dialog#evDlg textarea { min-height: 70px; resize: vertical; }
 dialog#photoDlg { border: 0; padding: 0; background: #000; color: #fff; width: 100vw; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; }
 dialog#photoDlg::backdrop { background: #000; }
 #photoDlg .wrapi { display: flex; flex-direction: column; height: 100%; }
-#photoDlg .imgbox { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
+#photoDlg .imgbox { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; position: relative; touch-action: pan-y; }
+#photoDlg .pnav { position: absolute; top: 50%; transform: translateY(-50%); width: 46px; height: 64px; border: 0; border-radius: 12px; background: rgba(255,255,255,.16); color: #fff; font-size: 38px; line-height: 1; cursor: pointer; z-index: 2; }
+#photoDlg .pnav:disabled { opacity: 0; pointer-events: none; }
+#photoDlg .pnav.prev { left: 8px; } #photoDlg .pnav.next { right: 8px; }
+#photoDlg .pcount { position: absolute; top: calc(18px + env(safe-area-inset-top)); left: 16px; font-size: 13px; background: rgba(0,0,0,.45); padding: 3px 9px; border-radius: 999px; }
 #photoDlg img { max-width: 100%; max-height: 100%; object-fit: contain; }
 #photoDlg .meta { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: #111; font-size: 14px; }
 #photoDlg .meta .btn { background: #222; color: #fff; border-color: #444; }
@@ -632,7 +636,12 @@ nav.tabs button.on { color: var(--accent); }
 <dialog id="photoDlg" aria-label="Foto">
   <div class="wrapi">
     <button class="close" id="pdClose" aria-label="Schließen">✕</button>
-    <div class="imgbox"><img id="pdImg" alt=""></div>
+    <div class="imgbox" id="pdBox">
+      <button class="pnav prev" id="pdPrev" aria-label="Vorheriges Foto">‹</button>
+      <img id="pdImg" alt="">
+      <button class="pnav next" id="pdNext" aria-label="Nächstes Foto">›</button>
+      <span class="pcount" id="pdCount"></span>
+    </div>
     <div class="meta">
       <div id="pdMeta"></div>
       <div class="btns" style="margin-top:8px">
@@ -871,7 +880,7 @@ function lockDevice() {
   if (!confirm('Gruppen-Code und gespeicherte Daten (Kosten, Standorte) von diesem Gerät entfernen?')) return;
   if (sharing) setSharing(false);
   ['gc', 'expCache', 'expCacheTime', 'progSheet', 'queue', 'progLocal'].forEach(k => { try { localStorage.removeItem('ldn26_' + k); } catch (e) {} });
-  photos = []; thumbCache.clear(); pending = []; renderPending();
+  photos = []; thumbCache.clear(); fullCache.clear(); pending = []; renderPending();
   GROUP_CODE = ''; SECRETS = null; expenses = []; queue = []; progSheet = {}; progLocal = {}; locs = {}; costsLoaded = 0;
   afterUnlockChange(); toast('Gerät gesperrt 🔒');
 }
@@ -1583,21 +1592,40 @@ function renderGallery() {
   for (let k = 0; k < 4; k++) next();
 }
 let openId = null;
+const fullCache = new Map();   // ID -> data:-URL (Originalgröße, nur diese Sitzung)
+async function fullImg(id) {
+  if (fullCache.has(id)) return fullCache.get(id);
+  const j = await apiGetRaw('img=' + encodeURIComponent(id) + '&s=f');
+  const url = 'data:image/jpeg;base64,' + j.data; fullCache.set(id, url); return url;
+}
+function navPhoto(delta) {
+  const i = photos.findIndex(x => x.id === openId);
+  const n = photos[i + delta];
+  if (n) openPhoto(n.id);
+}
 async function openPhoto(id) {
   const p = photos.find(x => x.id === id); if (!p) return;
   openId = id;
   const dlg = $('#photoDlg');
-  $('#pdImg').src = thumbCache.get(id) || '';
+  $('#pdImg').src = fullCache.get(id) || thumbCache.get(id) || '';
   const d = new Date(p.taken + ':00');
   $('#pdMeta').innerHTML = `<b>${esc(p.note || p.ort || 'Erinnerung')}</b><br><span style="opacity:.75">${isNaN(d) ? '' : d.toLocaleString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · von ${esc(p.von)}${p.ort ? ' · ' + esc(p.ort) : ''}</span>`;
   $('#pdMap').style.display = isNaN(p.lat) ? 'none' : '';
   $('#pdDel').style.display = p.von === ME ? '' : 'none';
   $('#pdSave').removeAttribute('href');
-  if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+  const idx = photos.indexOf(p);
+  $('#pdPrev').disabled = idx <= 0;
+  $('#pdNext').disabled = idx >= photos.length - 1;
+  $('#pdCount').textContent = `${idx + 1} / ${photos.length}`;
+  if (!dlg.open) { if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', ''); }
+  // Vorschaubild sofort, falls noch nicht geladen
+  if (!thumbCache.has(id)) thumb(id).then(u => { if (openId === id && !fullCache.has(id)) $('#pdImg').src = u; }).catch(() => {});
   try {
-    const j = await apiGetRaw('img=' + encodeURIComponent(id) + '&s=f');
-    if (openId === id) { const url = 'data:image/jpeg;base64,' + j.data; $('#pdImg').src = url; $('#pdSave').href = url; $('#pdSave').download = `London-${p.taken.replace(/[:T]/g, '-')}-${p.von}.jpg`; }
+    const url = await fullImg(id);
+    if (openId === id) { $('#pdImg').src = url; $('#pdSave').href = url; $('#pdSave').download = `London-${p.taken.replace(/[:T]/g, '-')}-${p.von}.jpg`; }
   } catch (e) {}
+  // Nachbarn im Hintergrund vorladen, damit Blättern flüssig ist
+  [photos[idx + 1], photos[idx - 1]].forEach(n => { if (n && openId === id) fullImg(n.id).catch(() => {}); });
 }
 function closePhoto() { const dlg = $('#photoDlg'); if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); openId = null; }
 async function deletePhoto() {
@@ -2083,6 +2111,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   $('#pdClose').onclick = closePhoto;
   $('#pdDel').onclick = deletePhoto;
   $('#pdMap').onclick = showPhotoOnMap;
+  $('#pdPrev').onclick = () => navPhoto(-1);
+  $('#pdNext').onclick = () => navPhoto(1);
+  let tx = null, ty = null;
+  $('#pdBox').addEventListener('touchstart', e => { tx = e.touches[0].clientX; ty = e.touches[0].clientY; }, { passive: true });
+  $('#pdBox').addEventListener('touchend', e => {
+    if (tx === null) return;
+    const dx = e.changedTouches[0].clientX - tx, dy = e.changedTouches[0].clientY - ty; tx = null;
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) navPhoto(dx < 0 ? 1 : -1);
+  });
+  document.addEventListener('keydown', e => {
+    if (!$('#photoDlg').open) return;
+    if (e.key === 'ArrowRight') navPhoto(1);
+    if (e.key === 'ArrowLeft') navPhoto(-1);
+  });
 
   // Programm-Editor
   $('#evForm').onsubmit = submitEditor;
