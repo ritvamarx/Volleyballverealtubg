@@ -701,7 +701,7 @@ nav.tabs button.on { color: var(--accent); }
 const SHEET_ID = '1-XBuRIJlECfbVELZru071S7sOIO8NsyPfnWGxKLlkfY';
 // Optional: Web-App-URL des Apps Scripts (siehe Kosten → Einrichtung).
 // Wenn hier eingetragen, können alle direkt in der App Ausgaben speichern.
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzoRprRNMeRYJ8oK0FCqMvUBH6iDASHkUfiztcZrzu-9Zpgm2el6Bc9lnH0s3QHygrvVw/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxYVvXtytP5F_cLqo3Z4ShA31uxvy4TbUZePDIq-8fh2lqeFlAg8j5Uxi3GS4rIBxwRgQ/exec';
 // Ersatz-Kurs, falls offline und noch nie ein Kurs geladen wurde (1 € = x £)
 const FALLBACK_RATE = 0.86;
 
@@ -883,7 +883,10 @@ function afterUnlockChange() {
 // Zugriff aufs Apps Script – immer mit Gruppen-Code
 async function apiGet(params) {
   if (!GROUP_CODE) throw new Error('auth');
-  const r = await fetch(cfg.script + (cfg.script.includes('?') ? '&' : '?') + params + '&k=' + encodeURIComponent(GROUP_CODE) + '&t=' + Date.now());
+  const url = () => cfg.script + (cfg.script.includes('?') ? '&' : '?') + params + '&k=' + encodeURIComponent(GROUP_CODE) + '&t=' + Date.now();
+  let r;
+  try { r = await fetch(url()); }
+  catch (e) { await new Promise(res => setTimeout(res, 1500)); r = await fetch(url()); }   // schwaches Netz: einmal wiederholen
   const j = await r.json();
   if (j && j.ok === false) throw new Error(j.error || 'fehler');
   return j.rows || [];
@@ -1533,7 +1536,7 @@ async function loadPhotos() {
     const head = (rows[0] || []).map(String);
     if (head[0] !== 'ID' || head[1] !== 'Datei') throw new Error('script');   // altes Script ohne Fotos
     photos = rows.slice(1).filter(r => r[0] && !r[10]).map(r => ({
-      id: String(r[0]), taken: String(r[3]), von: String(r[4]), lat: parseNum(r[5]), lng: parseNum(r[6]), ort: String(r[7] || ''), note: String(r[8] || ''),
+      id: String(r[0]), taken: normTaken(r[3]), von: String(r[4]), lat: parseNum(r[5]), lng: parseNum(r[6]), ort: String(r[7] || ''), note: String(r[8] || ''),
     })).sort((a, b) => a.taken.localeCompare(b.taken));
     photosLoaded = true;
     $('#galStatus').textContent = photos.length ? '' : 'Noch keine Fotos. Legt los! 📷';
@@ -1542,6 +1545,14 @@ async function loadPhotos() {
     $('#galStatus').textContent = e.message === 'script' ? '⚠️ Das Apps Script ist noch nicht auf dem neuesten Stand (Fotos fehlen).' : e.message === 'auth' ? '🔒 Gruppen-Code fehlt oder falsch.' : '⚠️ Erinnerungen konnten nicht geladen werden.';
   }
   renderGallery(); buildPhotoMarkers();
+}
+function normTaken(v) {
+  v = String(v || '').trim();
+  let m = v.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}T${m[4].padStart(2, '0')}:${m[5]}`;
+  m = v.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})[ ,]+(\d{1,2}):(\d{2})/);
+  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}T${m[4].padStart(2, '0')}:${m[5]}`;
+  return v;
 }
 async function thumb(id) {
   if (thumbCache.has(id)) return thumbCache.get(id);
@@ -1642,7 +1653,7 @@ async function loadLines() {
    KOSTEN (Google Sheets)
    ===================================================================== */
 let cfg = Object.assign({ script: SCRIPT_URL, sheet: SHEET_ID }, store.get('cfg', {}));
-if (SCRIPT_URL && !store.get('cfg', {}).script) cfg.script = SCRIPT_URL;
+if (SCRIPT_URL && (!store.get('cfg', {}).script || /AKfycbzoRprRNMeRYJ8oK0FC/.test(cfg.script))) cfg.script = SCRIPT_URL;
 let expenses = store.get('expCache', []);   // zuletzt geladene Einträge
 let queue = store.get('queue', []);         // noch nicht übertragene Einträge
 let costsLoaded = store.get('expCacheTime', 0);
