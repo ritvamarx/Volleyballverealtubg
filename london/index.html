@@ -1444,15 +1444,21 @@ function parseTiff(v, t) {
   } catch (e) {}
   return res;
 }
-// Bild verkleinern (Ausrichtung übernimmt der Browser) → JPEG als Base64
-async function shrink(file, max, q) {
+// Bild einmal dekodieren und in eine oder mehrere Größen verkleinern (Ausrichtung übernimmt der Browser)
+async function shrink(file, sizes) {
   const url = URL.createObjectURL(file);
   try {
     const img = new Image(); img.src = url; await img.decode();
-    const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
-    const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    return c.toDataURL('image/jpeg', q);
+    const out = sizes.map(([max, q]) => {
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const d = c.toDataURL('image/jpeg', q);
+      c.width = c.height = 0;   // Speicher sofort freigeben (wichtig auf dem iPhone)
+      return d;
+    });
+    img.src = '';
+    return out;
   } finally { URL.revokeObjectURL(url); }
 }
 // Programmpunkt zur Aufnahmezeit → dessen Ort
@@ -1469,23 +1475,27 @@ function itemAt(dt) {
 const placeOptions = () => Object.entries(PLACES).filter(([, p]) => p.lat != null).map(([k, p]) => `<option value="${k}">${esc(p.name)}</option>`).join('');
 function nowLocal() { const n = zoneNow('Europe/London'); return `${n.date}T${n.time}`; }
 
+// Auswahl: nur EXIF lesen und Vorschaubild erzeugen; die große Version entsteht erst beim Hochladen
 async function pickPhotos(files) {
   if (locked()) return askCode();
   if (!ME) return toast('Bitte oben bei „Ich bin“ deinen Namen antippen');
-  $('#uplStatus').textContent = 'Fotos werden vorbereitet …';
+  let n = 0;
   for (const f of files) {
+    n++; $('#uplStatus').textContent = `Fotos werden vorbereitet … ${n}/${files.length}`;
     try {
       const ex = readExif(await f.slice(0, 256 * 1024).arrayBuffer());
-      const full = await shrink(f, 2048, 0.85), thumb = await shrink(f, 480, 0.75);
+      const [thumb] = await shrink(f, [[480, 0.75]]);
       const date = ex.date || nowLocal();
       const it = itemAt(date), itPlace = it && it.place && PLACES[it.place] && PLACES[it.place].lat != null ? it.place : '';
-      pending.push({ id: 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), full, thumb, date, gps: ex.lat != null ? { lat: ex.lat, lng: ex.lng } : null,
-        loc: ex.lat != null ? 'gps' : (itPlace || 'none'), note: it ? it.title : '' });
-    } catch (e) { toast(`${f.name}: Format wird nicht unterstützt`); }
+      pending.push({ id: 'f' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), file: f, thumb, date, gps: ex.lat != null ? { lat: ex.lat, lng: ex.lng } : null,
+        loc: ex.lat != null ? 'gps' : (itPlace || 'none'), note: it ? it.title : '', status: '' });
+      renderPending();
+    } catch (e) { toast(`${f.name || 'Foto'}: Format wird nicht unterstützt`); }
   }
   $('#uplStatus').textContent = '';
   renderPending();
 }
+const UPL_STATUS = { '': '', wait: '⏳ wartet', up: '⬆️ wird hochgeladen …', check: '🔎 wird geprüft …', ok: '✅ angekommen', retry: '🔁 neuer Versuch …', fail: '⚠️ nicht angekommen' };
 function renderPending() {
   $('#uplList').innerHTML = pending.map((p, i) => `<div class="upli" data-i="${i}">
       <img src="${p.thumb}" alt="">
@@ -1498,7 +1508,7 @@ function renderPending() {
           <option value="none">– ohne Ort –</option>
         </select>
         <input type="text" class="pNote" maxlength="120" placeholder="Beschreibung (optional)" value="${esc(p.note)}">
-        <div class="src">${p.gps ? 'GPS im Foto gefunden' : 'Kein GPS im Foto: Ort aus dem Programm vorgeschlagen'}</div>
+        <div class="src">${p.status ? `<b>${UPL_STATUS[p.status]}</b>` : p.gps ? 'GPS im Foto gefunden' : 'Kein GPS im Foto: Ort aus dem Programm vorgeschlagen'}</div>
       </div></div>`).join('');
   $('#uplList').querySelectorAll('.upli').forEach(el => {
     const p = pending[+el.dataset.i];
@@ -1510,31 +1520,60 @@ function renderPending() {
   $('#uplBtns').style.display = pending.length ? '' : 'none';
   $('#uplGo').textContent = `⬆️ ${pending.length} Foto${pending.length === 1 ? '' : 's'} hochladen`;
 }
+function setUplStatus(p, st) {
+  p.status = st;
+  const el = $('#uplList').querySelector(`.upli[data-i="${pending.indexOf(p)}"] .src`);
+  if (el) el.innerHTML = `<b>${UPL_STATUS[st]}</b>`;
+}
 function herePos() {
   return new Promise(res => navigator.geolocation ? navigator.geolocation.getCurrentPosition(p => res({ lat: +p.coords.latitude.toFixed(5), lng: +p.coords.longitude.toFixed(5) }), () => res(null), { timeout: 15000, maximumAge: 60000 }) : res(null));
 }
+let uploading = false;
 async function uploadPending() {
   if (locked()) return askCode();
-  const list = pending.slice(); if (!list.length) return;
-  $('#uplGo').disabled = true;
+  if (uploading || !pending.length) return;
+  uploading = true; $('#uplGo').disabled = true; $('#uplCancel').disabled = true;
+  // Bildschirm während des Hochladens anlassen (sonst bricht das iPhone ab)
+  let wake = null; try { wake = await navigator.wakeLock?.request('screen'); } catch (e) {}
   let here = null;
-  if (list.some(p => p.loc === 'here')) here = await herePos();
-  let n = 0;
-  for (const p of list) {
-    n++; $('#uplStatus').textContent = `Lade ${n}/${list.length} hoch …`;
-    let lat = '', lng = '', ort = '';
-    if (p.loc === 'gps' && p.gps) ({ lat, lng } = p.gps);
-    else if (p.loc === 'here' && here) ({ lat, lng } = here);
-    else if (PLACES[p.loc]) { lat = PLACES[p.loc].lat; lng = PLACES[p.loc].lng; ort = PLACES[p.loc].name; }
+  if (pending.some(p => p.loc === 'here')) here = await herePos();
+  pending.forEach(p => { p.status = 'wait'; }); renderPending();
+  let offline = false;
+  for (let round = 0; round < 3 && pending.length && !offline; round++) {
+    const list = pending.slice();
+    let n = 0;
+    for (const p of list) {
+      n++; $('#uplStatus').textContent = `${round ? 'Neuer Versuch' : 'Hochladen'}: Foto ${n} von ${list.length} … Bitte App geöffnet lassen.`;
+      setUplStatus(p, round ? 'retry' : 'up');
+      let lat = '', lng = '', ort = '';
+      if (p.loc === 'gps' && p.gps) ({ lat, lng } = p.gps);
+      else if (p.loc === 'here' && here) ({ lat, lng } = here);
+      else if (PLACES[p.loc]) { lat = PLACES[p.loc].lat; lng = PLACES[p.loc].lng; ort = PLACES[p.loc].name; }
+      try {
+        const [full] = await shrink(p.file, [[1600, 0.82]]);
+        await apiPost({ action: 'foto', id: p.id, von: ME, taken: p.date, lat, lng, ort, note: p.note.trim(), full: full.split(',')[1], thumb: p.thumb.split(',')[1] });
+        setUplStatus(p, 'check');
+      } catch (e) {
+        if (!navigator.onLine) { offline = true; break; }
+        setUplStatus(p, 'fail');
+      }
+    }
+    // Nachprüfen, welche Fotos wirklich angekommen sind (das Script verhindert Doppelte)
+    $('#uplStatus').textContent = 'Prüfe, ob alles angekommen ist …';
     try {
-      await apiPost({ action: 'foto', id: p.id, von: ME, taken: p.date, lat, lng, ort, note: p.note.trim(), full: p.full.split(',')[1], thumb: p.thumb.split(',')[1] });
-      thumbCache.set(p.id, p.thumb);
-      pending = pending.filter(x => x !== p);
-    } catch (e) { $('#uplStatus').textContent = 'Keine Verbindung: bitte später erneut hochladen.'; break; }
+      const rows = await apiGet('tab=Fotos');
+      const ids = new Set(rows.slice(1).map(r => String(r[0])));
+      pending.filter(p => ids.has(p.id)).forEach(p => { thumbCache.set(p.id, p.thumb); setUplStatus(p, 'ok'); });
+      pending = pending.filter(p => !ids.has(p.id));
+      pending.forEach(p => { p.status = 'fail'; });
+    } catch (e) { offline = true; }
+    renderPending();
   }
-  $('#uplGo').disabled = false;
+  try { await wake?.release(); } catch (e) {}
+  uploading = false; $('#uplGo').disabled = false; $('#uplCancel').disabled = false;
   renderPending();
-  if (!pending.length) { $('#uplStatus').textContent = 'Hochgeladen ✓ Galerie wird aktualisiert …'; setTimeout(() => loadPhotos(), 1500); }
+  if (!pending.length) { $('#uplStatus').textContent = 'Alle Fotos angekommen ✓'; loadPhotos(); }
+  else { $('#uplStatus').textContent = offline ? `Keine Verbindung. ${pending.length} Foto(s) warten, bitte später erneut „Hochladen“ tippen.` : `${pending.length} Foto(s) sind nicht angekommen. Bitte erneut „Hochladen“ tippen.`; loadPhotos(); }
 }
 
 async function loadPhotos() {
