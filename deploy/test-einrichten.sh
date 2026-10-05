@@ -12,6 +12,11 @@
 # (mit Sicherungskopie + validate vor dem Reload). Mehrfach ausführbar.
 set -euo pipefail
 
+# Alles in einem { …; exit; }-Block: bash liest den Block vollständig ein,
+# bevor er läuft. Sonst würde das Kopieren von deploy/ dieses Skript
+# überschreiben, während bash es noch zeilenweise liest (→ Syntaxfehler).
+{
+
 REPO="ritvamarx/Volleyballverealtubg"
 PFAD="/opt/volleyball-test"
 DOMAIN="volleyball-test.nettverwaltet.de"
@@ -68,3 +73,5 @@ echo "▶ 6/6 Fertig"
 echo "🧪 TEST-UMGEBUNG BEREIT: https://$DOMAIN"
 echo "   (Erstes Trainerkonto anlegen mit:"
 echo "    cd $PFAD && docker compose exec volleyball ./manage.py create-trainer --username NAME)"
+exit
+}
