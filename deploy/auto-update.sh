@@ -24,12 +24,15 @@ curl -fsSL --max-time 120 "https://codeload.github.com/$REPO/tar.gz/$NEU" \
   | tar -xz -C "$TMP" --strip-components=1
 
 cp -r "$TMP/index.html" "$TMP/assets" "$TMP/server" "$TMP/deploy" "$PFAD/"
+for extra in manifest.webmanifest sw.js; do
+  [ -f "$TMP/$extra" ] && cp "$TMP/$extra" "$PFAD/"
+done
 cd "$PFAD"
-docker compose up -d --build app
+docker compose up -d --build volleyball
 
 # Erst nach erfolgreichem Start als deployt markieren
 sleep 3
-docker compose exec -T app python3 -c \
+docker compose exec -T volleyball python3 -c \
   "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/gesund')" \
   >/dev/null
 echo "$NEU" > "$SHA_DATEI"

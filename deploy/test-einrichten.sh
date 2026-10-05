@@ -22,6 +22,9 @@ TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/main" \
   | tar -xz -C "$TMP" --strip-components=1
 cp -r "$TMP/index.html" "$TMP/assets" "$TMP/server" "$TMP/deploy" "$PFAD/"
+for extra in manifest.webmanifest sw.js; do
+  [ -f "$TMP/$extra" ] && cp "$TMP/$extra" "$PFAD/"
+done
 
 echo "▶ 2/6 docker-compose und .env vorbereiten"
 if [ -f /opt/volleyball/docker-compose.yml ]; then
@@ -34,9 +37,9 @@ fi
 
 echo "▶ 3/6 Test-Container bauen und starten"
 cd "$PFAD"
-docker compose up -d --build app
+docker compose up -d --build volleyball
 sleep 3
-docker compose exec -T app python3 -c \
+docker compose exec -T volleyball python3 -c \
   "import urllib.request;print(urllib.request.urlopen('http://127.0.0.1:8000/gesund').read().decode())"
 
 echo "▶ 4/6 Caddy-vHost eintragen"
@@ -59,4 +62,4 @@ SHA="$(curl -fsSL "https://api.github.com/repos/$REPO/commits/main" | grep -m1 '
 echo "▶ 6/6 Fertig"
 echo "🧪 TEST-UMGEBUNG BEREIT: https://$DOMAIN"
 echo "   (Erstes Trainerkonto anlegen mit:"
-echo "    cd $PFAD && docker compose exec app ./manage.py create-trainer --username NAME)"
+echo "    cd $PFAD && docker compose exec volleyball ./manage.py create-trainer --username NAME)"
