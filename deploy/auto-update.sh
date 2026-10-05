@@ -11,8 +11,10 @@ REPO="ritvamarx/Volleyballverealtubg"
 PFAD="${1:-/opt/volleyball-test}"
 SHA_DATEI="$PFAD/.deployed-sha"
 
+# awk liest die Antwort vollständig (grep -m1 würde die Pipe vorzeitig
+# schließen → curl-Fehler 23, mit pipefail Abbruch bei jedem Lauf)
 NEU="$(curl -fsSL --max-time 30 "https://api.github.com/repos/$REPO/commits/main" \
-      | grep -m1 '"sha"' | cut -d'"' -f4)"
+      | awk -F'"' '/"sha"/ && !s {s=$4} END {print s}')" || true
 [ -n "$NEU" ] || exit 0
 ALT="$(cat "$SHA_DATEI" 2>/dev/null || true)"
 [ "$NEU" = "$ALT" ] && exit 0
@@ -34,6 +36,6 @@ docker compose up -d --build volleyball
 sleep 3
 docker compose exec -T volleyball python3 -c \
   "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/gesund')" \
-  >/dev/null
+  >/dev/null </dev/null
 echo "$NEU" > "$SHA_DATEI"
 echo "$(date -Is) erfolgreich aktualisiert auf $NEU"
