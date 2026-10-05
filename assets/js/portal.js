@@ -356,10 +356,10 @@
           <div class="title">${esc(a.title)}</div><div class="sub">${esc(a.body)}</div></div></div>`).join("")}
       </div></div>` : ""}
       <div class="card"><h3>📅 Die nächsten Termine</h3><div class="list">
-        ${naechste.length ? naechste.map((e) => `<div class="list-item"><div class="grow">
+        ${naechste.length ? naechste.map((e) => `<div class="list-item" data-gehzu="${e.id}" role="link" tabindex="0" style="cursor:pointer"><div class="grow">
             <div class="title">${e.art === "misc" ? esc(e.kategorie) + ": " : (ICON[e.art] || "📌") + " "}${esc(e.title || "")}${e.opponent ? " gegen " + esc(e.opponent) : ""}</div>
             <div class="sub">${fmtDate(e.start)} · ${fmtTime(e.start)} Uhr${e.location ? " · " + esc(e.location) : ""}</div>
-          </div></div>`).join("") : `<p class="soft">Aktuell stehen keine Termine an.</p>`}
+          </div><span class="arr">›</span></div>`).join("") : `<p class="soft">Aktuell stehen keine Termine an.</p>`}
       </div></div>
       ${d.links.length ? `<div class="card"><h3>🔗 Links</h3><div class="list">
         ${d.links.map((l) => `<a class="list-item" href="${escUrl(l.url)}" target="_blank" rel="noopener"><div class="grow">
@@ -413,7 +413,7 @@
     return `
       <div class="card"><h3>${istEltern() ? "🏐 Trainings – so hat sich dein Kind gemeldet" : "🏐 Training – bitte rückmelden"}</h3>
       ${d.trainings.length ? d.trainings.map((t) => `
-        <div class="portal-termin">
+        <div class="portal-termin" data-termin="${t.id}">
           <div class="title">${fmtDate(t.start)} · ${fmtTime(t.start)}–${fmtTime(t.end)} Uhr${t.location ? " · " + esc(t.location) : ""}</div>
           ${ortZeile(t)}
           ${zusagenPills(t.zusagen)}
@@ -424,7 +424,7 @@
         </div>`).join("") : `<p class="soft">Keine anstehenden Trainings eingetragen.</p>`}
       </div>
       <div class="card"><h3>${istEltern() ? "🏆 Spiele – Rückmeldestand deines Kindes" : "🏆 Spiele – bitte rückmelden"}</h3>
-      ${d.spiele.length ? d.spiele.map((s) => `<div class="portal-termin">
+      ${d.spiele.length ? d.spiele.map((s) => `<div class="portal-termin" data-termin="${s.id}">
           <div class="title">${s.type === "home" ? "🏟️ Heimspiel" : "🚌 Auswärtsspiel"}${s.opponent ? " gegen " + esc(s.opponent) : ""}</div>
           <div class="sub">${fmtDate(s.start)} · ${fmtTime(s.start)} Uhr${s.location ? " · " + esc(s.location) : ""}</div>
           ${ortZeile(s)}
@@ -448,7 +448,7 @@
         </div>`).join("") : `<p class="soft">Keine anstehenden Spiele eingetragen.</p>`}
       </div>
       ${(P.daten.weitere || []).length ? `<div class="card"><h3>📌 Weitere Termine</h3><div class="list">
-      ${P.daten.weitere.map((w) => `<div class="list-item"><div class="grow">
+      ${P.daten.weitere.map((w) => `<div class="list-item" data-termin="${w.id}"><div class="grow">
           <div class="title">${esc(w.kategorie)}: ${esc(w.title)}</div>
           <div class="sub">${fmtDate(w.start)} · ${fmtTime(w.start)} Uhr${w.location ? " · " + esc(w.location) : ""}</div>
           ${ortZeile(w)}
@@ -1002,6 +1002,18 @@
         if (r.ok) P.quiz = r.data;
       }
       render();
+    });
+    // Übersicht: ein Tipp auf einen Termin springt zum Termine-Tab und hebt ihn hervor
+    wrap.querySelectorAll("[data-gehzu]").forEach((n) => n.onclick = () => {
+      const id = n.dataset.gehzu;
+      P.tab = "termine";
+      render();
+      const ziel = document.querySelector(`[data-termin="${id}"]`);
+      if (ziel) {
+        ziel.scrollIntoView({ behavior: "smooth", block: "center" });
+        ziel.classList.add("termin-blitz");
+        setTimeout(() => ziel.classList.remove("termin-blitz"), 2400);
+      }
     });
     wrap.querySelectorAll("[data-aufg]").forEach((cb) => cb.onchange = () => {
       if (cb.checked) volleyballFlug();

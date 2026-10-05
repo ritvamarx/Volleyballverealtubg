@@ -283,6 +283,8 @@ textarea { resize: vertical; min-height: 72px; }
 }
 a.list-item { color: inherit; text-decoration: none; }
 a.list-item:hover, a.list-item:active { background: var(--surface-2); }
+@keyframes terminBlitz { 0%, 55% { outline: 2.5px solid var(--accent); outline-offset: 2px; } 100% { outline: 2.5px solid transparent; outline-offset: 2px; } }
+.termin-blitz { animation: terminBlitz 2.2s ease-out 1; border-radius: 12px; }
 .list-item .grow { flex: 1; min-width: 0; }
 .list-item .title { font-weight: 600; }
 .list-item .sub { font-size: .82rem; color: var(--text-soft); }
