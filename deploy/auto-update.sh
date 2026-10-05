@@ -7,6 +7,11 @@
 # data/ und .env der Ziel-Instanz bleiben unberührt.
 set -euo pipefail
 
+# Alles in einem { …; exit; }-Block: bash liest den Block vollständig ein,
+# bevor er läuft. Sonst würde das Kopieren von deploy/ dieses Skript
+# überschreiben, während bash es noch zeilenweise liest (→ Syntaxfehler).
+{
+
 REPO="ritvamarx/Volleyballverealtubg"
 PFAD="${1:-/opt/volleyball-test}"
 SHA_DATEI="$PFAD/.deployed-sha"
@@ -39,3 +44,5 @@ docker compose exec -T volleyball python3 -c \
   >/dev/null </dev/null
 echo "$NEU" > "$SHA_DATEI"
 echo "$(date -Is) erfolgreich aktualisiert auf $NEU"
+exit
+}
