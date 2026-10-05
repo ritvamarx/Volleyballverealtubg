@@ -768,6 +768,7 @@ def create_app() -> Flask:
             # Team-Avatare für die „Wer ist dabei?"-Anzeige – nur unter Spieler:innen
             "team": ([{"id": p["id"],
                        "name": f"{p.get('firstName', '')} {p.get('lastName', '')}".strip(),
+                       "vorname": (p.get("firstName") or "").strip(),
                        "avatarEmoji": p.get("avatarEmoji") or "",
                        "foto": foto_von(p.get("foto"))}
                       for p in daten.get("players", [])

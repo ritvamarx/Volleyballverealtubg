@@ -533,8 +533,8 @@
     return teile.length ? `<div class="sub">${teile.join(" · ")}</div>` : "";
   }
 
-  // „Wer ist dabei?": Avatare der Zugesagten (nur für Spieler:innen; Name beim
-  // Berühren/Hover per title – bewusst OHNE Gründe oder Bemerkungen)
+  // „Wer ist dabei?": Vornamen der Zugesagten (nur für Spieler:innen; voller
+  // Name beim Berühren/Hover per title – bewusst OHNE Gründe oder Bemerkungen)
   // Zu-/Absagen als farbige Zahl-Pillen (SpielerPlus-Muster)
   function zusagenPills(z) {
     z = z || {};
@@ -550,13 +550,20 @@
     const team = P.daten.team || [];
     const leute = t.dabeiIds.map((id) => team.find((p) => p.id === id)).filter(Boolean);
     if (!leute.length) return "";
-    const initialen = (name) => name.split(" ").map((x) => x[0] || "").join("").slice(0, 2).toUpperCase();
-    const zeig = leute.slice(0, 6);  // nur eine Handvoll Avatare, Rest steckt in der Zahl
+    const vorname = (p) => p.vorname || p.name.split(" ")[0] || p.name;
+    // Gleiche Vornamen im Team → Anfangsbuchstabe des Nachnamens dazu („Lena S.")
+    const anzahl = {};
+    leute.forEach((p) => { anzahl[vorname(p)] = (anzahl[vorname(p)] || 0) + 1; });
+    const anzeige = (p) => {
+      const v = vorname(p);
+      const nach = p.name.slice(v.length).trim();
+      return anzahl[v] > 1 && nach ? `${v} ${nach[0]}.` : v;
+    };
     return `<div class="dabei">
-      ${zeig.map((p) => p.foto
-        ? `<img class="mini" src="${p.foto}" alt="" title="${esc(p.name)}" style="object-fit:cover">`
-        : `<span class="mini" title="${esc(p.name)}"${p.avatarEmoji ? ' style="font-size:14px"' : ""}>${p.avatarEmoji ? esc(p.avatarEmoji) : esc(initialen(p.name))}</span>`).join("")}
-      <span class="n">${leute.length} dabei</span>
+      <span class="n">${leute.length} dabei:</span>
+      ${leute.map((p) => `<span class="dabei-name" title="${esc(p.name)}">${p.foto
+        ? `<img class="mini" src="${p.foto}" alt="" style="object-fit:cover">`
+        : p.avatarEmoji ? `<span class="mini emoji">${esc(p.avatarEmoji)}</span>` : ""}${esc(anzeige(p))}</span>`).join("")}
     </div>`;
   }
 
