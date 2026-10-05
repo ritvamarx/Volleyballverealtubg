@@ -18,6 +18,8 @@ DOMAIN="volleyball-test.nettverwaltet.de"
 
 echo "▶ 1/6 Dateien von GitHub holen"
 mkdir -p "$PFAD/data"
+# Der Container läuft als appuser (uid 1000) und muss die SQLite-DB anlegen können
+chown 1000:1000 "$PFAD/data"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 curl -fsSL "https://codeload.github.com/$REPO/tar.gz/refs/heads/main" \
   | tar -xz -C "$TMP" --strip-components=1
@@ -39,8 +41,10 @@ echo "▶ 3/6 Test-Container bauen und starten"
 cd "$PFAD"
 docker compose up -d --build volleyball
 sleep 3
+# </dev/null: sonst liest exec beim Aufruf per "curl … | bash" den Rest des Skripts
 docker compose exec -T volleyball python3 -c \
-  "import urllib.request;print(urllib.request.urlopen('http://127.0.0.1:8000/gesund').read().decode())"
+  "import urllib.request;print(urllib.request.urlopen('http://127.0.0.1:8000/gesund').read().decode())" \
+  </dev/null
 
 echo "▶ 4/6 Caddy-vHost eintragen"
 CADDY_CTN="$(docker ps --format '{{.Names}}\t{{.Image}}' | awk -F'\t' 'tolower($2) ~ /caddy/ {print $1; exit}')"
@@ -56,7 +60,8 @@ docker exec "$CADDY_CTN" caddy reload --config /etc/caddy/Caddyfile
 echo "▶ 5/6 Auto-Update der Test-Instanz einrichten (alle 10 Minuten)"
 chmod +x "$PFAD/deploy/auto-update.sh"
 cp "$PFAD/deploy/cron/volleyball-test-update" /etc/cron.d/volleyball-test-update
-SHA="$(curl -fsSL "https://api.github.com/repos/$REPO/commits/main" | grep -m1 '"sha"' | cut -d'"' -f4)"
+SHA="$(curl -fsSL "https://api.github.com/repos/$REPO/commits/main" \
+      | awk -F'"' '/"sha"/ && !s {s=$4} END {print s}')" || true
 [ -n "$SHA" ] && echo "$SHA" > "$PFAD/.deployed-sha"
 
 echo "▶ 6/6 Fertig"
