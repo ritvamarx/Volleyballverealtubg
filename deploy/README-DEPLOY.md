@@ -125,3 +125,10 @@ Caddy auf der Vereins-VM gibt `/api/content-feed` und `/api/content/*` nur für 
 Hub-VM (10.0.0.2) über einen privaten Port frei, siehe `anbindung/Caddyfile-vm1-snippet.txt`
 im Repo `contenthub`. Ohne Token antworten beide Endpunkte mit 404. Es werden nie
 Mitglieder-, Kinder- oder Kontaktdaten ausgeliefert.
+
+## Testumgebung: Auto-Update
+
+Die Test-Instanz (`/opt/volleyball-test`, `volleyball-test.nettverwaltet.de`)
+holt sich alle 10 Minuten den `main`-Stand von GitHub (`deploy/auto-update.sh`,
+Cron `/etc/cron.d/volleyball-test-update`, Log `data/update.log`). Die
+Live-Instanz wird davon nie berührt – Live-Updates nur per `deploy.sh`.
