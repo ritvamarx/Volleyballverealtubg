@@ -156,6 +156,7 @@
 
     el.innerHTML = `
       ${head("Übersicht", `Willkommen zurück im Trainer-Cockpit des ${esc(s.club)}`)}
+      <div id="dringend"></div>
       <div class="grid grid-4 mb">
         ${stat("🏐", "Aktive Spieler", s.players.filter((p) => p.membershipStatus !== "inaktiv").length, `${s.players.length} gesamt`, "#/players")}
         ${stat("📅", "Nächste Termine", next.length, next[0] ? `${labelForType(next[0].type)} ${relDays(next[0].start)}` : "—", "#/calendar")}
@@ -169,8 +170,8 @@
             <a class="btn sm outline" href="#/calendar">Kalender</a></div>
           <div class="timeline">
             ${next.length ? next.map((e) => `
-              <div class="tl-item">
-                <div class="flex"><strong>${esc(e.title)}</strong> ${eventPill(e.type)}</div>
+              <div class="tl-item tl-link" data-evgo="${e.id}" role="link" tabindex="0" title="${e.type === "training" ? "Zur Trainingsrückmeldung" : e.type === "away" ? "Zur Fahrerplanung" : e.type === "home" ? "Zu den Heimspiel-Jobs" : "Termin öffnen"}">
+                <div class="flex"><strong>${esc(e.title)}</strong> ${eventPill(e.type)}<span class="spacer"></span><span class="arr">›</span></div>
                 <div class="sub soft">${fmtDate(e.start)} · ${fmtTime(e.start)} Uhr · ${esc(e.location)}</div>
                 ${rsvpStand(e)}
               </div>`).join("") : empty("🗓️", "Keine anstehenden Termine")}
@@ -234,7 +235,46 @@
       volleyballFlug();
       toast("Aufgabe erledigt", "good"); reload();
     }));
+    // Anstehende Termine: ein Tipp führt direkt zur passenden Ansicht
+    $$("[data-evgo]", el).forEach((n) => n.onclick = () => {
+      const e = Store.byId("events", n.dataset.evgo);
+      if (!e) return;
+      if (e.type === "training") { training._sel = e.id; App.go("training"); }
+      else if (e.type === "away") { drivers._sel = e.id; App.go("drivers"); }
+      else if (e.type === "home") { jobs._sel = e.id; App.go("jobs"); }
+      else eventDetail(e.id);
+    });
     bindLinkActions(el);
+    ladeDringend(el);
+  }
+
+  // Offene Passwort-/Zugangsanfragen als sofort fällige Aufgabe anzeigen
+  // (nur in der Online-Version – die Anfragen liegen auf dem Server)
+  async function ladeDringend(el) {
+    const box = $("#dringend", el);
+    if (!box || !window.Sync || !Sync.active) return;
+    try {
+      const res = await fetch("/api/accounts", {
+        credentials: "same-origin",
+        headers: Sync.csrf ? { "X-CSRF-Token": Sync.csrf } : {},
+      });
+      if (!res.ok) return;
+      const anfragen = ((await res.json()).anfragen) || [];
+      if (!anfragen.length) { box.innerHTML = ""; return; }
+      const wann = (ts) => new Date(ts * 1000).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+      box.innerHTML = `
+        <div class="card mb" style="border:1.5px solid #d64545">
+          <div class="card-head"><h3>🚨 Sofort fällig (${anfragen.length})</h3><span class="spacer"></span>
+            <a class="btn sm" href="#/zugaenge">Jetzt erledigen</a></div>
+          <div class="list">
+            ${anfragen.map((a) => `
+              <a class="list-item" href="#/zugaenge"><div class="grow">
+                <div class="title">🔑 Wiederherstellungscode für „${esc(a.username)}“ erzeugen</div>
+                <div class="sub">Passwort-Anfrage · ${wann(a.created_at)} Uhr · bleibt hier stehen, bis sie erledigt oder verworfen ist</div>
+              </div><span class="arr">›</span></a>`).join("")}
+          </div>
+        </div>`;
+    } catch (e) { /* offline/lokal → keine Anzeige */ }
   }
   function prioBadge(p) {
     const m = { hoch: "bad", mittel: "warn", niedrig: "" };

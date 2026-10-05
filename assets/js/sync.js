@@ -251,6 +251,13 @@
     // Abmelden-Knopf + Status in der Seitenleiste
     const foot = document.querySelector(".sidebar-foot");
     if (foot && !$("#logoutBtn")) {
+      const bell = document.createElement("button");
+      bell.id = "pushBtn";
+      bell.className = "btn-ghost";
+      bell.textContent = "🔔 Mitteilungen";
+      bell.title = "Push-Mitteilungen für das Trainerteam (z. B. Passwort-Anfragen) an-/abschalten";
+      bell.onclick = trainerPushToggle;
+      foot.appendChild(bell);
       const btn = document.createElement("button");
       btn.id = "logoutBtn";
       btn.className = "btn-ghost";
@@ -261,7 +268,68 @@
       st.id = "syncStatus";
       st.className = "sync-status";
       foot.parentElement.insertBefore(st, foot);
+      pushKnopfAktualisieren();
+      pushAuffrischen();
     }
+  }
+
+  // ---------- Push-Mitteilungen für das Trainerteam ----------
+  function pushMoeglich() {
+    return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  }
+  function istIosOhneApp() {
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const installiert = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+    return ios && !installiert;
+  }
+  function b64ZuBytes(b64) {
+    const roh = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(roh, (z) => z.charCodeAt(0));
+  }
+  async function aktuellesPushAbo() {
+    if (!pushMoeglich()) return null;
+    const reg = await navigator.serviceWorker.getRegistration();
+    return reg ? reg.pushManager.getSubscription() : null;
+  }
+  async function pushKnopfAktualisieren() {
+    const b = $("#pushBtn");
+    if (!b) return;
+    const abo = await aktuellesPushAbo().catch(() => null);
+    b.textContent = abo ? "🔕 Mitteilungen aus" : "🔔 Mitteilungen an";
+  }
+  async function trainerPushToggle() {
+    const abo = await aktuellesPushAbo().catch(() => null);
+    if (abo) {
+      await api("/api/push/abo-loeschen", { method: "POST", body: JSON.stringify({ endpoint: abo.endpoint }) });
+      try { await abo.unsubscribe(); } catch (e) { /* leer */ }
+      U.toast("Mitteilungen abgeschaltet");
+      pushKnopfAktualisieren();
+      return;
+    }
+    if (istIosOhneApp()) { U.toast("Bitte zuerst als App installieren: Teilen → „Zum Home-Bildschirm“", "bad"); return; }
+    if (!pushMoeglich()) { U.toast("Dieser Browser unterstützt keine Mitteilungen", "bad"); return; }
+    const erlaubnis = await Notification.requestPermission();
+    if (erlaubnis !== "granted") { U.toast("Mitteilungen wurden nicht erlaubt", "bad"); return; }
+    const key = await api("/api/push/key");
+    if (!key.ok) { U.toast("Server-Schlüssel nicht erreichbar", "bad"); return; }
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) { U.toast("Seite bitte einmal neu laden und erneut versuchen", "bad"); return; }
+    let neu;
+    try {
+      neu = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ZuBytes(key.data.key) });
+    } catch (e) { U.toast("Mitteilungen konnten nicht eingerichtet werden", "bad"); return; }
+    const res = await api("/api/push/abo", { method: "POST", body: JSON.stringify(neu.toJSON()) });
+    if (!res.ok) { U.toast("Abo konnte nicht gespeichert werden", "bad"); return; }
+    U.toast("Mitteilungen sind aktiv 🎉", "good");
+    pushKnopfAktualisieren();
+  }
+  // Bestehendes Abo nach dem Login still auffrischen (Browser rotieren Endpunkte)
+  async function pushAuffrischen() {
+    try {
+      if (!pushMoeglich() || Notification.permission !== "granted") return;
+      const abo = await aktuellesPushAbo();
+      if (abo) await api("/api/push/abo", { method: "POST", body: JSON.stringify(abo.toJSON()) });
+    } catch (e) { /* leer */ }
   }
 
   async function pushNow(initial) {

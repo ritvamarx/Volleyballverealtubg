@@ -312,6 +312,8 @@ textarea { resize: vertical; min-height: 72px; }
   display: flex; align-items: center; gap: 12px; padding: 12px 14px;
   border: 1px solid var(--border); border-radius: 11px; background: var(--surface);
 }
+a.list-item { color: inherit; text-decoration: none; }
+a.list-item:hover, a.list-item:active { background: var(--surface-2); }
 .list-item .grow { flex: 1; min-width: 0; }
 .list-item .title { font-weight: 600; }
 .list-item .sub { font-size: .82rem; color: var(--text-soft); }
@@ -395,6 +397,9 @@ textarea { resize: vertical; min-height: 72px; }
 .timeline { position: relative; padding-left: 18px; }
 .timeline::before { content: ""; position: absolute; left: 4px; top: 4px; bottom: 4px; width: 2px; background: var(--border); }
 .timeline .tl-item { position: relative; padding: 0 0 16px 10px; }
+.timeline .tl-item.tl-link { cursor: pointer; border-radius: 10px; margin-left: -4px; padding-left: 14px; }
+.timeline .tl-item.tl-link:hover, .timeline .tl-item.tl-link:active { background: var(--surface-2); }
+.timeline .tl-item.tl-link .arr { color: var(--text-soft); font-weight: 700; }
 .timeline .tl-item::before { content: ""; position: absolute; left: -18px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--surface); }
 
 .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: .9rem; }
@@ -2216,6 +2221,7 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
 
     el.innerHTML = `
       ${head("Übersicht", `Willkommen zurück im Trainer-Cockpit des ${esc(s.club)}`)}
+      <div id="dringend"></div>
       <div class="grid grid-4 mb">
         ${stat("🏐", "Aktive Spieler", s.players.filter((p) => p.membershipStatus !== "inaktiv").length, `${s.players.length} gesamt`, "#/players")}
         ${stat("📅", "Nächste Termine", next.length, next[0] ? `${labelForType(next[0].type)} ${relDays(next[0].start)}` : "—", "#/calendar")}
@@ -2229,8 +2235,8 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
             <a class="btn sm outline" href="#/calendar">Kalender</a></div>
           <div class="timeline">
             ${next.length ? next.map((e) => `
-              <div class="tl-item">
-                <div class="flex"><strong>${esc(e.title)}</strong> ${eventPill(e.type)}</div>
+              <div class="tl-item tl-link" data-evgo="${e.id}" role="link" tabindex="0" title="${e.type === "training" ? "Zur Trainingsrückmeldung" : e.type === "away" ? "Zur Fahrerplanung" : e.type === "home" ? "Zu den Heimspiel-Jobs" : "Termin öffnen"}">
+                <div class="flex"><strong>${esc(e.title)}</strong> ${eventPill(e.type)}<span class="spacer"></span><span class="arr">›</span></div>
                 <div class="sub soft">${fmtDate(e.start)} · ${fmtTime(e.start)} Uhr · ${esc(e.location)}</div>
                 ${rsvpStand(e)}
               </div>`).join("") : empty("🗓️", "Keine anstehenden Termine")}
@@ -2294,7 +2300,46 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
       volleyballFlug();
       toast("Aufgabe erledigt", "good"); reload();
     }));
+    // Anstehende Termine: ein Tipp führt direkt zur passenden Ansicht
+    $$("[data-evgo]", el).forEach((n) => n.onclick = () => {
+      const e = Store.byId("events", n.dataset.evgo);
+      if (!e) return;
+      if (e.type === "training") { training._sel = e.id; App.go("training"); }
+      else if (e.type === "away") { drivers._sel = e.id; App.go("drivers"); }
+      else if (e.type === "home") { jobs._sel = e.id; App.go("jobs"); }
+      else eventDetail(e.id);
+    });
     bindLinkActions(el);
+    ladeDringend(el);
+  }
+
+  // Offene Passwort-/Zugangsanfragen als sofort fällige Aufgabe anzeigen
+  // (nur in der Online-Version – die Anfragen liegen auf dem Server)
+  async function ladeDringend(el) {
+    const box = $("#dringend", el);
+    if (!box || !window.Sync || !Sync.active) return;
+    try {
+      const res = await fetch("/api/accounts", {
+        credentials: "same-origin",
+        headers: Sync.csrf ? { "X-CSRF-Token": Sync.csrf } : {},
+      });
+      if (!res.ok) return;
+      const anfragen = ((await res.json()).anfragen) || [];
+      if (!anfragen.length) { box.innerHTML = ""; return; }
+      const wann = (ts) => new Date(ts * 1000).toLocaleString("de-DE", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+      box.innerHTML = `
+        <div class="card mb" style="border:1.5px solid #d64545">
+          <div class="card-head"><h3>🚨 Sofort fällig (${anfragen.length})</h3><span class="spacer"></span>
+            <a class="btn sm" href="#/zugaenge">Jetzt erledigen</a></div>
+          <div class="list">
+            ${anfragen.map((a) => `
+              <a class="list-item" href="#/zugaenge"><div class="grow">
+                <div class="title">🔑 Wiederherstellungscode für „${esc(a.username)}“ erzeugen</div>
+                <div class="sub">Passwort-Anfrage · ${wann(a.created_at)} Uhr · bleibt hier stehen, bis sie erledigt oder verworfen ist</div>
+              </div><span class="arr">›</span></a>`).join("")}
+          </div>
+        </div>`;
+    } catch (e) { /* offline/lokal → keine Anzeige */ }
   }
   function prioBadge(p) {
     const m = { hoch: "bad", mittel: "warn", niedrig: "" };
@@ -8602,6 +8647,13 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
     // Abmelden-Knopf + Status in der Seitenleiste
     const foot = document.querySelector(".sidebar-foot");
     if (foot && !$("#logoutBtn")) {
+      const bell = document.createElement("button");
+      bell.id = "pushBtn";
+      bell.className = "btn-ghost";
+      bell.textContent = "🔔 Mitteilungen";
+      bell.title = "Push-Mitteilungen für das Trainerteam (z. B. Passwort-Anfragen) an-/abschalten";
+      bell.onclick = trainerPushToggle;
+      foot.appendChild(bell);
       const btn = document.createElement("button");
       btn.id = "logoutBtn";
       btn.className = "btn-ghost";
@@ -8612,7 +8664,68 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
       st.id = "syncStatus";
       st.className = "sync-status";
       foot.parentElement.insertBefore(st, foot);
+      pushKnopfAktualisieren();
+      pushAuffrischen();
     }
+  }
+
+  // ---------- Push-Mitteilungen für das Trainerteam ----------
+  function pushMoeglich() {
+    return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+  }
+  function istIosOhneApp() {
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const installiert = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+    return ios && !installiert;
+  }
+  function b64ZuBytes(b64) {
+    const roh = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(roh, (z) => z.charCodeAt(0));
+  }
+  async function aktuellesPushAbo() {
+    if (!pushMoeglich()) return null;
+    const reg = await navigator.serviceWorker.getRegistration();
+    return reg ? reg.pushManager.getSubscription() : null;
+  }
+  async function pushKnopfAktualisieren() {
+    const b = $("#pushBtn");
+    if (!b) return;
+    const abo = await aktuellesPushAbo().catch(() => null);
+    b.textContent = abo ? "🔕 Mitteilungen aus" : "🔔 Mitteilungen an";
+  }
+  async function trainerPushToggle() {
+    const abo = await aktuellesPushAbo().catch(() => null);
+    if (abo) {
+      await api("/api/push/abo-loeschen", { method: "POST", body: JSON.stringify({ endpoint: abo.endpoint }) });
+      try { await abo.unsubscribe(); } catch (e) { /* leer */ }
+      U.toast("Mitteilungen abgeschaltet");
+      pushKnopfAktualisieren();
+      return;
+    }
+    if (istIosOhneApp()) { U.toast("Bitte zuerst als App installieren: Teilen → „Zum Home-Bildschirm“", "bad"); return; }
+    if (!pushMoeglich()) { U.toast("Dieser Browser unterstützt keine Mitteilungen", "bad"); return; }
+    const erlaubnis = await Notification.requestPermission();
+    if (erlaubnis !== "granted") { U.toast("Mitteilungen wurden nicht erlaubt", "bad"); return; }
+    const key = await api("/api/push/key");
+    if (!key.ok) { U.toast("Server-Schlüssel nicht erreichbar", "bad"); return; }
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) { U.toast("Seite bitte einmal neu laden und erneut versuchen", "bad"); return; }
+    let neu;
+    try {
+      neu = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ZuBytes(key.data.key) });
+    } catch (e) { U.toast("Mitteilungen konnten nicht eingerichtet werden", "bad"); return; }
+    const res = await api("/api/push/abo", { method: "POST", body: JSON.stringify(neu.toJSON()) });
+    if (!res.ok) { U.toast("Abo konnte nicht gespeichert werden", "bad"); return; }
+    U.toast("Mitteilungen sind aktiv 🎉", "good");
+    pushKnopfAktualisieren();
+  }
+  // Bestehendes Abo nach dem Login still auffrischen (Browser rotieren Endpunkte)
+  async function pushAuffrischen() {
+    try {
+      if (!pushMoeglich() || Notification.permission !== "granted") return;
+      const abo = await aktuellesPushAbo();
+      if (abo) await api("/api/push/abo", { method: "POST", body: JSON.stringify(abo.toJSON()) });
+    } catch (e) { /* leer */ }
   }
 
   async function pushNow(initial) {

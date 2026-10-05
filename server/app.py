@@ -1785,7 +1785,7 @@ def create_app() -> Flask:
                     con(), "🔑 Passwort-Hilfe angefragt",
                     f"„{username}“ hat das Passwort vergessen – bitte in den Portal-Zugängen"
                     " einen Wiederherstellungscode erzeugen und weitergeben.",
-                    "/", trainer_ids)
+                    "/#/zugaenge", trainer_ids)
         return jsonify({"ok": True,
                         "hint": "Das Trainerteam wurde informiert und meldet sich mit einem Code."})
 
