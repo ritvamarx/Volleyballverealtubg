@@ -185,6 +185,7 @@
   P.start = async function () {
     const gate = $("#authGate");
     if (gate) gate.hidden = true;
+    document.body.classList.add("portal-aktiv"); // Trainer-Schnellleiste ausblenden
     let wrap = $("#portalRoot2");
     if (!wrap) {
       wrap = document.createElement("div");

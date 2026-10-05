@@ -171,7 +171,7 @@
           <div class="timeline">
             ${next.length ? next.map((e) => `
               <div class="tl-item tl-link" data-evgo="${e.id}" role="link" tabindex="0" title="${e.type === "training" ? "Zur Trainingsrückmeldung" : e.type === "away" ? "Zur Fahrerplanung" : e.type === "home" ? "Zu den Heimspiel-Jobs" : "Termin öffnen"}">
-                <div class="flex"><strong>${esc(e.title)}</strong> ${eventPill(e.type)}<span class="spacer"></span><span class="arr">›</span></div>
+                <div class="flex"><strong>${esc(e.title)}</strong> ${eventPill(e.type)}<span class="spacer"></span>${["training", "home", "away"].includes(e.type) && window.Sync && Sync.active ? `<button class="btn sm ghost" data-erinnern="${e.id}" title="Alle ohne Rückmeldung per Push erinnern">⏰</button>` : ""}<span class="arr">›</span></div>
                 <div class="sub soft">${fmtDate(e.start)} · ${fmtTime(e.start)} Uhr · ${esc(e.location)}</div>
                 ${rsvpStand(e)}
               </div>`).join("") : empty("🗓️", "Keine anstehenden Termine")}
@@ -243,6 +243,17 @@
       else if (e.type === "away") { drivers._sel = e.id; App.go("drivers"); }
       else if (e.type === "home") { jobs._sel = e.id; App.go("jobs"); }
       else eventDetail(e.id);
+    });
+    // ⏰ Erinnerung an alle ohne Rückmeldung – direkt aus der Terminzeile
+    $$("[data-erinnern]", el).forEach((b) => b.onclick = async (ev) => {
+      ev.stopPropagation();
+      b.disabled = true;
+      const res = await apiZugang("/api/termin/erinnern", { eventId: b.dataset.erinnern });
+      b.disabled = false;
+      if (!res.ok) { toast(res.data.error || "Erinnerung konnte nicht gesendet werden", "bad"); return; }
+      if (!res.data.offen) toast("Alle haben schon geantwortet 🎉", "good");
+      else if (!res.data.empfaenger) toast(`${res.data.offen} offen – aber niemand davon hat ein Portal-Konto mit Push`, "bad");
+      else toast(`Erinnerung an ${res.data.empfaenger} Spieler geschickt (${res.data.ok} zugestellt)`, "good");
     });
     bindLinkActions(el);
     ladeDringend(el);
@@ -942,12 +953,28 @@
           <p class="soft">Rückmeldungen ändern unter „Training“.</p>` : ""}
         ${e.type === "away" ? `<p class="soft">${drivers.length} Fahrer eingetragen (${drivers.reduce((a, d) => a + d.seats, 0)} Plätze). Details unter „Fahrerplanung“.</p>` : ""}
         ${e.type === "home" ? `<p class="soft">${jobs.filter((j) => j.assignee).length}/${jobs.length} Jobs vergeben. Details unter „Heimspiel-Jobs“.</p>` : ""}`,
-      footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn danger" data-del>Löschen</button><button class="btn" data-edit>Bearbeiten</button>`,
+      footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn outline" data-share title="Termin-Info per WhatsApp o. ä. teilen">💬 Teilen</button><button class="btn danger" data-del>Löschen</button><button class="btn" data-edit>Bearbeiten</button>`,
       onOpen(m) {
         m.querySelector("[data-x]").onclick = closeModal;
         const stLink = m.querySelector("[data-stlink]");
         if (stLink) stLink.onclick = (ev2) => { ev2.preventDefault(); closeModal(); sportstaetteInfoModal(Store.byId("sportstaetten", stLink.dataset.stlink)); };
         m.querySelector("[data-edit]").onclick = () => { closeModal(); eventForm(e); };
+        // 💬 Termin-Info als fertigen Text teilen (Teilen-Dialog des Handys, sonst WhatsApp)
+        m.querySelector("[data-share]").onclick = async () => {
+          const zeilen = [
+            `🏐 ${labelForType(e.type)}: ${e.title || ""}`.trim(),
+            `📅 ${fmtDate(e.start)} · ${fmtTime(e.start)}${e.end ? "–" + fmtTime(e.end) : ""} Uhr`,
+            e.location ? `📍 ${e.location}` : "",
+            e.opponent ? `🆚 ${e.opponent}` : "",
+            e.description ? `ℹ️ ${e.description}` : "",
+            "— SKV Müritz Volleyball",
+          ].filter(Boolean);
+          const text = zeilen.join("\n");
+          if (navigator.share) {
+            try { await navigator.share({ text }); return; } catch (err) { if (err && err.name === "AbortError") return; }
+          }
+          window.open("https://wa.me/?text=" + encodeURIComponent(text), "_blank", "noopener");
+        };
         m.querySelector("[data-del]").onclick = () => {
           if (e.seriesId) {
             const count = S().events.filter((x) => x.seriesId === e.seriesId).length;
@@ -1762,7 +1789,9 @@
      FAHRERPLANUNG (Auswärtsspiele)
      ====================================================================== */
   function drivers(el) {
-    const away = S().events.filter((e) => e.type === "away").sort((a, b) => new Date(a.start) - new Date(b.start));
+    // Nur anstehende Auswärtsspiele (ab gestern) – vergangene Fahrten sind erledigt
+    const away = S().events.filter((e) => e.type === "away" && daysUntil(e.start) >= -1)
+      .sort((a, b) => new Date(a.start) - new Date(b.start));
     const sel = drivers._sel && away.find((a) => a.id === drivers._sel) ? drivers._sel : (away[0] || {}).id;
     const evt = Store.byId("events", sel);
 
@@ -4189,10 +4218,21 @@
     const opts = { credentials: "same-origin", headers: { "Content-Type": "application/json" } };
     if (window.Sync && Sync.csrf) opts.headers["X-CSRF-Token"] = Sync.csrf;
     if (body || methode) { opts.method = methode || "POST"; if (body) opts.body = JSON.stringify(body); }
-    const res = await fetch(pfad, opts);
+    let res;
+    try { res = await fetch(pfad, opts); }
+    catch (e) { return { ok: false, status: 0, data: { error: "Keine Verbindung zum Server" } }; }
     let data = {};
     try { data = await res.json(); } catch (e) { /* leer */ }
-    return { ok: res.ok, data };
+    return { ok: res.ok, status: res.status, data };
+  }
+  // Einheitliche, aussagekräftige Fehlermeldung für fehlgeschlagene Zugangs-Aufrufe
+  function ladeFehler(was, res) {
+    if (res.status === 401) {
+      return `<p class="soft">🔒 Deine Anmeldung ist abgelaufen – ${was} können erst nach erneuter Anmeldung geladen werden.
+        <button class="btn sm" onclick="location.reload()">Neu anmelden</button></p>`;
+    }
+    const grund = res.data && res.data.error ? res.data.error : (res.status ? `HTTP ${res.status}` : "keine Verbindung");
+    return `<p class="soft">${was} konnten nicht geladen werden (${esc(grund)}).</p>`;
   }
 
   // Einladungs-Vorlage: eine PDF-Seite je Code mit QR, Link, Code und
@@ -4599,7 +4639,7 @@
       _trainerNamen = null; // Konten wurden (neu) geladen/geändert → Trainer-Dropdown-Cache verwerfen
       const res = await apiZugang("/api/accounts");
       const ziel = $("#zgKonten", el);
-      if (!res.ok) { ziel.innerHTML = `<p class="soft">Konten konnten nicht geladen werden.</p>`; return; }
+      if (!res.ok) { ziel.innerHTML = ladeFehler("Konten", res); return; }
       const st = res.data.statistik || {};
       $("#zgStat", el).innerHTML = `
         ${stat("👥", "Portal-Konten", st.portalKonten != null ? st.portalKonten : "—", `${st.konten || 0} Konten gesamt`)}
@@ -4673,7 +4713,7 @@
     async function ladeCodes() {
       const res = await apiZugang("/api/invites");
       const ziel = $("#zgCodes", el);
-      if (!res.ok) { ziel.innerHTML = `<p class="soft">Codes konnten nicht geladen werden.</p>`; return; }
+      if (!res.ok) { ziel.innerHTML = ladeFehler("Codes", res); return; }
       const jetzt = Math.floor(Date.now() / 1000);
       const offen = res.data.invites.filter((i) => !i.used_by && i.expires_at > jetzt);
       ziel.innerHTML = offen.map((i) => `

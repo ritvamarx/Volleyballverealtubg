@@ -299,13 +299,7 @@
   }
   async function trainerPushToggle() {
     const abo = await aktuellesPushAbo().catch(() => null);
-    if (abo) {
-      await api("/api/push/abo-loeschen", { method: "POST", body: JSON.stringify({ endpoint: abo.endpoint }) });
-      try { await abo.unsubscribe(); } catch (e) { /* leer */ }
-      U.toast("Mitteilungen abgeschaltet");
-      pushKnopfAktualisieren();
-      return;
-    }
+    if (abo) { pushEinstellungen(abo); return; }
     if (istIosOhneApp()) { U.toast("Bitte zuerst als App installieren: Teilen → „Zum Home-Bildschirm“", "bad"); return; }
     if (!pushMoeglich()) { U.toast("Dieser Browser unterstützt keine Mitteilungen", "bad"); return; }
     const erlaubnis = await Notification.requestPermission();
@@ -322,6 +316,39 @@
     if (!res.ok) { U.toast("Abo konnte nicht gespeichert werden", "bad"); return; }
     U.toast("Mitteilungen sind aktiv 🎉", "good");
     pushKnopfAktualisieren();
+  }
+  // Einstellungen bei aktivem Abo: was soll gemeldet werden? + Abschalten
+  async function pushEinstellungen(abo) {
+    const res = await api("/api/trainer/benachrichtigungen");
+    const prefs = (res.ok && res.data.prefs) || {};
+    U.modal({
+      title: "🔔 Mitteilungen fürs Trainerteam",
+      body: `<p class="soft">Du bekommst Push-Mitteilungen auf dieses Gerät bei:</p>
+        <label class="list-item" style="cursor:pointer"><input type="checkbox" checked disabled style="width:auto">
+          <div class="grow"><div class="title">🔑 Passwort-/Code-Anfragen</div><div class="sub">immer – damit niemand ausgesperrt bleibt</div></div></label>
+        <label class="list-item" style="cursor:pointer;margin-top:8px"><input type="checkbox" data-absagen ${prefs.pushAbsagen === false ? "" : "checked"} style="width:auto">
+          <div class="grow"><div class="title">👎 Absagen von Spielern</div><div class="sub">sofort, wenn jemand für Training oder Spiel absagt</div></div></label>
+        <label class="list-item" style="cursor:pointer;margin-top:8px"><input type="checkbox" data-allgemein ${prefs.pushAllgemein === false ? "" : "checked"} style="width:auto">
+          <div class="grow"><div class="title">📣 Ankündigungen & Rückmelde-Warnungen</div><div class="sub">neue Ankündigungen, zu wenige Rückmeldungen vor Terminen</div></div></label>`,
+      footer: `<button class="btn ghost" data-aus>🔕 Abschalten</button><button class="btn" data-ok>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-ok]").onclick = async () => {
+          const r = await api("/api/trainer/benachrichtigungen", { method: "POST", body: JSON.stringify({
+            pushAbsagen: m.querySelector("[data-absagen]").checked,
+            pushAllgemein: m.querySelector("[data-allgemein]").checked,
+          }) });
+          U.closeModal();
+          U.toast(r.ok ? "Einstellungen gespeichert" : "Speichern fehlgeschlagen", r.ok ? "good" : "bad");
+        };
+        m.querySelector("[data-aus]").onclick = async () => {
+          await api("/api/push/abo-loeschen", { method: "POST", body: JSON.stringify({ endpoint: abo.endpoint }) });
+          try { await abo.unsubscribe(); } catch (e) { /* leer */ }
+          U.closeModal();
+          U.toast("Mitteilungen abgeschaltet");
+          pushKnopfAktualisieren();
+        };
+      },
+    });
   }
   // Bestehendes Abo nach dem Login still auffrischen (Browser rotieren Endpunkte)
   async function pushAuffrischen() {

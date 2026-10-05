@@ -55,7 +55,8 @@ def public_key() -> str:
 
 def _kategorie_erlaubt(prefs_json, kategorie: str) -> bool:
     """Ob ein Konto Push dieser Kategorie erhalten möchte. Standard: an (Opt-out)."""
-    schluessel = {"allgemein": "pushAllgemein", "teilnahme": "pushTeilnahme"}.get(kategorie)
+    schluessel = {"allgemein": "pushAllgemein", "teilnahme": "pushTeilnahme",
+                  "absagen": "pushAbsagen"}.get(kategorie)
     if not schluessel:
         return True  # unbekannte/leere Kategorie → immer senden
     try:

@@ -61,7 +61,7 @@
   function render(id) {
     const view = $("#view");
     $("#pageTitle").textContent = titles[id] || "Übersicht";
-    $$("#nav a").forEach((a) => a.classList.toggle("active", a.dataset.route === id));
+    $$("#nav a, .quickbar a").forEach((a) => a.classList.toggle("active", a.dataset.route === id));
     view.scrollTop = 0;
     window.scrollTo(0, 0);
     try {
@@ -104,6 +104,17 @@
       document.title = "TEST · " + document.title;
     }
     buildNav();
+    // Schnellleiste am Handy: die vier häufigsten Ziele ohne Menü-Umweg
+    if (!$(".quickbar")) {
+      const qb = document.createElement("nav");
+      qb.className = "quickbar";
+      qb.setAttribute("aria-label", "Schnellzugriff");
+      qb.innerHTML = [
+        ["dashboard", "🏠", "Übersicht"], ["training", "🏐", "Training"],
+        ["calendar", "📅", "Kalender"], ["tasks", "✅", "Aufgaben"],
+      ].map(([id, ic, label]) => `<a href="#/${id}" data-route="${id}"><span class="ic">${ic}</span><span>${label}</span></a>`).join("");
+      document.body.appendChild(qb);
+    }
     initTheme();
     window.addEventListener("hashchange", route);
     if (!location.hash) location.hash = "#/dashboard";

@@ -860,6 +860,8 @@ def create_app() -> Flask:
         ev = next((e for e in daten.get("events", []) if e.get("id") == eid), None)
         if ev is None or ev.get("type") not in ("training", "home", "away"):
             return err(404, "Termin nicht gefunden")
+        vorher = next((r.get("status") for r in daten.get("responses", [])
+                       if r.get("eventId") == eid and r.get("playerId") == pid), "")
 
         def mut(d):
             liste = [r for r in d.get("responses", [])
@@ -871,6 +873,23 @@ def create_app() -> Flask:
 
         if speichere_portal_aenderung(mut, f"{sess['name']} (Portal)") is None:
             return err(409, "Speichern gerade nicht möglich – bitte erneut versuchen")
+        # Neue Absage → Trainerteam sofort informieren (abschaltbar: pushAbsagen)
+        if status == "no" and vorher != "no":
+            sp = next((p for p in daten.get("players", []) if p.get("id") == pid), None)
+            sp_name = f"{sp.get('firstName', '')} {sp.get('lastName', '')}".strip() if sp else sess["name"]
+            start = str(ev.get("start") or "")
+            datum = f"{start[8:10]}.{start[5:7]}." if len(start) >= 10 else ""
+            titel = ev.get("title") or {"training": "Training", "home": "Heimspiel", "away": "Auswärtsspiel"}[ev["type"]]
+            trainer_ids = [r["id"] for r in con().execute(
+                "SELECT id FROM users WHERE active = 1 AND role = 'trainer'").fetchall()]
+            try:
+                import push
+                push.senden(con(), f"👎 Absage: {sp_name}",
+                            f"{sp_name} hat für {titel} am {datum} abgesagt"
+                            + (f" – „{grund}“" if grund else "."),
+                            "/#/training", trainer_ids, kategorie="absagen")
+            except Exception:
+                pass  # Push ist Komfort – die Absage selbst ist gespeichert
         return jsonify({"ok": True})
 
     @app.post("/api/portal/driver")
@@ -1066,6 +1085,67 @@ def create_app() -> Flask:
                                "/", saeumige, kategorie="teilnahme")
         ergebnis["empfaenger"] = len(saeumige)
         return jsonify(ergebnis)
+
+    @app.post("/api/termin/erinnern")
+    def api_termin_erinnern():
+        """Trainer:in erinnert per Push alle Spieler:innen, die zu einem Termin
+        noch keine Rückmeldung gegeben haben (Knopf im Trainer-Cockpit)."""
+        _sess, failure = require(role="trainer")
+        if failure:
+            return failure
+        eid = (request.get_json(silent=True) or {}).get("eventId")
+        _v, daten = lade_state()
+        ev = next((e for e in daten.get("events", []) if e.get("id") == eid), None)
+        if ev is None or ev.get("type") not in ("training", "home", "away"):
+            return err(404, "Termin nicht gefunden")
+        roster = {p["id"] for p in daten.get("players", []) if p.get("membershipStatus") != "inaktiv"}
+        geantwortet = {r.get("playerId") for r in daten.get("responses", []) if r.get("eventId") == eid}
+        offene = roster - geantwortet
+        empfaenger = []
+        for u in con().execute(
+                "SELECT id, player_ids FROM users WHERE active = 1 AND role = 'spieler'").fetchall():
+            try:
+                pids = set(json.loads(u["player_ids"] or "[]"))
+            except Exception:
+                pids = set()
+            if pids & offene:
+                empfaenger.append(u["id"])
+        if not empfaenger:
+            return jsonify({"empfaenger": 0, "offen": len(offene), "ok": 0, "weg": 0})
+        start = str(ev.get("start") or "")
+        datum = f"{start[8:10]}.{start[5:7]}." if len(start) >= 10 else ""
+        uhr = start[11:16] if len(start) >= 16 else ""
+        titel = ev.get("title") or {"training": "Training", "home": "Heimspiel", "away": "Auswärtsspiel"}[ev["type"]]
+        import push
+        ergebnis = push.senden(con(), "⏰ Kommst du?",
+                               f"Bitte sag kurz Bescheid: {titel} am {datum}"
+                               + (f" um {uhr} Uhr" if uhr else "") + " – 👍 ❓ 👎 im Portal",
+                               "/", empfaenger, kategorie="teilnahme")
+        ergebnis["empfaenger"] = len(empfaenger)
+        ergebnis["offen"] = len(offene)
+        return jsonify(ergebnis)
+
+    @app.get("/api/trainer/benachrichtigungen")
+    def api_trainer_benachr_get():
+        sess, failure = require(role="trainer")
+        if failure:
+            return failure
+        return jsonify({"prefs": notify_prefs_lesen(sess["user_id"])})
+
+    @app.post("/api/trainer/benachrichtigungen")
+    def api_trainer_benachr_set():
+        sess, failure = require(role="trainer")
+        if failure:
+            return failure
+        body = request.get_json(silent=True) or {}
+        prefs = notify_prefs_lesen(sess["user_id"])
+        for k in NOTIFY_DEFAULT:
+            if k in body:
+                prefs[k] = bool(body[k])
+        con().execute("UPDATE users SET notify_prefs = ? WHERE id = ?",
+                      (db.to_json(prefs), sess["user_id"]))
+        con().commit()
+        return jsonify({"ok": True, "prefs": prefs})
 
     # ---------- API: Volleyball-Quiz (Punkte je Konto) ----------
 
@@ -1499,7 +1579,7 @@ def create_app() -> Flask:
 
     # ---------- Benachrichtigungs-Einstellungen (Portal) ----------
 
-    NOTIFY_DEFAULT = {"pushAllgemein": True, "pushTeilnahme": True, "email": False}
+    NOTIFY_DEFAULT = {"pushAllgemein": True, "pushTeilnahme": True, "pushAbsagen": True, "email": False}
 
     def notify_prefs_lesen(user_id):
         """Gespeicherte Einstellungen mit den Standardwerten auffüllen."""
