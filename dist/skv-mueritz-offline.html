@@ -739,6 +739,60 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
   #authGate:not([hidden]) ~ .quickbar, body.portal-aktiv .quickbar { display: none; }
 }
 
+/* ---- Handy-Optimierung der Trainer-Seiten ---- */
+/* Raster-Kinder dürfen nie breiter als ihre Spalte werden (sonst sprengt
+   z. B. eine nicht umbrechende Chip-Zeile die ganze Seite) */
+.grid-2 > *, .grid-3 > *, .grid-4 > *, .main, .content, #view { min-width: 0; }
+@media (max-width: 640px) {
+  /* Tabellen als Karten: Kopfzeile weg, jede Zeile eine Karte, jede Zelle
+     eine Zeile „Beschriftung · Wert" (Beschriftung aus data-label, s. app.js) */
+  .table-wrap { overflow: visible; }
+  table:not(.compact) { display: block; border-collapse: separate; }
+  table:not(.compact) thead { display: none; }
+  table:not(.compact) tbody { display: block; }
+  table:not(.compact) tbody tr {
+    display: block; margin: 10px; padding: 6px 12px; border: 1px solid var(--border);
+    border-radius: 11px; background: var(--surface);
+  }
+  table:not(.compact) tbody td {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 7px 0; border: 0; border-bottom: 1px dashed var(--border); text-align: left;
+  }
+  table:not(.compact) tbody td:last-child { border-bottom: 0; }
+  table:not(.compact) tbody td::before {
+    content: attr(data-label); flex: 0 0 34%; font-size: .68rem; font-weight: 700;
+    letter-spacing: .03em; text-transform: uppercase; color: var(--text-soft);
+  }
+  table:not(.compact) tbody td[data-label=""]::before,
+  table:not(.compact) tbody td:first-child::before { display: none; }
+  table:not(.compact) tbody td:first-child { font-size: 1rem; }
+  /* Aktions-Zellen: Knöpfe gleichmäßig verteilen, Text darin nie umbrechen */
+  table:not(.compact) tbody td[data-label=""] { flex-wrap: wrap; justify-content: flex-start; gap: 6px; }
+  table:not(.compact) tbody td[data-label=""] .btn { flex: 1 1 auto; justify-content: center; }
+  table:not(.compact) tbody td.nowrap { white-space: normal; }
+  /* Kompakte Zahlentabellen (z. B. Ligatabelle) bleiben Tabellen, scrollen seitlich */
+  .table-wrap:has(table.compact) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Tipp-Flächen mindestens 40 px hoch, Chips greifbar */
+  .btn, .btn.sm, .chip { min-height: 40px; }
+  .btn.sm { padding: 8px 12px; font-size: .84rem; }
+  .list-item .btn.sm { min-height: 38px; }
+  input, select, textarea { min-height: 44px; }
+  input[type="checkbox"], input[type="radio"] { min-height: 0; width: 22px; height: 22px; }
+  /* Chip-Zeilen (Filter, Zähler) dürfen umbrechen statt die Seite zu sprengen */
+  .chip-row { flex-wrap: wrap; overflow: visible; }
+  .chip-row .badge { white-space: normal; }
+}
+@media (max-width: 640px) {
+  /* Lange Inhalte (E-Mails, Telefonnummern, mehrere Kontaktblöcke) bleiben in der Karte */
+  table:not(.compact) tbody td { flex-wrap: wrap; min-width: 0; overflow-wrap: anywhere; }
+  table:not(.compact) tbody td > * { min-width: 0; max-width: 100%; }
+  table:not(.compact) tbody td > .flex { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; flex: 1 1 60%; }
+  table:not(.compact) tbody td:first-child > .flex { justify-content: flex-start; }
+  /* Daumen-Knöpfe der Rückmeldung: fingerfreundlich */
+  .rsvp-daumen.sm { min-width: 46px; min-height: 42px; font-size: 1.15rem; }
+  table:not(.compact) tbody td[data-label=""] .rsvp-daumen { flex: 1 1 auto; }
+}
+
 </style>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cg fill='%23F1662A'%3E%3Cpath d='M346 64A213 213 0 0 0 105 405A55 55 0 0 0 187 330A300 300 0 0 1 346 64Z'/%3E%3Cpath transform='rotate(180 256 256)' d='M346 64A213 213 0 0 0 105 405A55 55 0 0 0 187 330A300 300 0 0 1 346 64Z'/%3E%3C/g%3E%3C/svg%3E" />
 </head>
@@ -5303,7 +5357,7 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
         <div class="card" style="padding:0">
           <div class="card-head" style="padding:18px 18px 0"><h3>📊 Tabelle Verbandsliga MV</h3><span class="spacer"></span>
             <button class="btn sm" data-stadd>＋ Team</button></div>
-          <div class="table-wrap"><table>
+          <div class="table-wrap"><table class="compact">
             <thead><tr><th>#</th><th>Team</th><th>Sp.</th><th>S</th><th>N</th><th>Sätze</th><th class="right">Pkt.</th><th></th></tr></thead>
             <tbody>${rows.map((r, i) => `<tr style="${/skv/i.test(r.team) ? "background:color-mix(in srgb,var(--accent) 10%,transparent)" : ""}">
               <td><strong>${i + 1}</strong></td>
@@ -7065,6 +7119,23 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
     }).join("");
   }
 
+  // Tabellen am Handy als Karten: jede Zelle bekommt die Spaltenüberschrift
+  // als data-label (CSS zeigt sie bei schmalen Bildschirmen vor dem Wert).
+  function mobilTabellen(root) {
+    (root || document).querySelectorAll("table:not(.compact):not([data-mobil])").forEach((t) => {
+      const heads = Array.from(t.querySelectorAll("thead th")).map((th) => th.textContent.trim());
+      if (!heads.length) return;
+      t.querySelectorAll("tbody tr").forEach((tr) => {
+        Array.from(tr.children).forEach((td, i) => {
+          if (td.tagName !== "TD") return;
+          const label = heads[i] || "";
+          if (!td.hasAttribute("data-label")) td.setAttribute("data-label", /^aktion/i.test(label) ? "" : label);
+        });
+      });
+      t.setAttribute("data-mobil", "1");
+    });
+  }
+
   let current = "dashboard";
 
   function route() {
@@ -7081,6 +7152,7 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
     window.scrollTo(0, 0);
     try {
       Views[id](view);
+      mobilTabellen(view);
     } catch (err) {
       view.innerHTML = `<div class="card"><h3>Fehler beim Laden</h3><pre style="white-space:pre-wrap">${U.esc(err && err.stack || err)}</pre></div>`;
       console.error(err);
@@ -7131,6 +7203,7 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
       document.body.appendChild(qb);
     }
     initTheme();
+    new MutationObserver(() => mobilTabellen($("#view"))).observe($("#view"), { childList: true, subtree: true });
     window.addEventListener("hashchange", route);
     if (!location.hash) location.hash = "#/dashboard";
     route();

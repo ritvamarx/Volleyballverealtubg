@@ -3215,7 +3215,7 @@
         <div class="card" style="padding:0">
           <div class="card-head" style="padding:18px 18px 0"><h3>📊 Tabelle Verbandsliga MV</h3><span class="spacer"></span>
             <button class="btn sm" data-stadd>＋ Team</button></div>
-          <div class="table-wrap"><table>
+          <div class="table-wrap"><table class="compact">
             <thead><tr><th>#</th><th>Team</th><th>Sp.</th><th>S</th><th>N</th><th>Sätze</th><th class="right">Pkt.</th><th></th></tr></thead>
             <tbody>${rows.map((r, i) => `<tr style="${/skv/i.test(r.team) ? "background:color-mix(in srgb,var(--accent) 10%,transparent)" : ""}">
               <td><strong>${i + 1}</strong></td>

@@ -50,6 +50,23 @@
     }).join("");
   }
 
+  // Tabellen am Handy als Karten: jede Zelle bekommt die Spaltenüberschrift
+  // als data-label (CSS zeigt sie bei schmalen Bildschirmen vor dem Wert).
+  function mobilTabellen(root) {
+    (root || document).querySelectorAll("table:not(.compact):not([data-mobil])").forEach((t) => {
+      const heads = Array.from(t.querySelectorAll("thead th")).map((th) => th.textContent.trim());
+      if (!heads.length) return;
+      t.querySelectorAll("tbody tr").forEach((tr) => {
+        Array.from(tr.children).forEach((td, i) => {
+          if (td.tagName !== "TD") return;
+          const label = heads[i] || "";
+          if (!td.hasAttribute("data-label")) td.setAttribute("data-label", /^aktion/i.test(label) ? "" : label);
+        });
+      });
+      t.setAttribute("data-mobil", "1");
+    });
+  }
+
   let current = "dashboard";
 
   function route() {
@@ -66,6 +83,7 @@
     window.scrollTo(0, 0);
     try {
       Views[id](view);
+      mobilTabellen(view);
     } catch (err) {
       view.innerHTML = `<div class="card"><h3>Fehler beim Laden</h3><pre style="white-space:pre-wrap">${U.esc(err && err.stack || err)}</pre></div>`;
       console.error(err);
@@ -116,6 +134,7 @@
       document.body.appendChild(qb);
     }
     initTheme();
+    new MutationObserver(() => mobilTabellen($("#view"))).observe($("#view"), { childList: true, subtree: true });
     window.addEventListener("hashchange", route);
     if (!location.hash) location.hash = "#/dashboard";
     route();

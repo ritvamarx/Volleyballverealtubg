@@ -707,3 +707,57 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
   .main { padding-bottom: 76px; }
   #authGate:not([hidden]) ~ .quickbar, body.portal-aktiv .quickbar { display: none; }
 }
+
+/* ---- Handy-Optimierung der Trainer-Seiten ---- */
+/* Raster-Kinder dürfen nie breiter als ihre Spalte werden (sonst sprengt
+   z. B. eine nicht umbrechende Chip-Zeile die ganze Seite) */
+.grid-2 > *, .grid-3 > *, .grid-4 > *, .main, .content, #view { min-width: 0; }
+@media (max-width: 640px) {
+  /* Tabellen als Karten: Kopfzeile weg, jede Zeile eine Karte, jede Zelle
+     eine Zeile „Beschriftung · Wert" (Beschriftung aus data-label, s. app.js) */
+  .table-wrap { overflow: visible; }
+  table:not(.compact) { display: block; border-collapse: separate; }
+  table:not(.compact) thead { display: none; }
+  table:not(.compact) tbody { display: block; }
+  table:not(.compact) tbody tr {
+    display: block; margin: 10px; padding: 6px 12px; border: 1px solid var(--border);
+    border-radius: 11px; background: var(--surface);
+  }
+  table:not(.compact) tbody td {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 7px 0; border: 0; border-bottom: 1px dashed var(--border); text-align: left;
+  }
+  table:not(.compact) tbody td:last-child { border-bottom: 0; }
+  table:not(.compact) tbody td::before {
+    content: attr(data-label); flex: 0 0 34%; font-size: .68rem; font-weight: 700;
+    letter-spacing: .03em; text-transform: uppercase; color: var(--text-soft);
+  }
+  table:not(.compact) tbody td[data-label=""]::before,
+  table:not(.compact) tbody td:first-child::before { display: none; }
+  table:not(.compact) tbody td:first-child { font-size: 1rem; }
+  /* Aktions-Zellen: Knöpfe gleichmäßig verteilen, Text darin nie umbrechen */
+  table:not(.compact) tbody td[data-label=""] { flex-wrap: wrap; justify-content: flex-start; gap: 6px; }
+  table:not(.compact) tbody td[data-label=""] .btn { flex: 1 1 auto; justify-content: center; }
+  table:not(.compact) tbody td.nowrap { white-space: normal; }
+  /* Kompakte Zahlentabellen (z. B. Ligatabelle) bleiben Tabellen, scrollen seitlich */
+  .table-wrap:has(table.compact) { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* Tipp-Flächen mindestens 40 px hoch, Chips greifbar */
+  .btn, .btn.sm, .chip { min-height: 40px; }
+  .btn.sm { padding: 8px 12px; font-size: .84rem; }
+  .list-item .btn.sm { min-height: 38px; }
+  input, select, textarea { min-height: 44px; }
+  input[type="checkbox"], input[type="radio"] { min-height: 0; width: 22px; height: 22px; }
+  /* Chip-Zeilen (Filter, Zähler) dürfen umbrechen statt die Seite zu sprengen */
+  .chip-row { flex-wrap: wrap; overflow: visible; }
+  .chip-row .badge { white-space: normal; }
+}
+@media (max-width: 640px) {
+  /* Lange Inhalte (E-Mails, Telefonnummern, mehrere Kontaktblöcke) bleiben in der Karte */
+  table:not(.compact) tbody td { flex-wrap: wrap; min-width: 0; overflow-wrap: anywhere; }
+  table:not(.compact) tbody td > * { min-width: 0; max-width: 100%; }
+  table:not(.compact) tbody td > .flex { flex-wrap: wrap; justify-content: flex-end; row-gap: 6px; flex: 1 1 60%; }
+  table:not(.compact) tbody td:first-child > .flex { justify-content: flex-start; }
+  /* Daumen-Knöpfe der Rückmeldung: fingerfreundlich */
+  .rsvp-daumen.sm { min-width: 46px; min-height: 42px; font-size: 1.15rem; }
+  table:not(.compact) tbody td[data-label=""] .rsvp-daumen { flex: 1 1 auto; }
+}
