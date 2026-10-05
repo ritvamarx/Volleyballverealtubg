@@ -1,0 +1,5 @@
+# Automatisches Update der Volleyball-LIVE-Instanz vom Branch "live".
+# Auf "live" wird nur nach ausdrücklicher Freigabe gepusht (git push origin main:live).
+# Installation:  cp nach /etc/cron.d/volleyball-live-update
+# Log:           /opt/volleyball/data/update.log
+*/10 * * * * root flock -n /run/volleyball-live-update.lock /opt/volleyball/deploy/auto-update.sh /opt/volleyball live >> /opt/volleyball/data/update.log 2>&1

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# SKV Müritz Volleyball – automatisches Update der TEST-Instanz vom
-# GitHub-Stand (main). Läuft per Cron (deploy/cron/volleyball-test-update):
+# SKV Müritz Volleyball – automatisches Update einer Instanz vom GitHub-Stand.
+# Test-Instanz folgt dem Branch main; die Live-Instanz folgt (optional) dem
+# Branch "live", auf den nur nach ausdrücklicher Freigabe gepusht wird. Läuft per Cron (deploy/cron/volleyball-test-update):
 # prüft alle 10 Minuten auf einen neuen Stand und deployt ihn selbstständig.
 # Die LIVE-Instanz (/opt/volleyball) wird hiervon NIE angefasst – Live-Updates
 # erfolgen nur nach ausdrücklicher Freigabe.
@@ -14,11 +15,12 @@ set -euo pipefail
 
 REPO="ritvamarx/Volleyballverealtubg"
 PFAD="${1:-/opt/volleyball-test}"
+BRANCH="${2:-main}"   # Test folgt main, Live folgt dem Branch "live" (nur nach Freigabe)
 SHA_DATEI="$PFAD/.deployed-sha"
 
 # awk liest die Antwort vollständig (grep -m1 würde die Pipe vorzeitig
 # schließen → curl-Fehler 23, mit pipefail Abbruch bei jedem Lauf)
-NEU="$(curl -fsSL --max-time 30 "https://api.github.com/repos/$REPO/commits/main" \
+NEU="$(curl -fsSL --max-time 30 "https://api.github.com/repos/$REPO/commits/$BRANCH" \
       | awk -F'"' '/"sha"/ && !s {s=$4} END {print s}')" || true
 [ -n "$NEU" ] || exit 0
 ALT="$(cat "$SHA_DATEI" 2>/dev/null || true)"
