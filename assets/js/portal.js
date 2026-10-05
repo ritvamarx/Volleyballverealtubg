@@ -550,12 +550,14 @@
     const team = P.daten.team || [];
     const leute = t.dabeiIds.map((id) => team.find((p) => p.id === id)).filter(Boolean);
     if (!leute.length) return "";
-    const initialen = (name) => name.split(" ").map((x) => x[0] || "").join("").slice(0, 2).toUpperCase();
-    const zeig = leute.slice(0, 6);  // nur eine Handvoll Avatare, Rest steckt in der Zahl
+    const vorname = (name) => (name || "").trim().split(" ")[0];
+    const zeig = leute.slice(0, 8);  // Vornamen als Chips, Rest steckt in der Zahl
+    const rest = leute.length - zeig.length;
     return `<div class="dabei">
-      ${zeig.map((p) => p.foto
-        ? `<img class="mini" src="${p.foto}" alt="" title="${esc(p.name)}" style="object-fit:cover">`
-        : `<span class="mini" title="${esc(p.name)}"${p.avatarEmoji ? ' style="font-size:14px"' : ""}>${p.avatarEmoji ? esc(p.avatarEmoji) : esc(initialen(p.name))}</span>`).join("")}
+      ${zeig.map((p) => `<span class="mini-name" title="${esc(p.name)}">${p.foto
+        ? `<img class="mini" src="${p.foto}" alt="" style="object-fit:cover">`
+        : (p.avatarEmoji ? `<span class="me">${esc(p.avatarEmoji)}</span>` : "")}${esc(vorname(p.name))}</span>`).join("")}
+      ${rest > 0 ? `<span class="mini-name">+${rest}</span>` : ""}
       <span class="n">${leute.length} dabei</span>
     </div>`;
   }
