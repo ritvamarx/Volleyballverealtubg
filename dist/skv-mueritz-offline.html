@@ -319,6 +319,10 @@ textarea { resize: vertical; min-height: 72px; }
   width: 40px; height: 40px; border-radius: 50%; flex: 0 0 40px;
   display: grid; place-items: center; font-weight: 700; color: #fff; font-size: .85rem;
 }
+.test-banner {
+  background: #f6c343; color: #3a2c00; text-align: center; font-weight: 600;
+  padding: 6px 12px; font-size: .85rem; position: sticky; top: 0; z-index: 80;
+}
 .progress { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
 .progress > span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
 
@@ -2924,6 +2928,14 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
     const drivers = S().drivers.filter((d) => d.eventId === id);
     const jobs = S().jobs.filter((j) => j.eventId === id);
     const st2 = sportstaetteZuOrt(e.location);
+    const nameOf = (pid) => { const p = Store.byId("players", pid); return p ? `${p.firstName} ${p.lastName}` : "Unbekannt"; };
+    const namesBy = (st) => responses.filter((r) => r.status === st).map((r) => nameOf(r.playerId)).sort((a, b) => a.localeCompare(b));
+    const roster = S().players.filter((p) => p.membershipStatus !== "inaktiv");
+    const answered = new Set(responses.map((r) => r.playerId));
+    const openNames = roster.filter((p) => !answered.has(p.id)).map((p) => `${p.firstName} ${p.lastName}`).sort((a, b) => a.localeCompare(b));
+    const rsvpRow = (icon, label, names) => names.length
+      ? `<div class="mb" style="margin-bottom:8px"><strong>${icon} ${label} (${names.length}):</strong> ${names.map((n) => esc(n)).join(", ")}</div>`
+      : "";
     modal({
       title: e.title,
       wide: true,
@@ -2937,7 +2949,12 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
           ${e.opponent ? `<dt>Gegner</dt><dd>${esc(e.opponent)}</dd>` : ""}
           ${e.description ? `<dt>Info</dt><dd>${esc(e.description)}</dd>` : ""}
         </dl>
-        ${e.type === "training" ? `<p class="soft">${responses.filter((r) => r.status === "yes").length} Zusagen · ${responses.filter((r) => r.status === "no").length} Absagen. Details unter „Training“.</p>` : ""}
+        ${e.type === "training" ? `
+          ${rsvpRow("✅", "Zugesagt", namesBy("yes"))}
+          ${rsvpRow("❌", "Abgesagt", namesBy("no"))}
+          ${rsvpRow("❔", "Unsicher", namesBy("maybe"))}
+          ${rsvpRow("⏳", "Keine Rückmeldung", openNames)}
+          <p class="soft">Rückmeldungen ändern unter „Training“.</p>` : ""}
         ${e.type === "away" ? `<p class="soft">${drivers.length} Fahrer eingetragen (${drivers.reduce((a, d) => a + d.seats, 0)} Plätze). Details unter „Fahrerplanung“.</p>` : ""}
         ${e.type === "home" ? `<p class="soft">${jobs.filter((j) => j.assignee).length}/${jobs.length} Jobs vergeben. Details unter „Heimspiel-Jobs“.</p>` : ""}`,
       footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn danger" data-del>Löschen</button><button class="btn" data-edit>Bearbeiten</button>`,
@@ -5532,7 +5549,7 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
         ${s.announcements.slice().sort((a, b) => new Date(b.date) - new Date(a.date)).map((a) => `
           <div class="card">
             <div class="flex mb"><h3 style="margin:0">${esc(a.title)}</h3><span class="spacer"></span>
-              <span class="badge ${a.audience === "eltern" ? "info" : "accent"}">${a.audience === "eltern" ? "👪 Eltern" : "👥 Alle"}</span>
+              <span class="badge ${a.audience === "eltern" ? "info" : (a.audience === "oeffentlich" ? "warn" : "accent")}">${a.audience === "eltern" ? "👪 Eltern" : (a.audience === "oeffentlich" ? "📣 Öffentlich (Content-Hub)" : "👥 Alle")}</span>
               <span class="badge">${fmtDateShort(a.date)}</span></div>
             <p style="margin:0" class="soft">${esc(a.body)}</p>
             <div class="flex mt"><span class="spacer"></span>
@@ -5548,7 +5565,7 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
       title: "Neue Ankündigung",
       body: `<form id="af"><div class="form-grid">
         <div class="field full"><label>Titel</label><input name="title" required></div>
-        <div class="field"><label>Zielgruppe</label><select name="audience"><option value="alle">Alle</option><option value="eltern">Eltern</option></select></div>
+        <div class="field"><label>Zielgruppe</label><select name="audience"><option value="alle">Alle</option><option value="eltern">Eltern</option><option value="oeffentlich">Öffentlich – darf der Content-Hub nach außen tragen</option></select></div>
         <div class="field full"><label>Nachricht</label><textarea name="body" rows="5" required></textarea></div>
       </div></form>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Veröffentlichen</button>`,
@@ -6980,6 +6997,14 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
 
   // ---- Init ----
   function init() {
+    // Testumgebung sichtbar kennzeichnen (volleyball-test.…)
+    if (/^volleyball-test\./i.test(location.hostname)) {
+      const b = document.createElement("div");
+      b.className = "test-banner";
+      b.textContent = "🧪 TESTUMGEBUNG – eigene Daten, unabhängig von der Live-Version";
+      document.body.prepend(b);
+      document.title = "TEST · " + document.title;
+    }
     buildNav();
     initTheme();
     window.addEventListener("hashchange", route);

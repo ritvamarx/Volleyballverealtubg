@@ -1946,6 +1946,17 @@ def create_app() -> Flask:
         resp.headers["Cache-Control"] = "no-cache"
         return resp
 
+    @app.get("/bg<int:nr>")
+    def wallpaper(nr: int):
+        # Vereins-Hintergrundbilder: /bg1 Mac dunkel, /bg2 iPhone dunkel,
+        # /bg3 Mac hell (Vereinsfarben), /bg4 iPhone hell (Vereinsfarben)
+        if nr < 1 or nr > 4:
+            return jsonify({"error": "Es gibt bg1 bis bg4."}), 404
+        return send_from_directory(
+            os.path.join(APP_ROOT, "assets", "wallpaper"), f"bg{nr}.png",
+            mimetype="image/png", max_age=86400,
+        )
+
     @app.get("/gesund")
     def health():
         con().execute("SELECT 1")
