@@ -761,3 +761,19 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
   .rsvp-daumen.sm { min-width: 46px; min-height: 42px; font-size: 1.15rem; }
   table:not(.compact) tbody td[data-label=""] .rsvp-daumen { flex: 1 1 auto; }
 }
+
+/* Trainingsrückmeldung: kompakte Namens-Chips (grün Zusage, rot Absage, gelb unsicher) */
+.rm-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.rm-chip {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 6px 10px 6px 13px;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2);
+  font-weight: 600; font-size: .92rem; cursor: pointer; max-width: 100%; color: var(--text);
+}
+.rm-chip:hover { filter: brightness(.97); }
+.rm-chip.ja   { background: #d6f1dd; border-color: #8fcfa0; color: #1b4d2a; }
+.rm-chip.nein { background: #f8d7d7; border-color: #e09d9d; color: #6e1f1f; }
+.rm-chip.viel { background: #fbefc8; border-color: #e3c56a; color: #5e4400; }
+.rm-chip.nn   { opacity: .55; text-decoration: line-through; }
+.rm-chip .rm-note { font-weight: 400; font-size: .8rem; opacity: .85; margin-left: 2px; }
+.rm-chip .rm-bell { border: 0; background: transparent; font-size: 1rem; line-height: 1; padding: 4px 2px 4px 4px; cursor: pointer; }
+.rm-wahl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }

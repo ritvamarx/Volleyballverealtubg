@@ -1093,14 +1093,19 @@ def create_app() -> Flask:
         _sess, failure = require(role="trainer")
         if failure:
             return failure
-        eid = (request.get_json(silent=True) or {}).get("eventId")
+        body = request.get_json(silent=True) or {}
+        eid = body.get("eventId")
+        nur_pid = body.get("playerId")  # optional: Erinnerung an genau eine Person
         _v, daten = lade_state()
         ev = next((e for e in daten.get("events", []) if e.get("id") == eid), None)
         if ev is None or ev.get("type") not in ("training", "home", "away"):
             return err(404, "Termin nicht gefunden")
         roster = {p["id"] for p in daten.get("players", []) if p.get("membershipStatus") != "inaktiv"}
-        geantwortet = {r.get("playerId") for r in daten.get("responses", []) if r.get("eventId") == eid}
-        offene = roster - geantwortet
+        if nur_pid:
+            offene = {nur_pid} & roster
+        else:
+            geantwortet = {r.get("playerId") for r in daten.get("responses", []) if r.get("eventId") == eid}
+            offene = roster - geantwortet
         empfaenger = []
         for u in con().execute(
                 "SELECT id, player_ids FROM users WHERE active = 1 AND role = 'spieler'").fetchall():

@@ -1418,55 +1418,65 @@
         ${stat("⏳", "Keine Rückmeldung", count.open)}
         ${count.nichtnom ? stat("🚫", "Nicht nominiert", count.nichtnom) : ""}
       </div>
-      ${Object.keys(gruende).length ? `<div class="card mb">
-        <div class="card-head"><h3>💬 Bemerkungen der Spieler:innen</h3><span class="badge">${Object.keys(gruende).length}</span></div>
-        <div class="list">
-          ${roster.filter((p) => gruende[p.id]).map((p) => `<div class="list-item" style="padding:8px 10px">
-            ${avatar(p.firstName, p.lastName, p)}<div class="grow">
-            <div class="title" style="font-size:.88rem">${esc(p.firstName)} ${esc(p.lastName)} ${rmBadge(resp[p.id] || "open")}</div>
-            <div class="sub">💬 ${esc(gruende[p.id])}</div></div></div>`).join("")}
-        </div>
-      </div>` : ""}
-      <div class="card" style="padding:0"><div class="table-wrap"><table>
-        <thead><tr><th>Spieler</th><th>Team</th><th>Rückmeldung</th><th class="right">Aktion</th></tr></thead>
-        <tbody>${roster.map((p) => {
-          const st = resp[p.id] || "open";
-          return `<tr>
-            <td><div class="flex">${avatar(p.firstName, p.lastName, p)}<strong>${esc(p.firstName)} ${esc(p.lastName)}</strong>
-              ${abwesend[p.id] ? `<span class="badge warn" title="Über das Portal gemeldet">🏖 ${esc(abwesend[p.id])}</span>` : ""}</div></td>
-            <td><span class="badge info">${esc(p.team)}</span></td>
-            <td>${rmBadge(st)}${gruende[p.id] ? `<div class="sub" title="Begründung aus dem Portal">💬 ${esc(gruende[p.id])}</div>` : ""}</td>
-            <td class="right nowrap">
-              <button class="rsvp-daumen sm ${st === "yes" ? "aktiv ja" : ""}" data-set="yes" data-pl="${p.id}" title="Zusagen">👍</button>
-              <button class="rsvp-daumen sm ${st === "maybe" ? "aktiv viel" : ""}" data-set="maybe" data-pl="${p.id}" title="Unsicher">❓</button>
-              <button class="rsvp-daumen sm ${st === "no" ? "aktiv nein" : ""}" data-set="no" data-pl="${p.id}" title="Absagen">👎</button>
-              <button class="rsvp-daumen sm ${st === "x" ? "aktiv nn" : ""}" data-set="x" data-pl="${p.id}" title="Nicht nominiert (Spieler:in kann selbst überschreiben)">🚫</button>
-            </td></tr>`;
-        }).join("")}</tbody>
-      </table></div></div>
+      <div class="card">
+        <div class="card-head"><h3>Rückmeldungen</h3><span class="spacer"></span>
+          <span class="soft" style="font-size:.76rem">Tippen = ändern · 🔔 = erinnern</span></div>
+        <div class="rm-chips">${roster.map((p) => {
+          const st = resp[p.id] || "";
+          const cls = { yes: "ja", no: "nein", maybe: "viel", x: "nn" }[st] || "";
+          const note = [gruende[p.id], abwesend[p.id] ? "abwesend: " + abwesend[p.id] : ""].filter(Boolean).join(" · ");
+          const titel = { yes: "Zusage", no: "Absage", maybe: "Unsicher", x: "nicht nominiert" }[st] || "keine Rückmeldung";
+          return `<span class="rm-chip ${cls}" data-rm="${p.id}" role="button" tabindex="0" title="${titel} – tippen zum Ändern">
+            <span class="rm-name">${esc(p.firstName)} ${esc(p.lastName)}</span>${note ? `<span class="rm-note">· ${esc(note)}</span>` : ""}
+            ${st === "yes" || st === "no" || st === "x" ? "" : `<button class="rm-bell" data-bell="${p.id}" title="Erinnerung zur Rückmeldung schicken">🔔</button>`}
+          </span>`;
+        }).join("")}</div>
+      </div>
       ${evt.type === "training" ? trainingsplanHTML(evt, count.yes) : ""}`;
 
-    $$("[data-set]", box).forEach((b) => b.onclick = () => {
-      const status = b.dataset.set;
-      const aktuell = resp[b.dataset.pl];
-      // Erneuter Klick auf den aktiven Daumen nimmt die Rückmeldung zurück
-      if (aktuell === status) {
-        const ex = S().responses.find((r) => r.eventId === evt.id && r.playerId === b.dataset.pl);
-        if (ex) Store.remove("responses", ex.id);
-        reload();
-        return;
-      }
-      let grund = "";
-      if (status === "no" || status === "maybe") {
-        // Auch beim Eintragen durch das Trainerteam wird die Begründung erfasst
-        const bisher = gruende[b.dataset.pl] || "";
-        const eingabe = prompt(status === "no"
-          ? "Begründung für die Absage (z. B. krank, Klassenfahrt):"
-          : "Begründung für „Unsicher“ (z. B. Mitfahrt offen):", bisher);
-        if (eingabe === null) return; // abgebrochen – nichts ändern
-        grund = eingabe.trim();
-      }
-      setResponse(evt.id, b.dataset.pl, status, grund); reload();
+    // Chip antippen → Rückmeldung für diese Person setzen (mit optionaler Bemerkung)
+    $$("[data-rm]", box).forEach((chip) => chip.onclick = (ev) => {
+      if (ev.target.closest("[data-bell]")) return;
+      const pid = chip.dataset.rm;
+      const p = Store.byId("players", pid);
+      if (!p) return;
+      const aktuell = resp[pid] || "";
+      modal({
+        title: `${esc(p.firstName)} ${esc(p.lastName)}`,
+        body: `<div class="rm-wahl">
+            <button class="btn ${aktuell === "yes" ? "" : "outline"}" data-w="yes">Zusage</button>
+            <button class="btn ${aktuell === "maybe" ? "secondary" : "outline"}" data-w="maybe">Unsicher</button>
+            <button class="btn ${aktuell === "no" ? "danger" : "outline"}" data-w="no">Absage</button>
+            <button class="btn ${aktuell === "x" ? "secondary" : "outline"}" data-w="x">Nicht nominiert</button>
+          </div>
+          <div class="field mt"><label>Bemerkung (optional)</label>
+            <input id="rmGrund" value="${esc(gruende[pid] || "")}" placeholder="z. B. krank, Klassenfahrt, kommt später" maxlength="80"></div>`,
+        footer: `<button class="btn ghost" data-x>Abbrechen</button>${aktuell ? '<button class="btn ghost" data-r>Zurücksetzen</button>' : ""}`,
+        onOpen(m) {
+          m.querySelector("[data-x]").onclick = closeModal;
+          const r = m.querySelector("[data-r]");
+          if (r) r.onclick = () => {
+            const ex = S().responses.find((x) => x.eventId === evt.id && x.playerId === pid);
+            if (ex) Store.remove("responses", ex.id);
+            closeModal(); reload();
+          };
+          $$("[data-w]", m).forEach((w) => w.onclick = () => {
+            setResponse(evt.id, pid, w.dataset.w, (m.querySelector("#rmGrund").value || "").trim());
+            closeModal(); reload();
+          });
+        },
+      });
+    });
+    // 🔔 Erinnerung an genau diese Person (Push über das Portal-Konto)
+    $$("[data-bell]", box).forEach((b) => b.onclick = async (ev) => {
+      ev.stopPropagation();
+      if (!window.Sync || !Sync.active) { toast("Erinnerungen gehen nur in der Online-Version", "bad"); return; }
+      b.disabled = true;
+      const res = await apiZugang("/api/termin/erinnern", { eventId: evt.id, playerId: b.dataset.bell });
+      b.disabled = false;
+      if (!res.ok) { toast(res.data.error || "Erinnerung fehlgeschlagen", "bad"); return; }
+      if (!res.data.empfaenger) toast("Kein Portal-Konto mit Mitteilungen für diese Person", "bad");
+      else toast(`Erinnerung geschickt${res.data.ok ? "" : " (noch kein Push-Abo – nur im Portal sichtbar)"}`, "good");
     });
     const leitungBtn = box.querySelector("[data-leitung]");
     if (leitungBtn) leitungBtn.onclick = async () => {
