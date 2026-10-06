@@ -794,12 +794,14 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
 }
 
 /* Trainingsrückmeldung: kompakte Namens-Chips (grün Zusage, rot Absage, gelb unsicher) */
-.rm-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.rm-chips { display: flex; flex-direction: column; gap: 6px; }
 .rm-chip {
   display: inline-flex; align-items: center; gap: 4px; min-height: 40px; padding: 6px 10px 6px 13px;
-  border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2);
-  font-weight: 600; font-size: .92rem; cursor: pointer; max-width: 100%; color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+  font-weight: 600; font-size: .92rem; cursor: pointer; width: 100%; color: var(--text);
 }
+.rm-chip .rm-note { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.rm-chip .rm-bell { margin-left: auto; }
 .rm-chip:hover { filter: brightness(.97); }
 .rm-chip.ja   { background: #d6f1dd; border-color: #8fcfa0; color: #1b4d2a; }
 .rm-chip.nein { background: #f8d7d7; border-color: #e09d9d; color: #6e1f1f; }
