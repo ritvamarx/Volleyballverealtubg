@@ -88,7 +88,7 @@
       view.innerHTML = `<div class="card"><h3>Fehler beim Laden</h3><pre style="white-space:pre-wrap">${U.esc(err && err.stack || err)}</pre></div>`;
       console.error(err);
     }
-    // Menü auf Mobile schließen
+    // Menü auf Mobile schließen (immer beide zusammen)
     $("#sidebar").classList.remove("open");
     $("#overlay").classList.remove("show");
   }
@@ -154,11 +154,24 @@
       },
     });
 
-    $("#hamburger").onclick = () => {
-      $("#sidebar").classList.toggle("open");
-      $("#overlay").classList.toggle("show");
+    // Menü am Handy: Seitenleiste und Abdunkelung IMMER gemeinsam schalten.
+    // (Früher nahm ein Tipp auf die Abdunkelung nur die Seitenleiste weg –
+    // die graue Fläche blieb liegen und fing alle weiteren Tipps ab.)
+    const menuOffen = () => $("#sidebar").classList.contains("open");
+    const menuSetzen = (offen) => {
+      $("#sidebar").classList.toggle("open", offen);
+      $("#overlay").classList.toggle("show", offen);
     };
-    $("#overlay").addEventListener("click", () => { $("#sidebar").classList.remove("open"); });
+    window.menuSchliessen = () => menuSetzen(false);
+    $("#hamburger").onclick = () => menuSetzen(!menuOffen());
+    $("#overlay").addEventListener("click", () => menuSetzen(false));
+    $("#overlay").addEventListener("touchend", (e) => { e.preventDefault(); menuSetzen(false); }, { passive: false });
+    // Menüpunkt antippen schließt immer – auch wenn die Seite bereits offen ist
+    // (dann feuert kein hashchange und render() würde das Menü nicht schließen)
+    $("#nav").addEventListener("click", (e) => { if (e.target.closest("a")) menuSetzen(false); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") menuSetzen(false); });
+    // Beim Zurückkehren in die App (Tab-Wechsel, Sperrbildschirm) nie mit grauer Fläche starten
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && !menuOffen()) $("#overlay").classList.remove("show"); });
 
     // Formulierungs-Update in bestehenden Briefen: nur exakte alte Standardsätze
     // werden ersetzt (individuell bearbeitete Texte bleiben unangetastet)
