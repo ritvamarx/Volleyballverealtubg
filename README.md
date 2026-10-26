@@ -90,6 +90,15 @@ assets/js/views.js         Alle Ansichten/Bereiche
 assets/js/app.js           Router & Initialisierung
 ```
 
+## 📣 Content-Automation (Content-Hub mit n8n)
+
+Konzept, Infrastruktur-Plan und Deployment-Paket für die automatische
+Content-Erstellung (ein Thema → viele Formate → mehrere Kanäle) mit n8n auf
+einer eigenen Hetzner-VM liegen im **privaten Repo
+[ritvamarx/contenthub](https://github.com/ritvamarx/contenthub)**. Für diese
+Volleyball-App ist dort die Content-Feed-/Inbox-Schnittstelle spezifiziert
+(`anbindung/content-feed-spec.md`), die in Stufe 3 in `server/` umgesetzt wird.
+
 ## 🖥️ Server-Betrieb (volleyball.nettverwaltet.de)
 
 Die App kann auf dem eigenen Server mit **Login** betrieben werden
