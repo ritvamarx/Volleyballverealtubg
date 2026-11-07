@@ -7,8 +7,10 @@ Konfiguration ausschließlich über Umgebungsvariablen (.env auf dem Server):
     MAIL_PORT      Port (Standard 587 für STARTTLS, 465 für SSL)
     MAIL_USER      Postfach-Benutzer
     MAIL_PASS      Postfach-Passwort
-    MAIL_FROM      Absenderadresse (z. B. "SKV Müritz <info@skv-mueritz.de>")
+    MAIL_FROM      Absenderadresse (z. B. "SKV Müritz Volleyball <skv.volleyball@nettverwaltet.de>")
     MAIL_SECURITY  "starttls" (Standard), "ssl" oder "none"
+    MAIL_REPLY_TO  optional: Antworten gehen an diese Adresse (z. B. das Trainerteam).
+                   Fehlt sie, steht in jeder Mail, dass Antworten nicht gelesen werden.
 
 Ist MAIL_HOST/USER/PASS nicht gesetzt, macht ``senden`` nichts (No-Op mit
 Log-Hinweis) – die App läuft unverändert weiter, es gehen nur keine Mails raus.
@@ -34,7 +36,18 @@ def _cfg() -> dict:
         "from": os.environ.get("MAIL_FROM", "").strip()
                  or os.environ.get("MAIL_USER", "").strip(),
         "security": os.environ.get("MAIL_SECURITY", "starttls").strip().lower(),
+        "reply_to": os.environ.get("MAIL_REPLY_TO", "").strip(),
     }
+
+
+def fusszeile() -> str:
+    """Hinweis unter jeder Mail: wohin Antworten gehen (oder dass keine gelesen werden)."""
+    c = _cfg()
+    if c["reply_to"]:
+        return ("\n\n--\nSKV Müritz Volleyball · automatische Nachricht aus der Vereins-App."
+                f"\nAntworten gehen an das Trainerteam ({c['reply_to']}).")
+    return ("\n\n--\nSKV Müritz Volleyball · automatische Nachricht aus der Vereins-App."
+            "\nBitte nicht auf diese E-Mail antworten – das Postfach wird nicht gelesen.")
 
 
 def konfiguriert() -> bool:
@@ -60,7 +73,10 @@ def senden(empfaenger: str, betreff: str, text: str) -> bool:
     msg["From"] = c["from"]
     msg["To"] = empfaenger
     msg["Subject"] = betreff
-    msg.set_content(text)
+    if c["reply_to"]:
+        msg["Reply-To"] = c["reply_to"]
+    msg["Auto-Submitted"] = "auto-generated"  # Autoresponder sollen nicht zurückschreiben
+    msg.set_content(text.rstrip() + fusszeile())
     try:
         if c["security"] == "ssl":
             with smtplib.SMTP_SSL(c["host"], c["port"], context=ssl.create_default_context(),

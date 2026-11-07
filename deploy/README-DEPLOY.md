@@ -132,3 +132,36 @@ Die Test-Instanz (`/opt/volleyball-test`, `volleyball-test.nettverwaltet.de`)
 holt sich alle 10 Minuten den `main`-Stand von GitHub (`deploy/auto-update.sh`,
 Cron `/etc/cron.d/volleyball-test-update`, Log `data/update.log`). Die
 Live-Instanz wird davon nie berührt – Live-Updates nur per `deploy.sh`.
+
+## E-Mail-Versand (Postfach skv.volleyball@nettverwaltet.de)
+
+Die Mails von nettverwaltet.de laufen über das Hetzner-Webhosting (MX
+`www4.your-server.de`). Das Postfach wird einmalig in **konsoleH**
+(https://konsoleh.your-server.de) angelegt: Domain *nettverwaltet.de* →
+*E-Mail* → *Postfächer* → *Neues Postfach*: `skv.volleyball`, eigenes langes
+Passwort. Optional dort unter *E-Mail → DKIM* die Signatur für die Domain
+einschalten (bessere Zustellbarkeit).
+
+Danach auf dem Server in `/opt/volleyball/.env` (und für die Test-Instanz in
+`/opt/volleyball-test/.env`) ergänzen – Passwort nur dort, nie im Chat:
+
+```
+MAIL_HOST=www4.your-server.de
+MAIL_PORT=587
+MAIL_SECURITY=starttls
+MAIL_USER=skv.volleyball@nettverwaltet.de
+MAIL_PASS=…
+MAIL_FROM=SKV Müritz Volleyball <skv.volleyball@nettverwaltet.de>
+MAIL_REPLY_TO=…            # Adresse des Trainerteams; weglassen = „bitte nicht antworten"
+```
+
+Container neu starten und Versand prüfen:
+
+```
+cd /opt/volleyball && docker compose up -d volleyball
+docker compose exec volleyball ./manage.py mail-test deine@adresse.de
+```
+
+`www4.your-server.de` ist zugleich der MX der Domain und damit vom bestehenden
+SPF-Eintrag (`v=spf1 +a +mx ?all`) abgedeckt. Jede Mail trägt `Auto-Submitted`
+und eine Fußzeile mit Antwort-Hinweis.
