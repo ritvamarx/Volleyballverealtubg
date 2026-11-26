@@ -470,7 +470,8 @@
       <div class="card"><h3>${istEltern() ? "🏐 Trainings – so hat sich dein Kind gemeldet" : "🏐 Training – bitte rückmelden"}</h3>
       ${d.trainings.length ? d.trainings.map((t) => `
         <div class="portal-termin" data-termin="${t.id}">
-          <div class="title">${fmtDate(t.start)} · ${fmtTime(t.start)}–${fmtTime(t.end)} Uhr${t.location ? " · " + esc(t.location) : ""}</div>
+          <div class="title">🏐 ${esc(t.title || "Training")}</div>
+          <div class="sub">${fmtDate(t.start)} · ${fmtTime(t.start)}–${fmtTime(t.end)} Uhr${t.location ? " · " + esc(t.location) : ""}</div>
           ${ortZeile(t)}
           ${zusagenPills(t.zusagen)}
           ${dabeiAvatare(t)}
@@ -481,8 +482,8 @@
       </div>
       <div class="card"><h3>${istEltern() ? "🏆 Spiele – Rückmeldestand deines Kindes" : "🏆 Spiele – bitte rückmelden"}</h3>
       ${d.spiele.length ? d.spiele.map((s) => `<div class="portal-termin" data-termin="${s.id}">
-          <div class="title">${s.type === "home" ? "🏟️ Heimspiel" : "🚌 Auswärtsspiel"}${s.opponent ? " gegen " + esc(s.opponent) : ""}</div>
-          <div class="sub">${fmtDate(s.start)} · ${fmtTime(s.start)} Uhr${s.location ? " · " + esc(s.location) : ""}</div>
+          <div class="title">${s.type === "home" ? "🏟️" : "🚌"} ${esc(s.title || (s.type === "home" ? "Heimspiel" : "Auswärtsspiel"))}</div>
+          <div class="sub">${s.type === "home" ? "Heimspiel" : "Auswärtsspiel"}${s.opponent ? " gegen " + esc(s.opponent) : ""} · ${fmtDate(s.start)} · ${fmtTime(s.start)} Uhr${s.location ? " · " + esc(s.location) : ""}</div>
           ${ortZeile(s)}
           ${zusagenPills(s.zusagen)}
           ${dabeiAvatare(s)}
