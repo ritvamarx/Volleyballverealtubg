@@ -951,7 +951,11 @@
               </div>
             </div></details>` : ""}
           ${eltern ? `<details style="margin-top:8px" data-upbereich="${sp.id}"><summary class="soft" style="cursor:pointer;font-size:.84rem">📎 Stattdessen unterschriebenes Formular hochladen (PDF oder Foto)</summary>
-            <div class="field" style="margin-top:8px"><label>Unterschrieben von</label><input data-upname="${sp.id}" value="${esc(kontakt.parentName || d.user.name)}"></div>
+            <div class="field" style="margin-top:8px"><label>Was lädst du hoch?</label><select data-upart="${sp.id}">
+              <option value="Sammel-Einverständniserklärung">📑 Sammel-Einverständniserklärung (alle Erklärungen)</option>
+              ${vorlagen.map((t) => `<option value="${esc(t.name)}">📄 ${esc(t.name)} (einzeln)</option>`).join("")}
+              <option value="Sonstiges Dokument">📎 Sonstiges (z. B. Attest, Widerruf)</option></select></div>
+            <div class="field"><label>Unterschrieben von</label><input data-upname="${sp.id}" value="${esc(kontakt.parentName || d.user.name)}"></div>
             <div class="portal-fahrer">
               <input type="file" data-updatei="${sp.id}" accept="application/pdf,image/*" style="flex:1;min-width:150px">
               <button class="btn sm" data-upsenden="${sp.id}">⬆️ Hochladen</button>
@@ -1386,6 +1390,7 @@
         const fd = new FormData();
         fd.append("datei", blob, name); fd.append("playerId", pid);
         fd.append("unterschriebenVon", (wrap.querySelector(`[data-upname="${pid}"]`) || {}).value || "");
+        fd.append("art", (wrap.querySelector(`[data-upart="${pid}"]`) || {}).value || "");
         if (P.busy) return;
         P.busy = true;
         let res;

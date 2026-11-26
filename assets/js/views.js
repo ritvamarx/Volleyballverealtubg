@@ -3235,6 +3235,11 @@
         <div class="field"><label>Spieler</label><select name="playerId" ${beleg ? "disabled" : ""}>
           ${s.players.map((p) => `<option value="${p.id}" ${p.id === pid0 ? "selected" : ""}>${esc(p.firstName)} ${esc(p.lastName)}</option>`).join("")}</select></div>
         <div class="field"><label>Datum der Erklärung</label><input type="date" name="datum" value="${beleg ? String(beleg.uploadedAt || "").slice(0, 10) || heuteISO() : heuteISO()}" required></div>
+        <div class="field"><label>Art des Dokuments</label><select name="art" id="cfArt">
+          <option value="sammel" ${!beleg || /Sammel/.test(beleg.type || "") ? "selected" : ""}>📑 Sammel-Einverständniserklärung (alle Erklärungen)</option>
+          ${vorlagen.map((t) => `<option value="${t.id}" ${beleg && beleg.type === t.name ? "selected" : ""}>📄 ${esc(t.name)} (einzeln)</option>`).join("")}
+          <option value="sonstig">📎 Sonstiges Dokument (Bezeichnung unten)</option></select></div>
+        <div class="field" id="cfArtText" hidden><label>Bezeichnung</label><input name="artText" placeholder="z. B. ärztliches Attest, Widerruf Fotoeinwilligung"></div>
         <div class="field full"><label>Unterschrieben von (Erziehungsberechtigte/r)</label><input name="signedBy" value="${esc(beleg ? (beleg.signedBy || "") : (Store.byId("players", pid0 || "") || {}).parentName || "")}" placeholder="Name Elternteil" required></div>
         ${beleg ? `<div class="field full"><label>Eingereichte Datei</label><p style="margin:0">${beleg.dokumentId ? `<a href="/api/dokumente/${beleg.dokumentId}/datei" target="_blank" rel="noopener">📎 ${esc(beleg.fileName)}</a> – bitte öffnen und die Kreuze unten übernehmen` : esc(beleg.fileName || "")}</p></div>`
         : `<div class="field full"><label>Datei (PDF/Bild, max. 20 MB) – oder unten „Papier liegt im Ordner“ wählen</label>
@@ -3258,14 +3263,30 @@
           };
         }
         m.querySelector("[data-x]").onclick = closeModal;
+        // Art des Dokuments steuert die Vorbelegung der Kreuze: Sammel = alle Pflicht ja,
+        // einzelne Vorlage = nur diese ja, Sonstiges = nichts vorbelegt
+        const artSel = m.querySelector("#cfArt");
+        const artAnwenden = () => {
+          const art = artSel.value;
+          m.querySelector("#cfArtText").hidden = art !== "sonstig";
+          vorlagen.forEach((t) => {
+            const wert = art === "sammel" ? (t.required ? "ja" : "offen") : art === t.id ? "ja" : "offen";
+            const r = m.querySelector(`input[name="ew_${t.id}"][value="${wert}"]`); if (r) r.checked = true;
+          });
+        };
+        artSel.onchange = artAnwenden;
+        if (!beleg || !/Sammel/.test(beleg.type || "")) artAnwenden();
         m.querySelector("[data-s]").onclick = async () => {
           const f = m.querySelector("#cf"); if (!f.reportValidity()) return;
           const d = formData(f);
           const pid = beleg ? beleg.playerId : d.playerId;
           const datei = fileInput && fileInput.files[0];
+          const art = artSel.value;
+          const artLabel = art === "sammel" ? "Sammel-Einverständniserklärung" : art === "sonstig" ? (d.artText || "").trim() || "Sonstiges Dokument"
+            : ((vorlagen.find((t) => t.id === art) || {}).name || "Erklärung");
           const antworten = vorlagen.map((t) => ({ t, w: (m.querySelector(`input[name="ew_${t.id}"]:checked`) || {}).value || "offen" })).filter((x) => x.w !== "offen");
           if (!beleg && !datei && !d.papier) { toast("Bitte Datei auswählen oder „Papier liegt im Ordner“ ankreuzen", "bad"); return; }
-          if (!antworten.length) { toast("Bitte mindestens eine Erklärung mit ja/nein beantworten", "bad"); return; }
+          if (!antworten.length && art !== "sonstig") { toast("Bitte mindestens eine Erklärung mit ja/nein beantworten", "bad"); return; }
           const knopf = m.querySelector("[data-s]"); knopf.disabled = true;
           try {
             let dokumentId = beleg ? beleg.dokumentId : null, fileName = beleg ? beleg.fileName : "Papier im Ordner";
@@ -3280,9 +3301,9 @@
               dokumentId = data.dokument.id; fileName = data.dokument.name;
             }
             const saison = saisonJahr(S());
-            const belegId = beleg ? beleg.id : Store.add("consents", { playerId: pid, type: antworten.length === 1 ? antworten[0].t.name : "Sammel-Einverständniserklärung",
+            const belegId = beleg ? beleg.id : Store.add("consents", { playerId: pid, type: artLabel,
               fileName, dokumentId, signedBy: d.signedBy, uploadedAt: d.datum + "T12:00:00", quelle: datei ? "trainer" : "papier", gesichtet: true, migriert: true }).id;
-            if (beleg) Store.update("consents", beleg.id, { gesichtet: true, signedBy: d.signedBy, migriert: true });
+            if (beleg) Store.update("consents", beleg.id, { gesichtet: true, signedBy: d.signedBy, migriert: true, type: artLabel + (beleg.quelle === "portal" ? " (Portal-Upload)" : "") });
             antworten.forEach(({ t, w }) => Store.add("einwilligungen", { playerId: pid, vorlageId: t.id, status: w, datum: d.datum, saison,
               quelle: beleg ? (beleg.quelle || "portal") : (datei ? "trainer" : "papier"), belegId, erfasstVon: (window.Sync && Sync.user && Sync.user.name) || "Trainer", erfasstAm: new Date().toISOString() }));
             einwFlagsSync();

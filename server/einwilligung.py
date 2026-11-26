@@ -136,12 +136,14 @@ def register(app, con, require, require_portal, err, h):
         if f is not None and f.filename:
             pid = str(request.form.get("playerId") or "").strip()
             unterschrieben = str(request.form.get("unterschriebenVon") or "").strip()[:80]
+            art_text = str(request.form.get("art") or "").strip()[:80]
             quelle_datei, name = f.stream, f.filename
         else:
             # Alter Weg (JSON mit dataUrl) – Übergangsweise weiter annehmen
             body = request.get_json(silent=True) or {}
             pid = str(body.get("playerId") or "").strip()
             unterschrieben = str(body.get("unterschriebenVon") or "").strip()[:80]
+            art_text = ""
             data_url = str(body.get("dataUrl") or "")
             m = re.match(r"^data:([a-z]+/[a-z0-9.+-]+);base64,(.*)$", data_url, re.S)
             if not m or m.group(1) not in MIME_ENDUNG:
@@ -174,7 +176,7 @@ def register(app, con, require, require_portal, err, h):
                     continue
                 liste.append(c)
             liste.append({"id": h["neue_id"]("co"), "playerId": pid,
-                          "type": "Sammel-Einverständniserklärung (Portal-Upload)",
+                          "type": (art_text or "Sammel-Einverständniserklärung") + " (Portal-Upload)",
                           "fileName": zeile["name"], "dokumentId": zeile["id"],
                           "signedBy": unterschrieben or sess["name"], "uploadedAt": h["iso_jetzt"](),
                           "quelle": "portal", "gesichtet": False})
