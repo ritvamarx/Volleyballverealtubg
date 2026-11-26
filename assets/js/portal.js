@@ -608,13 +608,11 @@
     const leute = t.dabeiIds.map((id) => team.find((p) => p.id === id)).filter(Boolean);
     if (!leute.length) return "";
     const vorname = (name) => (name || "").trim().split(" ")[0];
-    const zeig = leute.slice(0, 8);  // Vornamen als Chips, Rest steckt in der Zahl
-    const rest = leute.length - zeig.length;
+    // Alle Namen zeigen (Chips brechen um) – nichts kürzen
     return `<div class="dabei">
-      ${zeig.map((p) => `<span class="mini-name" title="${esc(p.name)}">${p.foto
+      ${leute.map((p) => `<span class="mini-name" title="${esc(p.name)}">${p.foto
         ? `<img class="mini" src="${p.foto}" alt="" style="object-fit:cover">`
         : (p.avatarEmoji ? `<span class="me">${esc(p.avatarEmoji)}</span>` : "")}${esc(vorname(p.name))}</span>`).join("")}
-      ${rest > 0 ? `<span class="mini-name">+${rest}</span>` : ""}
       <span class="n">${leute.length} dabei</span>
     </div>`;
   }
