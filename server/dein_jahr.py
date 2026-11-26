@@ -31,6 +31,37 @@ DUNKEL = (24, 32, 52)
 GRAU = (110, 118, 135)
 HELL = (247, 248, 251)
 CREME = (255, 252, 246)
+GOLD = (166, 126, 58)
+GOLD_HELL = (214, 188, 134)
+BRAUN = (92, 66, 34)
+
+_LOGO_FREI = None
+
+
+def _logo_frei():
+    """Vereinslogo ohne dunkelblauen Hintergrund (freigestellt, mit weichen Kanten)."""
+    global _LOGO_FREI
+    if _LOGO_FREI is not None:
+        return _LOGO_FREI or None
+    try:
+        from PIL import Image
+        img = Image.open(LOGO).convert("RGB")
+        blau, orange = (22, 37, 92), (241, 102, 42)
+        px = img.load()
+        out = Image.new("RGBA", img.size, (0, 0, 0, 0))
+        po = out.load()
+        for y in range(img.size[1]):
+            for x in range(img.size[0]):
+                r, g, b = px[x, y]
+                # Anteil Orange im Pixel (Entmischung der zwei Farben) = Deckkraft
+                a = ((r - blau[0]) / (orange[0] - blau[0]) + (blau[2] - b) / (blau[2] - orange[2])) / 2
+                a = max(0.0, min(1.0, a))
+                if a > 0.02:
+                    po[x, y] = (orange[0], orange[1], orange[2], int(round(a * 255)))
+        _LOGO_FREI = out
+    except Exception:  # noqa: BLE001
+        _LOGO_FREI = False
+    return _LOGO_FREI or None
 
 # Zeichen außerhalb der Grundebene (Emojis) hat DejaVu nicht
 _EMOJI = re.compile("[\U0001F000-\U0001FAFF\U0001F1E6-\U0001F1FF☀-➿️‍]")
@@ -189,6 +220,17 @@ class _Urkunde(FPDF):
         self.add_font("Serif", "", os.path.join(FONT_DIR, "DejaVuSerif.ttf"))
         self.add_font("Serif", "B", os.path.join(FONT_DIR, "DejaVuSerif-Bold.ttf"))
 
+    def zierlinie(self, y, breite=90):
+        """Trennlinie mit Rautenornament in der Mitte (klassische Urkunde)."""
+        cx = 105
+        self.set_draw_color(*GOLD); self.set_line_width(0.4)
+        self.line(cx - breite / 2, y, cx - 5, y)
+        self.line(cx + 5, y, cx + breite / 2, y)
+        self.set_fill_color(*GOLD)
+        self.star(cx, y, 0.7, 2.2, 4, 0, "F")
+        self.set_fill_color(*GOLD_HELL)
+        self.ellipse(cx - 9, y - 0.6, 1.2, 1.2, "F"); self.ellipse(cx + 7.8, y - 0.6, 1.2, 1.2, "F")
+
     def text_zentriert(self, y, text, font, groesse, farbe, zeichenabstand=0.0):
         self.set_font(*font, groesse)
         self.set_text_color(*farbe)
@@ -220,26 +262,44 @@ def urkunde(daten, con, user_id, spieler, start, ende, jahr) -> bytes:
     pdf = _Urkunde()
     pdf.add_page()
     W, H = 210, 297
-    # Hintergrund + Doppelrahmen in Vereinsfarben
+    # Pergament-Hintergrund, klassischer Urkundenrahmen in Altgold
     pdf.set_fill_color(*CREME)
     pdf.rect(0, 0, W, H, "F")
-    pdf.set_draw_color(*ORANGE); pdf.set_line_width(2.2); pdf.rect(9, 9, W - 18, H - 18)
-    pdf.set_draw_color(*GRUEN); pdf.set_line_width(0.7); pdf.rect(13, 13, W - 26, H - 26)
-    # Ecken-Akzente
-    pdf.set_fill_color(*ORANGE)
-    for x, y in ((9, 9), (W - 9, 9), (9, H - 9), (W - 9, H - 9)):
-        pdf.ellipse(x - 2.6, y - 2.6, 5.2, 5.2, "F")
-    # Logo + Vereinsname
-    if os.path.exists(LOGO):
+    pdf.set_draw_color(*GOLD); pdf.set_line_width(1.8); pdf.rect(8, 8, W - 16, H - 16)
+    pdf.set_line_width(0.35); pdf.rect(11.2, 11.2, W - 22.4, H - 22.4)
+    pdf.set_draw_color(*GOLD_HELL); pdf.set_line_width(0.6); pdf.rect(13, 13, W - 26, H - 26)
+    pdf.set_draw_color(*GOLD); pdf.set_line_width(0.35); pdf.rect(14.6, 14.6, W - 29.2, H - 29.2)
+    # Eckrosetten mit Perlenreihen entlang der Kanten
+    for sx, sy in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+        ex = 8 if sx > 0 else W - 8
+        ey = 8 if sy > 0 else H - 8
+        pdf.set_fill_color(*GOLD_HELL)
+        for k, rp in ((9, 1.3), (14, 1.0), (18, 0.7)):
+            pdf.ellipse(ex + sx * k - rp, ey - rp, 2 * rp, 2 * rp, "F")
+            pdf.ellipse(ex - rp, ey + sy * k - rp, 2 * rp, 2 * rp, "F")
+        pdf.set_draw_color(*GOLD); pdf.set_line_width(0.6)
+        pdf.set_fill_color(*CREME); pdf.ellipse(ex - 6.5, ey - 6.5, 13, 13, "FD")
+        pdf.set_fill_color(*GOLD); pdf.star(ex, ey, 1.4, 3.8, 8, 0, "F")
+        pdf.set_fill_color(*ORANGE); pdf.ellipse(ex - 1.2, ey - 1.2, 2.4, 2.4, "F")
+    # Zierstücke an den Seitenmitten
+    pdf.set_fill_color(*GOLD)
+    for x, y in ((W / 2, 8), (W / 2, H - 8), (8, H / 2), (W - 8, H / 2)):
+        pdf.set_fill_color(*CREME); pdf.ellipse(x - 3, y - 3, 6, 6, "F")
+        pdf.set_fill_color(*GOLD); pdf.star(x, y, 0.9, 2.6, 4, 0, "F")
+    # Logo (freigestellt) + Vereinsname
+    logo = _logo_frei()
+    if logo is not None:
+        pdf.image(logo, x=W / 2 - 13, y=19, w=26)
+    elif os.path.exists(LOGO):
         pdf.image(LOGO, x=W / 2 - 11, y=20, w=22)
-    pdf.text_zentriert(44, "SKV MÜRITZ · ABTEILUNG VOLLEYBALL", ("Sans", "B"), 9, GRAU, 1.2)
-    pdf.text_zentriert(52, "URKUNDE", ("Serif", "B"), 30, BLAU, 3.0)
-    pdf.text_zentriert(66, "Dein Jahr mit Volleyball", ("Serif", ""), 16, DUNKEL)
-    pdf.text_zentriert(74, saison_txt, ("Sans", ""), 10, GRAU)
-    # Profilbild (rund) mit Ring, sonst Initialen
-    cx, cy, r = W / 2, 102, 19
-    pdf.set_fill_color(*ORANGE); pdf.ellipse(cx - r - 1.6, cy - r - 1.6, 2 * r + 3.2, 2 * r + 3.2, "F")
-    pdf.set_fill_color(255, 255, 255); pdf.ellipse(cx - r - 0.6, cy - r - 0.6, 2 * r + 1.2, 2 * r + 1.2, "F")
+    pdf.text_zentriert(48, "SKV MÜRITZ · ABTEILUNG VOLLEYBALL", ("Sans", "B"), 10.5, GRAU, 1.4)
+    pdf.text_zentriert(55, "URKUNDE", ("Serif", "B"), 40, BLAU, 3.4)
+    pdf.text_zentriert(73, "Dein Jahr mit Volleyball", ("Serif", ""), 20, DUNKEL)
+    pdf.text_zentriert(83, saison_txt, ("Sans", ""), 12, GRAU)
+    # Profilbild (rund) mit Goldring, sonst Volleyball mit Saison
+    cx, cy, r = W / 2, 110, 21
+    pdf.set_fill_color(*GOLD); pdf.ellipse(cx - r - 1.8, cy - r - 1.8, 2 * r + 3.6, 2 * r + 3.6, "F")
+    pdf.set_fill_color(255, 255, 255); pdf.ellipse(cx - r - 0.7, cy - r - 0.7, 2 * r + 1.4, 2 * r + 1.4, "F")
     bild = _foto_rund(spieler.get("foto") or "")
     if bild is not None:
         pdf.image(bild, x=cx - r, y=cy - r, w=2 * r, h=2 * r)
@@ -249,12 +309,12 @@ def urkunde(daten, con, user_id, spieler, start, ende, jahr) -> bytes:
             pdf.image(ball, x=cx - r, y=cy - r, w=2 * r, h=2 * r)
         else:
             pdf.set_fill_color(*BLAU); pdf.ellipse(cx - r, cy - r, 2 * r, 2 * r, "F")
-    pdf.text_zentriert(128, "verliehen an", ("Sans", ""), 9.5, GRAU)
-    pdf.text_zentriert(135, _t(name), ("Serif", "B"), 24, DUNKEL)
+    pdf.text_zentriert(137, "verliehen an", ("Sans", ""), 11, GRAU)
+    pdf.text_zentriert(144, _t(name), ("Serif", "B"), 30, DUNKEL)
     if mannschaft:
-        pdf.text_zentriert(146, _t(mannschaft), ("Sans", ""), 10.5, BLAU)
-    y = 156
-    pdf.set_draw_color(*GRUEN); pdf.set_line_width(0.5); pdf.line(60, y, W - 60, y)
+        pdf.text_zentriert(158, _t(mannschaft), ("Sans", ""), 12.5, BLAU)
+    y = 167
+    pdf.zierlinie(y)
     # Kennzahlen als Medaillons
     tr, sp, alle = z["training"], z["spiele"], z["alle"]
     QUIZ_MEDAILLE = {1: "Gold im Vereinsquiz", 2: "Silber im Vereinsquiz", 3: "Bronze im Vereinsquiz"}
@@ -270,44 +330,44 @@ def urkunde(daten, con, user_id, spieler, start, ende, jahr) -> bytes:
             platz_txt = f"{_t(r_.get('team') or '')}: Platz {platz} von {len(rows)} in der Liga"
     # nur Positives: Medaillons mit 0 entfallen, der Rest wird mittig gesetzt
     med = [m for m in med if m[0] not in ("0", "")]
-    bw, gap = 40, 6
+    bw, gap = 42, 6
     x0 = (W - (len(med) * bw + max(0, len(med) - 1) * gap)) / 2
-    y = 162
+    y = 172
     for i, (zahl, label, sub) in enumerate(med):
         x = x0 + i * (bw + gap)
-        pdf.set_fill_color(*HELL); pdf.set_draw_color(*GRUEN); pdf.set_line_width(0.4)
-        pdf.rect(x, y, bw, 24, "FD", round_corners=True, corner_radius=3)
-        pdf.set_font("Serif", "B", 15); pdf.set_text_color(*ORANGE)
-        pdf.set_xy(x, y + 3); pdf.cell(bw, 8, zahl, align="C")
-        pdf.set_font("Sans", "B", 7.5); pdf.set_text_color(*DUNKEL)
-        pdf.set_xy(x, y + 12); pdf.cell(bw, 4.5, label, align="C")
-        pdf.set_font("Sans", "", 7); pdf.set_text_color(*GRAU)
-        pdf.set_xy(x, y + 16.5); pdf.cell(bw, 4.5, sub, align="C")
-    y = 190
+        pdf.set_fill_color(*HELL); pdf.set_draw_color(*GOLD_HELL); pdf.set_line_width(0.5)
+        pdf.rect(x, y, bw, 28, "FD", round_corners=True, corner_radius=3)
+        pdf.set_font("Serif", "B", 20); pdf.set_text_color(*ORANGE)
+        pdf.set_xy(x, y + 3); pdf.cell(bw, 10, zahl, align="C")
+        pdf.set_font("Sans", "B", 9.5); pdf.set_text_color(*DUNKEL)
+        pdf.set_xy(x, y + 14); pdf.cell(bw, 5, label, align="C")
+        pdf.set_font("Sans", "", 8.5); pdf.set_text_color(*GRAU)
+        pdf.set_xy(x, y + 19.5); pdf.cell(bw, 5, sub, align="C")
+    y = 205
     if platz_txt:
-        pdf.text_zentriert(y, platz_txt, ("Sans", "B"), 9, BLAU)
-        y += 6
+        pdf.text_zentriert(y, platz_txt, ("Sans", "B"), 11, BLAU)
+        y += 7.5
     # Abzeichen: Spieler:in, Quiz, Familie – nur erreichte
     namen = [a["name"] for a in abz]
     if punkte and qplatz in QUIZ_MEDAILLE:
         namen.append(QUIZ_MEDAILLE[qplatz])
     if namen or eltern_abz:
         y += 2
-        pdf.text_zentriert(y, "ABZEICHEN", ("Sans", "B"), 8.5, GRAU, 1.5)
-        y += 6.5
+        pdf.text_zentriert(y, "ABZEICHEN", ("Sans", "B"), 10.5, GOLD, 1.8)
+        y += 8
         if namen:
-            pdf.set_font("Sans", "", 9.5); pdf.set_text_color(*DUNKEL)
-            pdf.set_xy(20, y); pdf.multi_cell(W - 40, 5, "★   " + "   ★   ".join(namen[:7]), align="C")
-            y = pdf.get_y() + 1
+            pdf.set_font("Sans", "", 11.5); pdf.set_text_color(*DUNKEL)
+            pdf.set_xy(20, y); pdf.multi_cell(W - 40, 6, "★   " + "   ★   ".join(namen[:7]), align="C")
+            y = pdf.get_y() + 1.5
         if eltern_abz:
-            pdf.set_font("Sans", "", 8.8); pdf.set_text_color(*GRUEN)
-            pdf.set_xy(20, y); pdf.multi_cell(W - 40, 4.8, "Deine Familie hat mit angepackt:  " + "  ·  ".join(eltern_abz[:4]), align="C")
-            y = pdf.get_y() + 1
+            pdf.set_font("Sans", "", 10.5); pdf.set_text_color(*GRUEN)
+            pdf.set_xy(20, y); pdf.multi_cell(W - 40, 5.6, "Deine Familie hat mit angepackt:  " + "  ·  ".join(eltern_abz[:4]), align="C")
+            y = pdf.get_y() + 1.5
     # Rückenwind (nur wenn vorhanden)
     if rw:
-        y = max(y + 3, 212)
-        pdf.text_zentriert(y, "RÜCKENWIND", ("Sans", "B"), 8.5, GRAU, 1.5)
-        y += 7
+        y = max(y + 3, 214)
+        pdf.text_zentriert(y, "RÜCKENWIND", ("Sans", "B"), 10.5, GOLD, 1.8)
+        y += 8
     if rw:
         for x in rw[-5:]:
             teile = [_t(k) for k in (x.get("kacheln") or []) if _t(k)]
@@ -316,19 +376,19 @@ def urkunde(daten, con, user_id, spieler, start, ende, jahr) -> bytes:
             if not teile:
                 continue
             pdf.set_xy(26, y)
-            pdf.set_font("Serif", "", 9.5); pdf.set_text_color(*DUNKEL)
-            pdf.multi_cell(W - 52, 4.6, " · ".join(teile) + f"   — {_t(x.get('vonName')) or 'Familie'}", align="C")
+            pdf.set_font("Serif", "", 11); pdf.set_text_color(*DUNKEL)
+            pdf.multi_cell(W - 52, 5.4, " · ".join(teile) + f"   — {_t(x.get('vonName')) or 'Familie'}", align="C")
             y = pdf.get_y() + 1.5
-            if y > 258:
+            if y > 256:
                 break
     # Schlusssatz + Unterschrift
-    pdf.set_draw_color(*GRUEN); pdf.set_line_width(0.5); pdf.line(60, 263, W - 60, 263)
-    pdf.text_zentriert(266, "Danke für deinen Einsatz – jedes Training, jede Zusage und jede faire Aktion zählt.", ("Sans", ""), 8.8, DUNKEL)
+    pdf.zierlinie(261.5)
+    pdf.text_zentriert(265, "Danke für deinen Einsatz – jedes Training, jede Zusage und jede faire Aktion zählt.", ("Serif", ""), 10.5, DUNKEL)
     datum = ende.astimezone(BERLIN).strftime("%d.%m.%Y")
-    pdf.set_font("Sans", "", 8); pdf.set_text_color(*GRAU)
-    pdf.set_xy(30, 276); pdf.cell(60, 4, f"Waren (Müritz), {datum}", align="C")
-    pdf.set_draw_color(*GRAU); pdf.set_line_width(0.3); pdf.line(125, 279.5, 180, 279.5)
-    pdf.set_xy(120, 280); pdf.cell(65, 4, "Trainerteam SKV Müritz Volleyball", align="C")
+    pdf.set_font("Sans", "", 9.5); pdf.set_text_color(*GRAU)
+    pdf.set_xy(28, 276); pdf.cell(64, 5, f"Waren (Müritz), {datum}", align="C")
+    pdf.set_draw_color(*BRAUN); pdf.set_line_width(0.3); pdf.line(122, 280, 182, 280)
+    pdf.set_xy(117, 280.5); pdf.cell(70, 5, "Trainerteam SKV Müritz Volleyball", align="C")
     return bytes(pdf.output())
 
 

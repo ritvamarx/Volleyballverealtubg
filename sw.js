@@ -26,7 +26,7 @@ self.addEventListener("install", (e) => {
 
 self.addEventListener("activate", (e) => {
   e.waitUntil(caches.keys().then((keys) =>
-    Promise.all(keys.filter((k) => k !== STATIK).map((k) => caches.delete(k)))
+    Promise.all(keys.filter((k) => k !== STATIK && k !== DATEN).map((k) => caches.delete(k)))
   ).then(() => self.clients.claim()));
 });
 
@@ -34,11 +34,64 @@ self.addEventListener("message", (e) => {
   if (e.data && e.data.typ === "SKIP_WAITING") self.skipWaiting();
 });
 
+// ------------------------------ Offline-Daten (Teil B) ---------------------
+// Portal-Paket & Co.: Netz zuerst, bei Netzfehler der zuletzt gespeicherte Stand
+// (mit Kopfzeile X-Offline-Stand = Speicherzeit). Fotos: einmal laden, dann vom Gerät.
+// Der Daten-Cache hängt NICHT an der App-Version und wird bei An-/Abmeldung geleert
+// (gemeinsam genutzte Geräte: nie den Stand einer anderen Person zeigen).
+const DATEN = "skv-daten-v1";
+const DATEN_PFADE = ["/api/me", "/api/portal", "/api/portal/wetter", "/api/portal/quiz",
+  "/api/dokumente", "/api/passkey/liste", "/api/portal/helfer"];
+const AUTH_PFADE = /^\/api\/(login|logout|register|passkey\/login\/finish|reset)/;
+
+function mitKopf(antwort, kopf) {
+  const h = new Headers(antwort.headers);
+  Object.keys(kopf).forEach((k) => h.set(k, kopf[k]));
+  return antwort.blob().then((b) => new Response(b, { status: antwort.status, statusText: antwort.statusText, headers: h }));
+}
+
+async function datenNetzZuerst(req) {
+  const c = await caches.open(DATEN);
+  try {
+    const r = await fetch(req);
+    if (r && r.ok) {
+      const kopie = await mitKopf(r.clone(), { "X-Gespeichert": new Date().toISOString() });
+      c.put(new Request(req.url.split("?")[0]), kopie).catch(() => {});
+    } else if (r && r.status === 401) {
+      // Sitzung weg → gespeicherten Stand dieser Route verwerfen
+      c.delete(new Request(req.url.split("?")[0])).catch(() => {});
+    }
+    return r;
+  } catch (err) {
+    const alt = await c.match(new Request(req.url.split("?")[0]));
+    if (!alt) throw err;
+    return mitKopf(alt, { "X-Offline-Stand": alt.headers.get("X-Gespeichert") || "" });
+  }
+}
+
+async function bildCacheZuerst(req) {
+  const c = await caches.open(DATEN);
+  const alt = await c.match(req);
+  if (alt) return alt;
+  const r = await fetch(req);
+  if (r && r.ok) c.put(req, r.clone()).catch(() => {});
+  return r;
+}
+
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
-  if (e.request.method !== "GET" || url.origin !== location.origin) return;
+  if (url.origin !== location.origin) return;
   const pfad = url.pathname;
-  // API und der Service Worker selbst laufen immer übers Netz –
+  if (e.request.method !== "GET") {
+    // An-/Abmeldung: Daten-Cache leeren, damit nie der Stand einer anderen Person erscheint
+    if (AUTH_PFADE.test(pfad)) {
+      e.respondWith(fetch(e.request).then(async (r) => { try { await caches.delete(DATEN); } catch (err) { /* leer */ } return r; }));
+    }
+    return;
+  }
+  if (/^\/api\/portal\/(foto|bild)\//.test(pfad)) { e.respondWith(bildCacheZuerst(e.request)); return; }
+  if (DATEN_PFADE.includes(pfad)) { e.respondWith(datenNetzZuerst(e.request)); return; }
+  // Übrige API und der Service Worker selbst laufen immer übers Netz –
   // Anmeldung, Datenstand und Versionsprüfung dürfen nie aus dem Cache kommen.
   if (pfad.startsWith("/api/") || pfad === "/sw.js" || pfad === "/gesund") return;
 

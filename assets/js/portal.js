@@ -18,11 +18,31 @@
     const opts = { credentials: "same-origin", headers: { "Content-Type": "application/json" } };
     if (window.Sync && Sync.csrf) opts.headers["X-CSRF-Token"] = Sync.csrf;
     if (body) { opts.method = "POST"; opts.body = JSON.stringify(body); }
-    const res = await fetch(pfad, opts);
+    let res;
+    try {
+      res = await fetch(pfad, opts);
+    } catch (e) {
+      // Kein Netz (und kein gespeicherter Stand im Service Worker)
+      return { ok: false, offline: true, data: { error: "Keine Verbindung – bitte später noch einmal versuchen" } };
+    }
     let data = {};
     try { data = await res.json(); } catch (e) { /* leer */ }
-    return { ok: res.ok, data };
+    // Service Worker hat den zuletzt gespeicherten Stand geliefert (offline)
+    const stand = res.headers.get("X-Offline-Stand");
+    if (pfad === "/api/portal" || pfad.startsWith("/api/portal?")) {
+      P.offlineStand = stand || null;
+    }
+    return { ok: res.ok, data, offline: !!stand };
   }
+
+  function offlineLeiste() {
+    if (!P.offlineStand) return "";
+    const z = new Date(P.offlineStand);
+    const wann = isNaN(z) ? "" : ` · Stand ${z.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr`;
+    return `<div class="offline-leiste">📴 Offline${wann} – Änderungen sind gerade nicht möglich</div>`;
+  }
+
+  window.addEventListener("online", () => { if (P.daten) neuLaden(true); });
 
   // ---------- Push-Mitteilungen (Phase 4) ----------
 
@@ -196,7 +216,10 @@
     wrap.innerHTML = `<div class="portal-lade">🏐 Portal wird geladen …</div>`;
     const res = await api("/api/portal");
     if (!res.ok) {
-      wrap.innerHTML = `<div class="portal-lade">Portal konnte nicht geladen werden – bitte Seite neu laden.</div>`;
+      wrap.innerHTML = `<div class="portal-lade">${res.offline
+        ? "📴 Du bist offline und es gibt noch keinen gespeicherten Stand. Sobald du Netz hast, lädt das Portal."
+        : "Portal konnte nicht geladen werden – bitte Seite neu laden."}</div>`;
+      if (res.offline) window.addEventListener("online", () => location.reload(), { once: true });
       return;
     }
     P.daten = res.data;
@@ -338,6 +361,20 @@
     }
     // Abzeichen der laufenden Saison (vom Server berechnet, pro Spieler:in)
     const mitAbzeichen = d.spieler.filter((sp) => (sp.abzeichen || []).length);
+    // Spieler:innen: kurze Übersicht aller erreichbaren Abzeichen (Abzeichen + Stichwort)
+    const stichwort = (x) => {
+      const b = { training: "Trainings", spiel: "Spiele" }[x.bereich] || "Termine";
+      return x.typ === "teilnahme" ? `${x.schwelle} % der ${b} dabei` : `${x.schwelle} % rechtzeitig zurückgemeldet`;
+    };
+    const erreicht = new Set(d.spieler.flatMap((sp) => (sp.abzeichen || []).map((a) => a.name)));
+    const defs = d.abzeichenDefs || [];
+    const abzUebersicht = !istEltern() && defs.length ? `<details class="abz-details"${mitAbzeichen.length ? "" : " open"}>
+        <summary>🎯 Welche Abzeichen gibt es? <span class="soft">(${defs.length + 1})</span></summary>
+        <div class="abz-grid">
+          ${defs.map((x) => `<div class="abz-chip${erreicht.has(x.name) ? " da" : ""}"><span class="abz-emoji">${esc(x.emoji || "🏅")}</span>
+            <div class="grow"><b>${esc(x.name)}</b><small>${esc(stichwort(x))}</small></div>${erreicht.has(x.name) ? "<span class=\"abz-ok\">✓</span>" : ""}</div>`).join("")}
+          <div class="abz-chip"><span class="abz-emoji">🥇</span><div class="grow"><b>Quiz-Medaille</b><small>Top 3 der Wochen-Bestenliste</small></div></div>
+        </div></details>` : "";
     const abzeichenKarte = mitAbzeichen.length ? `
       <div class="card"><h3>🏅 ${istEltern() ? "Abzeichen" : "Deine Abzeichen"}</h3>
         ${mitAbzeichen.map((sp) => `<div class="portal-termin">
@@ -348,9 +385,11 @@
           </div>
         </div>`).join("")}
         <p class="soft" style="font-size:.78rem;margin-bottom:0">Abzeichen gibt es fürs zuverlässige Zurückmelden und fürs Dabeisein – sie gelten für die laufende Saison.</p>
+        ${abzUebersicht}
       </div>` : (!istEltern() && d.spieler.length ? `
       <div class="card"><h3>🏅 Abzeichen</h3>
-        <p class="soft" style="margin-bottom:0">Noch keine Abzeichen – melde dich fleißig zu Trainings und Spielen zurück, dann klappt das! 💪</p>
+        <p class="soft" style="margin-bottom:${abzUebersicht ? "6px" : "0"}">Noch keine Abzeichen – melde dich fleißig zu Trainings und Spielen zurück, dann klappt das! 💪</p>
+        ${abzUebersicht}
       </div>` : "");
     // Aufgaben-Karte (bei Eltern direkt unter der Begrüßung)
     const aufgabenKarte = (d.aufgaben || []).length ? `<div class="card"><h3>✅ Deine Aufgaben vom Trainerteam</h3><div class="list">
@@ -1359,6 +1398,7 @@
           return ampelHTML() + bild + esc(P.daten.user.name);
         })()}</div>
       </header>
+      ${offlineLeiste()}
       <main class="portal-inhalt">${inhalt()}</main>
       <nav class="portal-tabs">
         ${TABS().map((t) => `<button class="${P.tab === t.id ? "aktiv" : ""}" data-tab="${t.id}">
@@ -1372,7 +1412,7 @@
     P.busy = true;
     const res = await api(pfad, body);
     P.busy = false;
-    if (!res.ok) { toast(res.data.error || "Aktion fehlgeschlagen", "bad"); return; }
+    if (!res.ok) { toast(res.offline ? "📴 Keine Verbindung – die Änderung wurde nicht gespeichert" : (res.data.error || "Aktion fehlgeschlagen"), "bad"); return; }
     if (erfolg) toast(erfolg, "good");
     await neuLaden(voll);
   }

@@ -605,6 +605,72 @@ def create_app() -> Flask:
         import datetime as _dt
         return _dt.datetime.now(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
+    def portal_antwort(payload: dict):
+        """JSON mit ETag: schickt der Client denselben Stand (If-None-Match), kommt 304
+        ohne Inhalt. „private, no-cache" = Browser darf speichern, muss aber nachfragen."""
+        import hashlib as _hashlib
+        body = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+        etag = '"' + _hashlib.sha1(body.encode("utf-8")).hexdigest()[:24] + '"'
+        wenn = [t.strip() for t in (request.headers.get("If-None-Match") or "").split(",") if t.strip()]
+        if etag in wenn or "*" in wenn:
+            resp = app.response_class(status=304)
+        else:
+            resp = app.response_class(body, mimetype="application/json")
+        resp.headers["ETag"] = etag
+        resp.headers["Cache-Control"] = "private, no-cache"
+        resp.headers["Vary"] = "Cookie"
+        return resp
+
+    def data_url_antwort(data_url: str):
+        """Base64-Data-URL als echtes Bild ausliefern – unveränderlich je Versions-Hash."""
+        import base64 as _b64
+        import hashlib as _hashlib
+        m = re.match(r"^data:(image/[a-z+.-]+);base64,(.*)$", str(data_url or ""), re.S)
+        if not m:
+            return err(404, "Kein Bild")
+        try:
+            roh = _b64.b64decode(m.group(2), validate=False)
+        except Exception:  # noqa: BLE001
+            return err(404, "Kein Bild")
+        etag = '"' + _hashlib.sha1(roh).hexdigest()[:24] + '"'
+        wenn = [t.strip() for t in (request.headers.get("If-None-Match") or "").split(",") if t.strip()]
+        if etag in wenn:
+            resp = app.response_class(status=304)
+        else:
+            resp = app.response_class(roh, mimetype=m.group(1))
+        resp.headers["ETag"] = etag
+        resp.headers["Cache-Control"] = "private, max-age=31536000, immutable"
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        return resp
+
+    @app.get("/api/portal/foto/<pid>")
+    def api_portal_foto(pid):
+        sess, failure = require_portal()
+        if failure:
+            return failure
+        _v, daten = lade_state()
+        meine_ids = {p["id"] for p in eigene_spieler(sess, daten)}
+        p = next((x for x in daten.get("players", []) if isinstance(x, dict) and x.get("id") == pid), None)
+        # Fremde Fotos nur unter Spieler:innen und nur mit Foto-Einwilligung – Eltern nie
+        # (Zugriff zuerst prüfen, damit Fremde nicht einmal erfahren, ob ein Foto existiert)
+        if pid not in meine_ids and not (sess["role"] == "spieler" and p and p.get("membershipStatus") != "inaktiv"
+                                         and _einw.foto_erlaubt(daten, pid)):
+            return err(403, "Kein Zugriff")
+        if not p or not p.get("foto"):
+            return err(404, "Kein Foto")
+        return data_url_antwort(p.get("foto"))
+
+    @app.get("/api/portal/bild/<oid>")
+    def api_portal_bild(oid):
+        sess, failure = require_portal()
+        if failure:
+            return failure
+        _v, daten = lade_state()
+        c = next((x for x in daten.get("clothing", []) if isinstance(x, dict) and x.get("id") == oid), None)
+        if not c or not c.get("bild"):
+            return err(404, "Kein Bild")
+        return data_url_antwort(c.get("bild"))
+
     @app.get("/api/portal")
     def api_portal():
         sess, failure = require_portal()
@@ -849,8 +915,16 @@ def create_app() -> Flask:
 
         # „leicht": Nach einer Aktion lädt das Portal ohne die großen Base64-Fotos
         # neu (der Client behält sie aus dem ersten vollen Load) – spart Bandbreite.
-        leicht = request.args.get("leicht") == "1"
-        foto_von = (lambda v: "") if leicht else (lambda v: v or "")
+        # Fotos/Bilder liegen NICHT mehr als Base64 im Paket, sondern als kleine URL
+        # mit Versions-Hash: einmal geladen, dann ein Jahr aus dem Gerätecache
+        # (Teil B: mobile Daten sparen). ?leicht=1 wird aus Kompatibilität weiter akzeptiert.
+        import hashlib as _hashlib
+
+        def bild_url(art, oid, data_url):
+            if not data_url or not str(data_url).startswith("data:image/"):
+                return ""
+            return f"/api/portal/{art}/{oid}?v={_hashlib.sha1(str(data_url).encode()).hexdigest()[:10]}"
+        foto_von = lambda v: v or ""  # noqa: E731 (nur noch für Altpfade)
 
         abt = {d.get("id"): d.get("name") for d in daten.get("departments", [])}
         # Kategorie-Label einmal aufbauen (statt pro „weiterer" Termin neu)
@@ -861,7 +935,7 @@ def create_app() -> Flask:
              for a in daten.get("announcements", []) if a.get("audience") in ("alle", "oeffentlich", rolle)],
             key=lambda a: str(a.get("date", "")), reverse=True)[:10]
 
-        return jsonify({
+        return portal_antwort({
             "user": {"name": sess["name"], "role": rolle},
             "benachrichtigungen": {
                 "prefs": notify_prefs_lesen(sess["user_id"]),
@@ -874,17 +948,22 @@ def create_app() -> Flask:
             "team": ([{"id": p["id"],
                        "name": f"{p.get('firstName', '')} {p.get('lastName', '')}".strip(),
                        "avatarEmoji": p.get("avatarEmoji") or "",
-                       "foto": (foto_von(p.get("foto"))
+                       "foto": (bild_url("foto", p["id"], p.get("foto"))
                                 if (p["id"] in meine_ids or _einw.foto_erlaubt(daten, p["id"])) else "")}
                       for p in daten.get("players", [])
                       if p.get("membershipStatus") != "inaktiv"]
                      if rolle == "spieler" else []),
+            # Spieler:innen: alle erreichbaren Abzeichen (kurz) – motiviert, zeigt das Ziel
+            "abzeichenDefs": ([{k: d.get(k) for k in ("id", "name", "emoji", "typ", "schwelle", "bereich")}
+                               for d in sorted(daten.get("abzeichenDefs", []), key=lambda d: (d.get("bereich") or "", d.get("schwelle") or 0))
+                               if isinstance(d, dict)]
+                              if rolle == "spieler" else []),
             "whatsapp": (daten.get("whatsapp") or {}).get(
                 "eltern" if rolle == "eltern" else "spieler") or "",
             "spieler": [{"id": p["id"],
                          "name": f"{p.get('firstName', '')} {p.get('lastName', '')}".strip(),
                          "avatarEmoji": p.get("avatarEmoji") or "",
-                         "foto": foto_von(p.get("foto")),
+                         "foto": bild_url("foto", p["id"], p.get("foto")),
                          "abzeichen": abz.get(p["id"], []),
                          "abteilung": ", ".join(
                              n for n in (abt.get(i) for i in (
@@ -919,7 +998,7 @@ def create_app() -> Flask:
             "quizFragen": [{k: q.get(k) for k in ("id", "kapitel", "f", "a", "r", "stufe")}
                            for q in daten.get("quizFragen", [])],
             "kleidung": [dict({k: c.get(k) for k in ("id", "name", "description", "price", "sizes", "kind", "color")},
-                              bild=foto_von(c.get("bild")))
+                              bild=bild_url("bild", c.get("id"), c.get("bild")))
                          for c in daten.get("clothing", [])],
             "kleidungAnfragen": [{"id": r.get("id"), "itemId": r.get("itemId"), "playerId": r.get("playerId"),
                                   "size": r.get("size"), "qty": r.get("qty"), "status": r.get("status")}
@@ -2222,7 +2301,9 @@ def create_app() -> Flask:
         # API nie zwischenspeichern – außer Dokument-Dateien (unveränderlich je ID,
         # „private": nur im Browser des angemeldeten Nutzers, nie in Zwischenproxys)
         if request.path.startswith("/api/") and not re.fullmatch(r"/api/dokumente/\d+/datei", request.path):
-            resp.headers["Cache-Control"] = "no-store"
+            # Routen mit eigener Cache-Strategie (Portal-Paket mit ETag, Fotos
+            # unveränderlich je Hash) behalten ihren Header
+            resp.headers.setdefault("Cache-Control", "no-store")
         return resp
 
     @app.get("/")

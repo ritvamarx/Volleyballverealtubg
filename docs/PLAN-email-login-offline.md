@@ -66,7 +66,12 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
 
 ## Teil B: Weniger mobile Daten, Offline-Portal
 
-### B1 Daten sparen (sofort wirksam)
+### B1 Daten sparen (sofort wirksam) – UMGESETZT 2026-11-26 (Punkte 1, 2)
+- Fotos/Kleidungsbilder kommen als kleine URL (`/api/portal/foto/<id>?v=HASH`, `/api/portal/bild/<id>?v=HASH`),
+  ausgeliefert mit `private, max-age=1 Jahr, immutable` + ETag; Rechteprüfung wie im Paket (Eltern nie fremde Fotos).
+- `/api/portal` mit ETag + `private, no-cache` → unverändert = 304 ohne Inhalt.
+- Offen: Wetter/Quiz erst beim Öffnen des Tabs laden (klein, geringer Nutzen); Messung auf der Test-Instanz.
+
 1. Fotos raus aus `/api/portal`: eigene Route `/api/portal/foto/<id>` mit `ETag` und
    `Cache-Control: immutable`; der Service Worker cached sie dauerhaft. Fotos werden so
    nur beim ersten Mal übertragen.
@@ -75,13 +80,21 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
 3. Wetter und Quiz erst beim Öffnen des jeweiligen Tabs laden, nicht bei jedem Start.
 4. Messen auf der Test-Instanz: Bytes pro Portal-Start vorher/nachher.
 
-### B2 Offline lesen
+### B2 Offline lesen – UMGESETZT 2026-11-26
+- Service Worker: `/api/me`, `/api/portal`, Wetter, Quiz, Dokumentenliste, Passkey-Liste netz-zuerst mit
+  Cache-Rückfall (`skv-daten-v1`, unabhängig von der App-Version); Fotos cache-zuerst.
+- Offline-Stand kommt mit Kopfzeile `X-Offline-Stand`; das Portal zeigt eine gelbe Leiste
+  „📴 Offline · Stand 14:32 Uhr – Änderungen sind gerade nicht möglich“; Aktionen melden „Keine Verbindung“.
+- Beim `online`-Ereignis lädt das Portal automatisch neu; An-/Abmeldung leert den Daten-Cache
+  (gemeinsam genutzte Geräte zeigen nie den Stand einer anderen Person).
+- Test: `localStorage.skv_sw = "1"` schaltet den Service Worker auch auf `localhost` ein.
+
 1. Service Worker: `/api/portal` netz-zuerst mit Cache-Rückfall; zusätzlich letzter
    Payload mit Zeitstempel in IndexedDB.
 2. Ohne Netz startet das Portal aus dem Cache, kleiner Hinweis „Stand 14:32 · offline“.
 3. `/api/me` offline → zuletzt bekannter Nutzer, Portal öffnet trotzdem (Cookie ist 30/180 Tage gültig).
 
-### B3 Offline schreiben (Warteschlange)
+### B3 Offline schreiben (Warteschlange) – NÄCHSTER SCHRITT
 1. Alle Portal-Aktionen (Zu-/Absage, Abwesenheit, Fahrer, Aufgabe, Buffet, Job, Kleidung,
    Kontakt, Profilbild) landen bei Netzfehler in einer IndexedDB-Warteschlange; die Anzeige
    wird sofort lokal aktualisiert.

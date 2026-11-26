@@ -192,7 +192,10 @@
   <script>
   // PWA: Service Worker nur im echten Web-Betrieb registrieren – die
   // Offline-Einzeldatei (file://) und HTTP-Vorschauen bleiben unberührt.
-  if ("serviceWorker" in navigator && location.protocol === "https:") {
+  // (auf localhost nur für Tests, wenn localStorage.skv_sw = "1" gesetzt ist)
+  var swLokal = false;
+  try { swLokal = location.hostname === "localhost" && localStorage.getItem("skv_sw") === "1"; } catch (e) { /* leer */ }
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || swLokal)) {
     window.addEventListener("load", function () {
       navigator.serviceWorker.register("/sw.js").then(function (reg) {
         function updateHinweis(wartend) {
