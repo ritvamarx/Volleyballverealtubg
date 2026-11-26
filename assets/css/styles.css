@@ -799,3 +799,5 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
 .modal { z-index: 610; }
 .toast-root { z-index: 620; }
 .portal-tabs, .quickbar { z-index: 60; }
+/* Mobiles Trainer-Menü über dem Overlay (sonst ausgegraut und nicht antippbar), unter Dialogen */
+@media (max-width: 820px) { .sidebar { z-index: 605; } }
