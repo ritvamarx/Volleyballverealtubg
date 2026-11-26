@@ -157,6 +157,7 @@
     el.innerHTML = `
       ${head("Übersicht", `Willkommen zurück im Trainer-Cockpit des ${esc(s.club)}`)}
       <div id="dringend"></div>
+      <div id="passkeyAngebot"></div>
       <div class="grid grid-4 mb">
         ${stat("🏐", "Aktive Spieler", s.players.filter((p) => p.membershipStatus !== "inaktiv").length, `${s.players.length} gesamt`, "#/players")}
         ${stat("📅", "Nächste Termine", next.length, next[0] ? `${labelForType(next[0].type)} ${relDays(next[0].start)}` : "—", "#/calendar")}
@@ -257,6 +258,32 @@
     });
     bindLinkActions(el);
     ladeDringend(el);
+    ladePasskeyAngebot(el);
+  }
+
+  // Karte „Schneller anmelden": Passkey (Face ID / Fingerabdruck) fürs Trainerkonto anbieten
+  async function ladePasskeyAngebot(el) {
+    const box = $("#passkeyAngebot", el);
+    if (!box || !window.Sync || !Sync.active || !window.Passkey) return;
+    if (!(await Passkey.angebot())) { box.innerHTML = ""; return; }
+    box.innerHTML = `
+      <div class="card mb">
+        <div class="card-head"><h3>🔐 Schneller anmelden</h3></div>
+        <p class="soft" style="margin-top:0">Anmelden mit ${Passkey.wort()} – ein Tipp statt Passwort und Authenticator-Code.
+        Sicher auf diesem Gerät gespeichert, Passwort + 2FA funktionieren weiterhin.</p>
+        <div class="flex" style="gap:8px;flex-wrap:wrap">
+          <button class="btn" data-pkneu>🔐 ${Passkey.wort()} einrichten</button>
+          <button class="btn sm ghost" data-pkspaeter>Später</button>
+        </div>
+      </div>`;
+    $("[data-pkneu]", box).onclick = async () => {
+      toast("Gerät fragt nach " + Passkey.wort() + " …");
+      const r = await Passkey.einrichten();
+      if (!r.ok) { if (r.error !== "Abgebrochen") toast(r.error, "bad"); return; }
+      toast(r.schon ? "Auf diesem Gerät ist schon ein Passkey eingerichtet" : "Fertig – beim nächsten Mal reicht ein Tipp 🔐", "good");
+      box.innerHTML = "";
+    };
+    $("[data-pkspaeter]", box).onclick = () => { Passkey.spaeterSetzen(); box.innerHTML = ""; };
   }
 
   // Offene Passwort-/Zugangsanfragen als sofort fällige Aufgabe anzeigen

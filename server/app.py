@@ -171,7 +171,7 @@ def create_app() -> Flask:
     # Passkeys (Face ID / Fingerabdruck) – siehe server/passkeys.py
     import passkeys
     passkeys.register(app, con, require, start_session, err, rate_limited, log_login,
-                      SESSION_DAYS_PORTAL)
+                      lambda rolle: SESSION_DAYS if rolle == "trainer" else SESSION_DAYS_PORTAL)
 
     # ---------- API: Sitzung ----------
 

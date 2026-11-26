@@ -56,7 +56,9 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
   eingerichtetem Passkey steht er ganz oben – ein Tipp genügt.
 - Technik: WebAuthn (py_webauthn), Resident Keys mit Pflicht-Nutzerverifikation, Tabellen
   `passkeys` und `webauthn_challenges`. Passwort- und Code-Weg bleiben unverändert.
-- Trainerkonten vorerst ausgenommen (2FA-Pflicht); Freischaltung später möglich.
+- Auch für Trainerkonten (seit 2026-11-26): Einrichten nach Anmeldung mit 2FA über die Seitenleiste
+  „🔐 Passkey“ oder die Dashboard-Karte; der Passkey ersetzt Passwort + Authenticator-Code
+  (Besitz + Biometrie = zwei Faktoren). Sitzung Trainer 30 Tage, Portal 180 Tage.
 
 ### A4 Später, nach Freigabe
 - Codeweg nur noch als Trainer-Notfall sichtbar.

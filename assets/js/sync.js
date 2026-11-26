@@ -120,6 +120,14 @@
       catch (e) { return false; }
     },
     hier: () => { try { return localStorage.getItem(Passkey.FLAG) === "1"; } catch (e) { return false; } },
+    spaeter: () => { try { return Date.now() < parseInt(localStorage.getItem(Passkey.NEIN) || "0", 10); } catch (e) { return false; } },
+    spaeterSetzen: () => { try { localStorage.setItem(Passkey.NEIN, String(Date.now() + 30 * 86400000)); } catch (e) { /* leer */ } },
+    wort: () => (/iPhone|iPad|Macintosh/.test(navigator.userAgent) ? "Face ID / Touch ID" : "Fingerabdruck / Gesicht"),
+    // Soll die Karte „Schneller anmelden" gezeigt werden? (Gerät kann es, hier noch keiner, kein „Später")
+    async angebot() {
+      if (!Passkey.moeglich() || Passkey.hier() || Passkey.spaeter()) return false;
+      return Passkey.plattform();
+    },
     merken: (ja) => { try { if (ja) localStorage.setItem(Passkey.FLAG, "1"); else localStorage.removeItem(Passkey.FLAG); } catch (e) { /* leer */ } },
     geraetName() {
       const ua = navigator.userAgent;
@@ -384,6 +392,15 @@
       bell.title = "Push-Mitteilungen für das Trainerteam (z. B. Passwort-Anfragen) an-/abschalten";
       bell.onclick = trainerPushToggle;
       foot.appendChild(bell);
+      if (Passkey.moeglich()) {
+        const pk = document.createElement("button");
+        pk.id = "passkeyBtn";
+        pk.className = "btn-ghost";
+        pk.textContent = "🔐 Passkey";
+        pk.title = "Anmeldung mit Face ID / Touch ID / Fingerabdruck einrichten oder verwalten";
+        pk.onclick = passkeyEinstellungen;
+        foot.appendChild(pk);
+      }
       const btn = document.createElement("button");
       btn.id = "logoutBtn";
       btn.className = "btn-ghost";
@@ -417,6 +434,45 @@
     const reg = await navigator.serviceWorker.getRegistration();
     return reg ? reg.pushManager.getSubscription() : null;
   }
+  // Passkeys des Trainerkontos verwalten (Seitenleiste 🔐)
+  async function passkeyEinstellungen() {
+    const r = await api("/api/passkey/liste");
+    if (!r.ok) { U.toast("Passkeys konnten nicht geladen werden", "bad"); return; }
+    const liste = r.data.passkeys || [];
+    const datum = (ts) => new Date(ts * 1000).toLocaleDateString("de-DE");
+    U.modal({
+      title: "🔐 Anmeldung ohne Passwort",
+      body: `<p class="soft" style="margin-top:0;font-size:.88rem">${Passkey.wort()} statt Passwort und Authenticator-Code –
+        ein Passkey je Gerät, sicher auf dem Gerät gespeichert. Passwort + 2FA bleiben als Weg erhalten.</p>
+        ${liste.length ? `<div class="list" style="margin-bottom:10px">${liste.map((k) => `
+          <div class="list-item" style="padding:8px 10px"><div class="grow">
+            <div class="title" style="font-size:.88rem">🔐 ${U.esc(k.geraet || "Gerät")}</div>
+            <div class="sub">eingerichtet ${datum(k.seit)}${k.zuletzt ? ` · zuletzt ${datum(k.zuletzt)}` : ""}</div></div>
+            <button class="btn sm ghost" data-pkweg="${k.id}" title="Passkey entfernen">🗑️</button></div>`).join("")}</div>`
+          : `<p class="soft" style="font-size:.85rem">Noch kein Passkey eingerichtet.</p>`}`,
+      footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn" data-pkneu>🔐 Auf diesem Gerät einrichten</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = U.closeModal;
+        m.querySelector("[data-pkneu]").onclick = async () => {
+          U.toast("Gerät fragt nach " + Passkey.wort() + " …");
+          const e = await Passkey.einrichten();
+          if (!e.ok) { if (e.error !== "Abgebrochen") U.toast(e.error, "bad"); return; }
+          U.toast(e.schon ? "Auf diesem Gerät ist schon ein Passkey eingerichtet" : "Fertig – beim nächsten Mal reicht ein Tipp 🔐", "good");
+          U.closeModal(); passkeyEinstellungen();
+          const karte = document.querySelector("#passkeyAngebot"); if (karte) karte.innerHTML = "";
+        };
+        m.querySelectorAll("[data-pkweg]").forEach((b) => b.onclick = async () => {
+          if (!confirm("Diesen Passkey entfernen? Die Anmeldung geht dann wieder nur mit Passwort + 2FA.")) return;
+          const d = await api("/api/passkey/loeschen", { method: "POST", body: JSON.stringify({ id: parseInt(b.dataset.pkweg, 10) }) });
+          if (!d.ok) { U.toast("Konnte nicht entfernt werden", "bad"); return; }
+          if (!(d.data.passkeys || []).length) Passkey.merken(false);
+          U.closeModal(); passkeyEinstellungen();
+        });
+      },
+    });
+  }
+  window.passkeyEinstellungen = passkeyEinstellungen;
+
   async function pushKnopfAktualisieren() {
     const b = $("#pushBtn");
     if (!b) return;

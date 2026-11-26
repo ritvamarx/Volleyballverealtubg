@@ -177,8 +177,9 @@ Sitzungen von Spieler-/Elternkonten gelten 180 Tage, Trainer 30 Tage (2FA).
 
 ### Passkeys (Face ID / Touch ID / Fingerabdruck)
 
-Spieler-/Elternkonten können im Portal einen Passkey einrichten und sich danach
-am Anmeldebildschirm ohne Passwort anmelden (WebAuthn, Bibliothek `webauthn`
+Alle Konten können einen Passkey einrichten (Portal: Karte/Konto-Tab, Trainer:
+Seitenleiste „🔐 Passkey“) und sich danach am Anmeldebildschirm ohne Passwort
+anmelden – Trainer dabei ohne Authenticator-Code (WebAuthn, Bibliothek `webauthn`
 in `server/requirements.txt`, Modul `server/passkeys.py`). Passkeys gelten je
 Domain – Test- und Live-Instanz haben getrennte. Keine Server-Einrichtung nötig,
 HTTPS ist Voraussetzung (Caddy). Passkeys bleiben bei Passwort-Reset erhalten;

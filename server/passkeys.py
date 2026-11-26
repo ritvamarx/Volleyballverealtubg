@@ -1,10 +1,11 @@
 """Passkeys (WebAuthn): Anmelden mit Face ID, Touch ID oder Fingerabdruck.
 
-Spieler:innen und Eltern richten nach einer normalen Anmeldung im Portal einen
-Passkey ein. Danach reicht am Anmeldebildschirm ein Tipp auf „Mit Face ID /
-Fingerabdruck anmelden" – kein Benutzername, kein Passwort. Passwort- und
-Code-Weg bleiben unverändert bestehen. Trainerkonten (2FA-Pflicht) sind
-vorerst ausgenommen.
+Nach einer normalen Anmeldung (Trainer: inklusive 2FA) wird ein Passkey
+eingerichtet. Danach reicht am Anmeldebildschirm ein Tipp auf „Mit Face ID /
+Fingerabdruck anmelden" – kein Benutzername, kein Passwort, für Trainer auch
+kein Authenticator-Code mehr: Ein Passkey mit Nutzerverifikation ist Besitz
+plus Biometrie/PIN und damit selbst zwei Faktoren. Passwort- und Code-Weg
+bleiben unverändert bestehen.
 
 Technik: py_webauthn, Resident Keys (discoverable) mit Pflicht zur
 Nutzerverifikation, Challenges liegen 5 Minuten in der Tabelle
@@ -25,10 +26,9 @@ import db
 
 CHALLENGE_SEK = 300
 RP_NAME = "SKV Müritz Volleyball"
-ROLLEN = ("spieler", "eltern")
 
 
-def register(app, con, require, start_session, err, rate_limited, log_login, session_tage):
+def register(app, con, require, start_session, err, rate_limited, log_login, tage_fuer):
     def rp_id() -> str:
         host = (request.host or "").split(":")[0].lower()
         return host if re.fullmatch(r"[a-z0-9.-]+", host) else "localhost"
@@ -83,15 +83,13 @@ def register(app, con, require, start_session, err, rate_limited, log_login, ses
         sess, failure = require()
         if failure:
             return failure
-        return jsonify(dict(liste_json(sess["user_id"]), erlaubt=sess["role"] in ROLLEN))
+        return jsonify(dict(liste_json(sess["user_id"]), erlaubt=True))
 
     @app.post("/api/passkey/register/start")
     def api_passkey_register_start():
         sess, failure = require()
         if failure:
             return failure
-        if sess["role"] not in ROLLEN:
-            return err(403, "Für Trainerkonten ist die Passkey-Anmeldung noch nicht freigeschaltet")
         if len(eigene(sess["user_id"])) >= 10:
             return err(400, "Zu viele Passkeys – bitte zuerst einen entfernen")
         nutzer = con().execute("SELECT username, name, email FROM users WHERE id = ?",
@@ -178,7 +176,7 @@ def register(app, con, require, start_session, err, rate_limited, log_login, ses
         pk = con().execute(
             "SELECT p.*, u.active, u.role FROM passkeys p JOIN users u ON u.id = p.user_id"
             " WHERE p.cred_id = ?", (str(credential.get("id") or ""),)).fetchone()
-        if pk is None or not pk["active"] or pk["role"] not in ROLLEN:
+        if pk is None or not pk["active"]:
             log_login("passkey", False)
             return err(401, "Dieser Passkey ist hier nicht (mehr) eingerichtet – bitte mit Passwort anmelden")
         try:
@@ -197,7 +195,8 @@ def register(app, con, require, start_session, err, rate_limited, log_login, ses
         user = con().execute("SELECT * FROM users WHERE id = ?", (pk["user_id"],)).fetchone()
         log_login(user["username"], True)
         resp = jsonify({})
-        start_session(resp, user["id"], pre_2fa=False, tage=session_tage)
+        # Passkey = Besitz + Nutzerverifikation → auch für Trainer direkt volle Sitzung (kein TOTP)
+        start_session(resp, user["id"], pre_2fa=False, tage=tage_fuer(user["role"]))
         resp.set_data(db.to_json({"need": None, "user": {
             "username": user["username"], "name": user["name"], "role": user["role"]}}))
         return resp
