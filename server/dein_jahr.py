@@ -122,6 +122,44 @@ def quiz_rang(con, user_id):
     return punkte, platz
 
 
+def _volleyball(jahr: int, px: int = 600):
+    """Stilisierter Volleyball (PIL) mit der Saison darauf – Ersatz für ein fehlendes Profilbild."""
+    try:
+        import math
+        from PIL import Image, ImageDraw, ImageFont
+        img = Image.new("RGBA", (px, px), (0, 0, 0, 0))
+        d = ImageDraw.Draw(img)
+        d.ellipse((4, 4, px - 5, px - 5), fill=(255, 255, 255, 255))
+        # Drei klassische Nähte: Bögen von Kreisen außerhalb des Balls, zur Mitte hin gewölbt,
+        # auf eine eigene Ebene gezeichnet und mit der Ballform maskiert
+        ebene = Image.new("RGBA", (px, px), (0, 0, 0, 0))
+        dz = ImageDraw.Draw(ebene)
+        c = px / 2
+        R, abstand, w = px * 0.62, px * 0.80, 11
+        for winkel, farbe in ((30, ORANGE), (150, BLAU), (270, ORANGE)):
+            kx = c + abstand * math.cos(math.radians(winkel))
+            ky = c + abstand * math.sin(math.radians(winkel))
+            start = (winkel + 180 - 62) % 360
+            dz.arc((kx - R, ky - R, kx + R, ky + R), start, start + 124, fill=farbe + (255,), width=w)
+        maske = Image.new("L", (px, px), 0)
+        ImageDraw.Draw(maske).ellipse((14, 14, px - 15, px - 15), fill=255)
+        img.paste(ebene, (0, 0), Image.composite(ebene.split()[3], Image.new("L", (px, px), 0), maske))
+        d.ellipse((4, 4, px - 5, px - 5), outline=ORANGE + (255,), width=10)
+        text = f"{jahr}/{str(jahr + 1)[2:]}"
+        try:
+            font = ImageFont.truetype(os.path.join(FONT_DIR, "DejaVuSans-Bold.ttf"), int(px * 0.16))
+        except Exception:
+            font = ImageFont.load_default()
+        box = d.textbbox((0, 0), text, font=font)
+        tw, th = box[2] - box[0], box[3] - box[1]
+        d.rounded_rectangle((c - tw / 2 - 18, c - th / 2 - 12, c + tw / 2 + 18, c + th / 2 + 14),
+                            radius=22, fill=(255, 255, 255, 240), outline=BLAU + (255,), width=4)
+        d.text((c - tw / 2 - box[0], c - th / 2 - box[1]), text, font=font, fill=BLAU + (255,))
+        return img
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _foto_rund(data_url: str, px: int = 600):
     """Base64-Foto → rundes RGBA-Bild (PIL) oder None."""
     try:
@@ -206,10 +244,11 @@ def urkunde(daten, con, user_id, spieler, start, ende, jahr) -> bytes:
     if bild is not None:
         pdf.image(bild, x=cx - r, y=cy - r, w=2 * r, h=2 * r)
     else:
-        pdf.set_fill_color(*BLAU); pdf.ellipse(cx - r, cy - r, 2 * r, 2 * r, "F")
-        initialen = "".join(p[0] for p in name.split()[:2]).upper() or "?"
-        pdf.set_font("Sans", "B", 22); pdf.set_text_color(255, 255, 255)
-        pdf.set_xy(cx - r, cy - 5); pdf.cell(2 * r, 10, initialen, align="C")
+        ball = _volleyball(jahr)
+        if ball is not None:
+            pdf.image(ball, x=cx - r, y=cy - r, w=2 * r, h=2 * r)
+        else:
+            pdf.set_fill_color(*BLAU); pdf.ellipse(cx - r, cy - r, 2 * r, 2 * r, "F")
     pdf.text_zentriert(128, "verliehen an", ("Sans", ""), 9.5, GRAU)
     pdf.text_zentriert(135, _t(name), ("Serif", "B"), 24, DUNKEL)
     if mannschaft:
@@ -229,8 +268,10 @@ def urkunde(daten, con, user_id, spieler, start, ende, jahr) -> bytes:
         platz, r_ = wir[0]
         if platz <= max(1, (len(rows) + 1) // 2):
             platz_txt = f"{_t(r_.get('team') or '')}: Platz {platz} von {len(rows)} in der Liga"
+    # nur Positives: Medaillons mit 0 entfallen, der Rest wird mittig gesetzt
+    med = [m for m in med if m[0] not in ("0", "")]
     bw, gap = 40, 6
-    x0 = (W - (4 * bw + 3 * gap)) / 2
+    x0 = (W - (len(med) * bw + max(0, len(med) - 1) * gap)) / 2
     y = 162
     for i, (zahl, label, sub) in enumerate(med):
         x = x0 + i * (bw + gap)

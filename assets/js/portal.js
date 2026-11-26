@@ -296,7 +296,7 @@
   function tabStart() {
     const d = P.daten;
     const naechste = [...d.trainings.map((t) => ({ ...t, art: "training" })),
-                      ...d.spiele.map((s) => ({ ...s, art: s.type })),
+                      ...spieltage(d.spiele).map((s) => ({ ...s, art: s.type })),
                       ...(d.weitere || []).map((w) => ({ ...w, art: "misc" }))]
       .sort((a, b) => String(a.start).localeCompare(String(b.start))).slice(0, 5);
     const ICON = { training: "🏐", home: "🏟️", away: "🚌" };
@@ -310,13 +310,14 @@
     </div>`;
     // Schnelle Rückmeldung: der nächste rückmeldbare Termin (Training + Spiel)
     const naechstesTraining = d.trainings[0];
-    const naechstesSpiel = d.spiele[0];
+    const naechstesSpiel = spieltage(d.spiele)[0];
     const schnell = !istEltern() && (naechstesTraining || naechstesSpiel) ? `
       <div class="card"><h3>⚡ Kommst du? Sag schnell Bescheid!</h3>
         ${[naechstesTraining, naechstesSpiel].filter(Boolean).map((t) => `
         <div class="portal-termin">
-          <div class="title">${t.type === "home" ? "🏟️ Heimspiel" : t.type === "away" ? "🚌 Auswärtsspiel" : "🏐 " + esc(t.title || "Training")}${t.opponent ? " gegen " + esc(t.opponent) : ""}</div>
+          <div class="title">${t.type === "home" ? "🏟️ " : t.type === "away" ? "🚌 " : "🏐 "}${esc(t.title || (t.type === "home" ? "Heimspiel" : t.type === "away" ? "Auswärtsspiel" : "Training"))}${t.opponent && !t.spieltag ? " gegen " + esc(t.opponent) : ""}</div>
           <div class="sub">${fmtDate(t.start)} · ${fmtTime(t.start)} Uhr${t.location ? " · " + esc(t.location) : ""}</div>
+          ${spieleZeile(t)}
           ${ortZeile(t)}
           ${dabeiAvatare(t)}
           ${d.spieler.map((sp) => rsvpKnoepfe(t, sp.id)).join("")}
@@ -445,22 +446,24 @@
           const spiel = e.art === "home" || e.art === "away";
           const offen = (e.art === "training" || spiel) && !e.abgesagt
             ? d.spieler.filter((sp) => !((e.meine || {})[sp.id])) : [];
-          const jobsHier = e.art === "home" ? (d.jobs || []).filter((j) => j.eventId === e.id) : [];
-          const fahrt = e.art === "away" && istEltern() ? (d.fahrer || []).find((f) => f.eventId === e.id) : null;
-          return `<div class="list-item" data-gehzu="${e.id}" role="link" tabindex="0" style="cursor:pointer;flex-wrap:wrap"><div class="grow" style="min-width:200px">
-            <div class="title">${e.art === "misc" ? esc(e.kategorie) + ": " : (ICON[e.art] || "📌") + " "}${esc(e.title || "")}${e.opponent ? " gegen " + esc(e.opponent) : ""}
+          const ids = e.ids || [e.id];
+          const jobsHier = e.art === "home" ? (d.jobs || []).filter((j) => ids.includes(j.eventId)) : [];
+          const fahrt = e.art === "away" && istEltern() ? (d.fahrer || []).find((f) => ids.includes(f.eventId)) : null;
+          return `<div class="list-item" data-gehzu="${ids[0]}" role="link" tabindex="0" style="cursor:pointer;flex-wrap:wrap"><div class="grow" style="min-width:200px">
+            <div class="title">${e.art === "misc" ? esc(e.kategorie) + ": " : (ICON[e.art] || "📌") + " "}${esc(e.title || "")}${e.opponent && !e.spieltag ? " gegen " + esc(e.opponent) : ""}
               ${e.abgesagt ? '<span class="badge bad">abgesagt</span>' : ""}
               ${offen.length ? `<span class="badge warn" title="Noch keine Rückmeldung${d.spieler.length > 1 ? ": " + esc(offen.map((x) => x.name.split(" ")[0]).join(", ")) : ""}">🟡 Rückmeldung fehlt</span>` : ""}
               ${(spiel || e.art === "training") && !e.abgesagt ? `<span class="badge" title="Zusagen inkl. Trainer:in">👥 ${((e.zusagen || {}).yes || 0) + 1} dabei</span>` : ""}
               ${spiel && !e.abgesagt ? `<span class="badge accent" data-countdown="${esc(e.start)}">${countdownText(e.start)}</span>` : ""}</div>
             <div class="sub">${fmtDate(e.start)} · ${fmtTime(e.start)} Uhr${e.location ? " · " + esc(e.location) : ""}</div>
+            ${spieleZeile(e)}
             ${ortZeile(e)}
           </div><span class="arr">›</span>
           ${jobsHier.length ? `<div style="flex-basis:100%;margin-top:6px"><div class="sub" style="margin-bottom:4px">🙌 Hilfe gesucht – einfach übernehmen:</div>
             ${jobsHier.map((j) => `<div class="flex" style="justify-content:space-between;align-items:center;gap:8px;padding:4px 0;border-top:1px dashed var(--border)">
               <span style="font-size:.86rem">${JOB_KAT[j.category] || "📌"} ${esc(j.title)}${jobDauer(j)}${j.meiner ? ' <span class="badge good">deiner 💪</span>' : ""}</span>
               ${j.meiner ? `<button class="btn sm ghost" data-jobab="${j.id}">Abgeben</button>` : `<button class="btn sm" data-job="${j.id}">Übernehmen</button>`}
-            </div>`).join("")}${helferZeile([e.id])}</div>` : ""}
+            </div>`).join("")}${helferZeile(ids)}</div>` : ""}
           ${e.art === "away" && istEltern() && !e.abgesagt ? `<div style="flex-basis:100%;margin-top:6px" class="sub">🚗 ${fahrt && fahrt.seats ? `Du bietest ${fahrt.seats} Mitfahrplätze an – danke!` : `Mitfahrplätze gesucht – <a href="#" data-gehtab="mithelfen">jetzt anbieten</a>`}</div>` : ""}
           </div>`;
         }).join("") : `<p class="soft">Aktuell stehen keine Termine an.</p>`}
@@ -530,9 +533,11 @@
         </div>`).join("") : `<p class="soft">Keine anstehenden Trainings eingetragen.</p>`}
       </div>
       <div class="card"><h3>${istEltern() ? "🏆 Spiele – Rückmeldestand deines Kindes" : "🏆 Spiele – bitte rückmelden"}</h3>
-      ${d.spiele.length ? d.spiele.map((s) => `<div class="portal-termin" data-termin="${s.id}">
+      ${d.spiele.length ? spieltage(d.spiele).map((s) => `<div class="portal-termin" data-termin="${(s.ids || [s.id])[0]}" data-termine="${esc((s.ids || [s.id]).join(","))}">
           <div class="title">${s.type === "home" ? "🏟️" : "🚌"} ${esc(s.title || (s.type === "home" ? "Heimspiel" : "Auswärtsspiel"))}</div>
-          <div class="sub">${s.type === "home" ? "Heimspiel" : "Auswärtsspiel"}${s.opponent ? " gegen " + esc(s.opponent) : ""} · ${fmtDate(s.start)} · ${fmtTime(s.start)} Uhr${s.location ? " · " + esc(s.location) : ""}</div>
+          <div class="sub">${s.spieltag ? "" : (s.type === "home" ? "Heimspiel" : "Auswärtsspiel") + (s.opponent ? " gegen " + esc(s.opponent) : "") + " · "}${fmtDate(s.start)} · ${fmtTime(s.start)} Uhr${s.location ? " · " + esc(s.location) : ""}</div>
+          ${spieleZeile(s)}
+          ${s.spieltag ? '<div class="sub">Eine Rückmeldung gilt für den ganzen Spieltag.</div>' : ""}
           ${ortZeile(s)}
           ${zusagenPills(s.zusagen)}
           ${dabeiAvatare(s)}
@@ -543,13 +548,13 @@
             <div class="sub">🥗 Buffet: ${s.buffetAnzahl || 0} ${s.buffetAnzahl === 1 ? "Beitrag" : "Beiträge"} angekündigt${s.meinBuffet ? ` · deiner: <strong>${esc(s.meinBuffet)}</strong>` : ""}</div>
             <div class="portal-fahrer">
               <input data-bufin="${s.id}" placeholder="Ich bringe mit: z. B. Kuchen, Salat, Getränke …" value="${esc(s.meinBuffet || "")}" maxlength="80">
-              <button class="btn sm" data-bufsave="${s.id}">Speichern</button>
+              <button class="btn sm" data-bufsave="${s.id}" data-ids="${esc((s.ids || [s.id]).join(","))}">Speichern</button>
             </div>` : `
             <div class="sub">🚗 Mitfahrgelegenheiten: ${s.plaetzeGesamt || 0} ${s.plaetzeGesamt === 1 ? "Platz" : "Plätze"} angeboten${s.meinePlaetze ? ` · deine: <strong>${s.meinePlaetze}</strong>` : ""}</div>
             <div class="portal-fahrer">
               <select data-mfseats="${s.id}">${[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) =>
                 `<option value="${n}" ${(s.meinePlaetze || 0) === n ? "selected" : ""}>${n === 0 ? "kein Angebot" : n + (n === 1 ? " Platz" : " Plätze")}</option>`).join("")}</select>
-              <button class="btn sm" data-mfsave="${s.id}">Speichern</button>
+              <button class="btn sm" data-mfsave="${s.id}" data-ids="${esc((s.ids || [s.id]).join(","))}">Speichern</button>
             </div>`}
         </div>`).join("") : `<p class="soft">Keine anstehenden Spiele eingetragen.</p>`}
       </div>
@@ -1095,6 +1100,39 @@
     });
   }
 
+  // ---------- Spieltage: mehrere Spiele am selben Tag/Ort = ein Eintrag ----------
+  function spieltage(spiele) {
+    const m = new Map();
+    (spiele || []).forEach((e) => {
+      const k = `${String(e.start).slice(0, 10)}|${(e.location || "").trim().toLowerCase()}|${e.type}`;
+      if (!m.has(k)) m.set(k, []);
+      m.get(k).push(e);
+    });
+    return Array.from(m.values()).map((evs) => {
+      evs.sort((a, b) => String(a.start).localeCompare(String(b.start)));
+      if (evs.length === 1) return Object.assign({}, evs[0], { ids: [evs[0].id], events: evs });
+      const f = evs[0];
+      // Rückmeldung je Spieler:in: gleich bei allen Spielen → diese, sonst die erste vorhandene
+      const meine = {};
+      Object.keys(Object.assign({}, ...evs.map((e) => e.meine || {}))).forEach((pid) => {
+        const st = evs.map((e) => (e.meine || {})[pid] || "");
+        meine[pid] = st.every((x) => x === st[0]) ? st[0] : (st.find((x) => x) || "");
+      });
+      const gegner = evs.map((e) => e.opponent).filter(Boolean);
+      return Object.assign({}, f, {
+        id: evs.map((e) => e.id).join(","), ids: evs.map((e) => e.id), events: evs,
+        end: evs[evs.length - 1].end || f.end, meine,
+        title: f.title || (f.type === "home" ? "Heimspieltag" : "Auswärtsspieltag"),
+        opponent: gegner.join(" & "), spieltag: true,
+        abgesagt: evs.every((e) => e.abgesagt) ? f.abgesagt : null,
+        dabeiIds: Array.from(new Set(evs.flatMap((e) => e.dabeiIds || []))),
+        buffetAnzahl: evs.reduce((a, e) => a + (e.buffetAnzahl || 0), 0),
+        plaetzeGesamt: Math.max(...evs.map((e) => e.plaetzeGesamt || 0)),
+      });
+    });
+  }
+  const spieleZeile = (g) => g.spieltag ? `<div class="sub">${g.events.length} Spiele: ${g.events.map((e) => `${fmtTime(e.start)} Uhr${e.opponent ? " gegen " + esc(e.opponent) : ""}${e.abgesagt ? " (abgesagt)" : ""}`).join(" · ")}</div>` : "";
+
   // ---------- Countdown bis zum Spiel, Kompakttabelle, Eltern-Abzeichen ----------
   function countdownText(start) {
     const diff = new Date(start) - Date.now();
@@ -1219,6 +1257,8 @@
     const d = P.daten; if (!d) return [];
     const heute = new Date().toISOString().slice(0, 10);
     const punkte = [];
+    if (pushMoeglich() && !P.pushAktiv) punkte.push({ art: "gelb", text: "Mitteilungen sind aus", aktion: "push",
+      sub: istIosOhneApp() ? "iPhone: zuerst als App installieren, dann einschalten" : "Absagen, Jobs und Antworten sofort aufs Handy – antippen zum Einschalten" });
     (d.aufgaben || []).filter((t) => !t.erledigt).forEach((t) => punkte.push({
       art: t.due && t.due < heute ? "rot" : "gelb", text: t.title,
       sub: t.due ? "fällig " + fmtDateShort(t.due) : "Aufgabe vom Trainerteam", tab: "start" }));
@@ -1229,13 +1269,13 @@
       else punkte.push({ art: "rot", text: `Einverständniserklärung für ${sp.name || "dich"} fehlt`,
         sub: istEltern() ? "im Konto digital bestätigen oder hochladen" : "deine Eltern bestätigen sie im Elternkonto", tab: "kontakt" });
     });
-    const termine = [...(d.trainings || []), ...(d.spiele || [])].filter((t) => !t.abgesagt);
+    const termine = [...(d.trainings || []), ...spieltage(d.spiele || [])].filter((t) => !t.abgesagt);
     termine.forEach((t) => {
       const tage = (new Date(String(t.start).slice(0, 10)) - new Date(heute)) / 86400000;
       if (tage < 0 || tage > 7) return;
       const fehlt = d.spieler.filter((sp) => !((t.meine || {})[sp.id]));
       if (!fehlt.length) return;
-      punkte.push({ art: "gelb", text: `Rückmeldung fehlt: ${t.title || "Termin"}`, sub: `${fmtDateShort(t.start)}${d.spieler.length > 1 ? " · " + fehlt.map((x) => x.name.split(" ")[0]).join(", ") : ""}`, tab: "termine", termin: t.id });
+      punkte.push({ art: "gelb", text: `Rückmeldung fehlt: ${t.title || "Termin"}`, sub: `${fmtDateShort(t.start)}${d.spieler.length > 1 ? " · " + fehlt.map((x) => x.name.split(" ")[0]).join(", ") : ""}`, tab: "termine", termin: (t.ids || [t.id])[0] });
     });
     return punkte;
   }
@@ -1250,7 +1290,7 @@
     U.modal({
       title: p.length ? `🚦 ${p.length} offene${p.length === 1 ? "r Punkt" : " Punkte"}` : "🚦 Alles erledigt",
       body: p.length ? `<div class="list">${p.map((x, i) => `<button class="list-item" data-ampelgo="${i}" style="text-align:left;width:100%;background:none;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer">
-          <span style="font-size:1.1rem">${x.art === "rot" ? "🔴" : "🟡"}</span>
+          <span style="font-size:1.1rem">${x.aktion === "push" ? "🔔" : x.art === "rot" ? "🔴" : "🟡"}</span>
           <div class="grow"><div class="title" style="font-size:.9rem">${esc(x.text)}</div><div class="sub">${esc(x.sub || "")}</div></div><span class="arr">›</span></button>`).join("")}</div>`
         : `<p class="soft">Keine offenen Aufgaben, alle Erklärungen liegen vor und die Termine der nächsten Woche sind beantwortet. 🟢</p>`,
       footer: `<button class="btn ghost" data-x>Schließen</button>`,
@@ -1258,6 +1298,7 @@
         m.querySelector("[data-x]").onclick = U.closeModal;
         m.querySelectorAll("[data-ampelgo]").forEach((b) => b.onclick = () => {
           const x = p[parseInt(b.dataset.ampelgo, 10)];
+          if (x.aktion === "push") { U.closeModal(); pushNachfragen(); return; }
           U.closeModal(); P.tab = x.tab; render();
           setTimeout(() => {
             const ziel = x.termin ? document.querySelector(`[data-termin="${x.termin}"]`) : (x.tab === "kontakt" ? document.querySelector("#einwKarte") : null);
@@ -1501,16 +1542,22 @@
     if (rsvpAbbruch) rsvpAbbruch.onclick = () => { P.rsvpBegr = null; render(); };
     const rsvpFeld = wrap.querySelector("[data-rsvpgrund]");
     if (rsvpFeld) rsvpFeld.onkeydown = (ev) => { if (ev.key === "Enter") { ev.preventDefault(); rsvpSenden.click(); } };
+    const fuerAlle = async (ids, pfad, bodyFn, erfolg) => {
+      for (let i = 0; i < ids.length; i++) {
+        if (i < ids.length - 1) { const r = await api(pfad, bodyFn(ids[i])); if (!r.ok) { toast(r.data.error || "Speichern fehlgeschlagen", "bad"); return; } }
+        else await aktion(pfad, bodyFn(ids[i]), erfolg);
+      }
+    };
     wrap.querySelectorAll("[data-bufsave]").forEach((b) => b.onclick = () => {
       const eid = b.dataset.bufsave;
       const wert = wrap.querySelector(`[data-bufin="${eid}"]`).value.trim();
-      aktion("/api/portal/buffet", { eventId: eid, beitrag: wert },
+      fuerAlle((b.dataset.ids || eid).split(",").filter(Boolean), "/api/portal/buffet", (id) => ({ eventId: id, beitrag: wert }),
         wert ? "Danke – dein Buffet-Beitrag ist angekündigt! 🥗" : "Buffet-Beitrag zurückgezogen");
     });
     wrap.querySelectorAll("[data-mfsave]").forEach((b) => b.onclick = () => {
       const eid = b.dataset.mfsave;
       const plaetze = parseInt(wrap.querySelector(`[data-mfseats="${eid}"]`).value, 10) || 0;
-      aktion("/api/portal/driver", { eventId: eid, seats: plaetze },
+      fuerAlle((b.dataset.ids || eid).split(",").filter(Boolean), "/api/portal/driver", (id) => ({ eventId: id, seats: plaetze }),
         plaetze ? "Danke – deine Mitfahrgelegenheit ist eingetragen! 🚗" : "Mitfahr-Angebot zurückgezogen");
     });
     wrap.querySelectorAll("[data-fsave]").forEach((b) => b.onclick = async () => {

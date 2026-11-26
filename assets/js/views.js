@@ -157,6 +157,7 @@
     el.innerHTML = `
       ${head("Übersicht", `Willkommen zurück im Trainer-Cockpit des ${esc(s.club)}`)}
       <div id="dringend"></div>
+      <div id="pushAngebot"></div>
       ${(() => { const u = (s.nachrichten || []).filter((n) => !n.gelesen); return u.length ? `
       <div class="card mb" style="border:1.5px solid var(--primary-2,#2563eb)">
         <div class="card-head"><h3>📨 Neue Nachrichten (${u.length})</h3><span class="spacer"></span><a class="btn sm" href="#/nachrichten">Lesen &amp; antworten</a></div>
@@ -265,7 +266,20 @@
     bindLinkActions(el);
     ladeDringend(el);
     ladePasskeyAngebot(el);
+    ladePushAngebot(el);
     einwMigration();
+  }
+
+  // Gelbe Karte: Push-Mitteilungen fürs Trainerkonto sind aus (Passwort-Anfragen, Absagen, Nachrichten)
+  async function ladePushAngebot(el) {
+    const box = $("#pushAngebot", el);
+    if (!box || !window.Sync || !Sync.active || !window.trainerPushAktiv) return;
+    const aktiv = await window.trainerPushAktiv();
+    if (aktiv !== false) { box.innerHTML = ""; return; }
+    box.innerHTML = `<div class="card mb" style="border:1.5px solid #e8a13c">
+      <div class="card-head"><h3>🟡 Mitteilungen sind aus</h3><span class="spacer"></span><button class="btn sm" data-pushan>🔔 Einschalten</button></div>
+      <p class="soft" style="margin:0">Passwort-Anfragen, Absagen, eingereichte Erklärungen und Eltern-Nachrichten kommen dann sofort aufs Handy.</p></div>`;
+    $("[data-pushan]", box).onclick = async () => { await window.trainerPushToggle(); ladePushAngebot(el); };
   }
 
   // Karte „Schneller anmelden": Passkey (Face ID / Fingerabdruck) fürs Trainerkonto anbieten

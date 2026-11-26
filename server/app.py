@@ -973,18 +973,22 @@ def create_app() -> Flask:
         if pid not in sess_player_ids(sess):
             return err(403, "Spieler:in ist nicht mit deinem Konto verknüpft")
         _v, daten = lade_state()
-        ev = next((e for e in daten.get("events", []) if e.get("id") == eid), None)
-        if ev is None or ev.get("type") not in ("training", "home", "away"):
+        # Spieltag: "id1,id2" = mehrere Spiele am selben Tag, eine Rückmeldung für alle
+        eids = [x for x in str(eid or "").split(",") if x][:6]
+        evs = [e for e in daten.get("events", []) if e.get("id") in eids and e.get("type") in ("training", "home", "away")]
+        if not eids or len(evs) != len(eids):
             return err(404, "Termin nicht gefunden")
+        ev, eid = evs[0], eids[0]
         vorher = next((r.get("status") for r in daten.get("responses", [])
                        if r.get("eventId") == eid and r.get("playerId") == pid), "")
 
         def mut(d):
             liste = [r for r in d.get("responses", [])
-                     if not (r.get("eventId") == eid and r.get("playerId") == pid)]
+                     if not (r.get("eventId") in eids and r.get("playerId") == pid)]
             if status:
-                liste.append({"id": neue_id("rs"), "eventId": eid, "playerId": pid,
-                              "status": status, "grund": grund, "at": iso_jetzt(), "quelle": "portal"})
+                for e_id in eids:
+                    liste.append({"id": neue_id("rs"), "eventId": e_id, "playerId": pid,
+                                  "status": status, "grund": grund, "at": iso_jetzt(), "quelle": "portal"})
             d["responses"] = liste
 
         if speichere_portal_aenderung(mut, f"{sess['name']} (Portal)") is None:

@@ -478,6 +478,12 @@
     });
   }
   window.passkeyEinstellungen = passkeyEinstellungen;
+  // Fürs Dashboard: Mitteilungen aktiv? (null = Browser kann kein Push)
+  window.trainerPushAktiv = async () => {
+    if (!pushMoeglich()) return null;
+    try { return !!(await aktuellesPushAbo()); } catch (e) { return false; }
+  };
+  window.trainerPushToggle = trainerPushToggle;
 
   async function pushKnopfAktualisieren() {
     const b = $("#pushBtn");
