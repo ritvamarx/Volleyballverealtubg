@@ -2874,7 +2874,9 @@
         <div class="field full"><label>Datei (PDF/Bild)</label>
           <label class="file-drop" id="fd">📎 Klicken zum Auswählen<div class="sub" id="fdname"></div>
           <input type="file" name="file" accept="application/pdf,image/*" hidden></label></div>
-      </div><p class="muted" style="font-size:.8rem">Die Datei wird lokal im Browser gespeichert (DSGVO-konform ohne Server). Für den Vereinsbetrieb kann eine sichere Serverablage angebunden werden.</p></form>`,
+      </div><p class="muted" style="font-size:.8rem">${window.Sync && Sync.active
+        ? "Die Datei wird verschlüsselt (HTTPS) übertragen und auf dem Vereinsserver gespeichert – nur für angemeldete Trainer:innen sichtbar, Teil der täglichen Sicherung. Max. 4 MB je Datei."
+        : "Die Datei wird lokal in diesem Browser gespeichert (ohne Server)."}</p></form>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
       onOpen(m) {
         const fileInput = m.querySelector('input[name="file"]');
