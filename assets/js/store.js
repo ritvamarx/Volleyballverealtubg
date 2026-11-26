@@ -382,6 +382,12 @@
       consents: includeDemo ? consents : [],
       einwilligungen: [],
       nachrichten: [],
+      rueckenwind: [],
+      rueckenwindKacheln: [
+        "Starker Einsatz bis zum Schluss", "Respekt, wie du drangeblieben bist", "Fair gespielt",
+        "Mutig angenommen", "Ruhig geblieben, als es eng wurde", "Gut für das Team gesprochen",
+        "Konzentriert von Anfang an", "Sichtbar besser als letzte Woche", "Du hast andere mitgezogen",
+      ],
       calendarFeeds: includeDemo ? calendarFeeds : [],
       finances: includeDemo ? finances : [],
       clothingRequests: includeDemo ? clothingRequests : [],

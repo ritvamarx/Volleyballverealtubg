@@ -909,6 +909,7 @@ def create_app() -> Flask:
             "fahrer": fahrer,
             "jobs": jobs,
             "helfer": (helfer if rolle == "eltern" else {}),
+            "rueckenwind": _rw.payload(con(), daten, sess, meine),
             "elternAbzeichen": eltern_abzeichen(),
             "nachrichten": [{"id": n.get("id"), "text": n.get("text") or "", "at": n.get("at"),
                              "antworten": [{"text": a.get("text") or "", "von": a.get("von") or "Trainerteam",
@@ -1321,8 +1322,15 @@ def create_app() -> Flask:
         for k in NOTIFY_DEFAULT:
             if k in body:
                 prefs[k] = bool(body[k])
+        # Andere gespeicherte Schlüssel (z. B. Rückenwind-Opt-in) unverändert mitnehmen
+        row = con().execute("SELECT notify_prefs FROM users WHERE id = ?", (sess["user_id"],)).fetchone()
+        try:
+            gesamt = json.loads((row["notify_prefs"] if row else "") or "{}")
+        except Exception:
+            gesamt = {}
+        gesamt.update(prefs)
         con().execute("UPDATE users SET notify_prefs = ? WHERE id = ?",
-                      (db.to_json(prefs), sess["user_id"]))
+                      (db.to_json(gesamt), sess["user_id"]))
         con().commit()
         return jsonify({"ok": True, "prefs": prefs})
 
@@ -1728,6 +1736,14 @@ def create_app() -> Flask:
         "neue_id": neue_id, "iso_jetzt": iso_jetzt, "client_ip": client_ip, "log_login": log_login,
         "push": _push, "auth": auth, "pdf_brief": __import__("pdf_brief")})
 
+    # Rückenwind (Eltern → Spieler:in) – siehe server/rueckenwind.py
+    import rueckenwind as _rw
+    _rw.register(app, con, require_portal, err, {
+        "sess_player_ids": sess_player_ids, "lade_state": lade_state,
+        "speichere_portal_aenderung": speichere_portal_aenderung, "neue_id": neue_id,
+        "iso_jetzt": iso_jetzt, "push": _push, "log_login": log_login})
+
+
     # ---------- Benachrichtigungs-Einstellungen (Portal) ----------
 
     NOTIFY_DEFAULT = {"pushAllgemein": True, "pushTeilnahme": True, "pushAbsagen": True, "email": False}
@@ -1783,8 +1799,15 @@ def create_app() -> Flask:
         for k in NOTIFY_DEFAULT:
             if k in body:
                 prefs[k] = bool(body[k])
+        # Andere gespeicherte Schlüssel (z. B. Rückenwind-Opt-in) unverändert mitnehmen
+        row = con().execute("SELECT notify_prefs FROM users WHERE id = ?", (sess["user_id"],)).fetchone()
+        try:
+            gesamt = json.loads((row["notify_prefs"] if row else "") or "{}")
+        except Exception:
+            gesamt = {}
+        gesamt.update(prefs)
         con().execute("UPDATE users SET notify_prefs = ? WHERE id = ?",
-                      (db.to_json(prefs), sess["user_id"]))
+                      (db.to_json(gesamt), sess["user_id"]))
         con().commit()
         return jsonify({"ok": True, "prefs": prefs})
 

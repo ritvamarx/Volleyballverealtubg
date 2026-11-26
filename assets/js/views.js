@@ -342,6 +342,11 @@
         ${stat("💬", "Gesamt", liste.length, "Nachrichten")}
         ${stat("✅", "Beantwortet", liste.filter((n) => (n.antworten || []).length).length, "mit Antwort")}
       </div>
+      <div class="card mb"><div class="card-head"><h3>💬 Rückenwind-Kacheln</h3><span class="spacer"></span><button class="btn sm" data-kachelneu>＋ Kachel</button></div>
+        <p class="soft" style="font-size:.85rem;margin-top:0">Eltern schicken ihren Spieler:innen nach Terminen private, positive Rückmeldungen aus diesen Kacheln
+        (max. 12, kurz, konkret, nie bewertend). Inhalte sind nur für Eltern und Spieler:in sichtbar – das Trainerteam pflegt hier nur die Auswahl.</p>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${(s.rueckenwindKacheln || []).map((k, i) => `<span class="badge good" style="font-size:.85rem">${esc(k)} <button class="btn sm ghost" data-kachelweg="${i}" style="padding:0 4px" title="entfernen">✕</button></span>`).join("") || '<span class="soft">Keine Kacheln – Standardliste wird genutzt.</span>'}</div>
+      </div>
       ${liste.length ? liste.map((n) => `
         <div class="card mb" style="${n.gelesen ? "" : "border:1.5px solid var(--primary-2,#2563eb)"}">
           <div class="card-head"><h3 style="font-size:1rem">${n.gelesen ? "" : "🔵 "}${esc(n.von)} <span class="soft" style="font-weight:400">· ${n.rolle === "eltern" ? "Eltern" : esc(n.rolle || "")}${kinder(n) ? " von " + esc(kinder(n)) : ""}</span></h3>
@@ -356,6 +361,17 @@
             <button class="btn sm ghost" data-ndel="${n.id}" title="Nachricht löschen">🗑️</button>
           </div>
         </div>`).join("") : `<div class="card">${empty("📨", "Noch keine Nachrichten – Eltern schreiben über die Startseite ihres Portals.")}</div>`}`;
+    $("[data-kachelneu]", el).onclick = () => {
+      const t = prompt("Neue Kachel (kurz, konkret, positiv – z. B. „Klasse aufgeschlagen“):");
+      if (!t || !t.trim()) return;
+      const liste = (S().rueckenwindKacheln || []).slice();
+      if (liste.length >= 12) { toast("Höchstens 12 Kacheln", "bad"); return; }
+      liste.push(t.trim().slice(0, 60)); S().rueckenwindKacheln = liste; Store.save(); reload();
+    };
+    $$("[data-kachelweg]", el).forEach((b) => b.onclick = () => {
+      const liste = (S().rueckenwindKacheln || []).slice(); liste.splice(parseInt(b.dataset.kachelweg, 10), 1);
+      S().rueckenwindKacheln = liste; Store.save(); reload();
+    });
     $$("[data-gelesen]", el).forEach((b) => b.onclick = () => { Store.update("nachrichten", b.dataset.gelesen, { gelesen: true }); reload(); });
     $$("[data-ungelesen]", el).forEach((b) => b.onclick = () => { Store.update("nachrichten", b.dataset.ungelesen, { gelesen: false }); reload(); });
     $$("[data-ndel]", el).forEach((b) => b.onclick = () => confirmDialog("Nachricht samt Antworten löschen?", () => { Store.remove("nachrichten", b.dataset.ndel); reload(); }));
@@ -2287,6 +2303,7 @@
       Store.remove("consents", c.id);
     }
     (s.einwilligungen || []).filter((e) => e.playerId === pid).forEach((e) => Store.remove("einwilligungen", e.id));
+    (s.rueckenwind || []).filter((r) => r.playerId === pid).forEach((r) => Store.remove("rueckenwind", r.id));
   }
 
   // Einmalige Umstellung: Base64-Scans in die Dokumentenablage, alte Einträge → Einwilligungen

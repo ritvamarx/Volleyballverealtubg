@@ -212,6 +212,7 @@
       // Kanal für Absagen, Jobs, Antworten des Trainerteams
       if (istEltern() && pushMoeglich() && !P.pushGefragt) { P.pushGefragt = true; pushNachfragen(); }
     }).catch(() => {});
+    if (location.hash === "#rueckenwind") setTimeout(() => { const z = document.querySelector("#rwKarte"); if (z) z.scrollIntoView({ behavior: "smooth", block: "start" }); }, 300);
     if (location.hash === "#nachrichten") setTimeout(() => { const z = document.querySelector("#nachrichtenKarte"); if (z) z.scrollIntoView({ behavior: "smooth", block: "start" }); }, 300);
     // Wetter für die Begrüßung (Spieler:innen UND Eltern), Quiz nur für Spieler:innen
     api("/api/portal/wetter").then((r) => { if (r.ok) { P.wetter = r.data; P.grussText = null; render(); } });
@@ -412,7 +413,9 @@
       </div>` : "";
     return `
       ${hallo}
+      ${rwSpielerStart()}
       ${einwKarteStart}
+      ${rwElternStart()}
       ${nachrichtenKarte}
       ${istEltern() ? elternAbzeichenKarte() : ""}
       ${passkeyKarte}
@@ -918,6 +921,7 @@
         </div>
       </div>
       ${einwKarte()}
+      ${rwElternKonto()}${rwSpielerKonto()}
       <div class="card"><h3>🎟️ Weiteren Einladungscode einlösen</h3>
         <p class="soft">${eltern ? "Du hast mehrere Kinder im Verein? Löse hier den Code für das weitere Kind ein – dann siehst du alle in einem Konto." : "Hier kannst du einen weiteren Code mit deinem Konto verknüpfen."}</p>
         <form id="portalCode" class="portal-fahrer">
@@ -967,6 +971,93 @@
           <a href="/datenschutz" target="_blank" rel="noopener">Datenschutz</a> ·
           <a href="/impressum" target="_blank" rel="noopener">Impressum</a></p>
       </div>`;
+  }
+
+  // ---------- Rückenwind: Eltern → Spieler:in (privat, Opt-in, nur positiv) ----------
+  const RW_EMOJI = ["👏", "💪", "🔥", "❤️", "🙌"];
+  const RW_REAKT = ["👍", "❤️", "🙌"];
+  function rwFormular(pid, terminId, kopf) {
+    const rw = P.daten.rueckenwind || {};
+    const key = `${pid}|${terminId || "frei"}`;
+    return `<div class="portal-termin" data-rwform="${key}" data-rwpid="${pid}" data-rwtermin="${terminId || ""}">
+      ${kopf}
+      <div class="sub" style="margin:6px 0 4px">Bis zu zwei Dinge, die dir aufgefallen sind:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${(rw.kacheln || []).map((k) => `<button class="btn sm ghost" data-rwkachel="${esc(k)}">${esc(k)}</button>`).join("")}</div>
+      <div class="field" style="margin-top:8px"><input data-rwtext maxlength="140" placeholder="Optional ein Satz: „Mir ist aufgefallen, dass du …“"></div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        ${RW_EMOJI.map((e) => `<button class="btn sm ghost" data-rwemoji="${e}" style="font-size:1.1rem">${e}</button>`).join("")}
+        <span class="spacer"></span><button class="btn sm" data-rwsenden>💬 Senden</button>
+      </div>
+    </div>`;
+  }
+  function rwElternStart() {
+    if (!istEltern()) return "";
+    const rw = P.daten.rueckenwind; if (!rw) return "";
+    const d = P.daten;
+    const bloecke = [];
+    d.spieler.forEach((sp) => {
+      const k = (rw.kinder || {})[sp.id]; if (!k) return;
+      if (k.status !== "an" && k.status !== "offen") return;
+      const offen = (k.fenster || []).filter((f) => !f.gesendet).slice(0, 2);
+      offen.forEach((f) => bloecke.push(rwFormular(sp.id, f.terminId,
+        `<div class="title">💬 Rückenwind für ${esc(sp.name.split(" ")[0])}</div>
+         <div class="sub">${f.typ === "training" ? "🏐" : "🏆"} ${esc(f.titel)} · ${fmtDateShort(f.start)}${k.status === "offen" ? ' · <span class="badge warn">wartet auf Freigabe</span>' : ""}</div>`)));
+    });
+    if (!bloecke.length) return "";
+    return `<div class="card" id="rwKarte"><h3>💬 Rückenwind</h3>
+      <p class="soft" style="margin-top:0">Eine kurze, konkrete Rückmeldung nach dem Termin – nur Positives, nichts zum Ergebnis. Sieht nur dein Kind.</p>
+      ${bloecke.join("")}</div>`;
+  }
+  function rwElternKonto() {
+    if (!istEltern()) return "";
+    const rw = P.daten.rueckenwind; if (!rw) return "";
+    const d = P.daten;
+    const STATUS = { an: ["aktiv", "good"], offen: ["wartet auf Freigabe", "warn"], aus: ["derzeit nicht aktiviert", ""], "kein-konto": ["kein Spielerkonto", ""] };
+    const frei = d.spieler.filter((sp) => { const k = (rw.kinder || {})[sp.id]; return k && (k.status === "an" || k.status === "offen") && k.einfachSoMoeglich; });
+    return `<div class="card"><h3>💬 Rückenwind</h3>
+      <p class="soft" style="margin-top:0">Wertschätzung an dein Kind – privat, freiwillig, jederzeit von der Spieler:in abschaltbar.</p>
+      ${d.spieler.map((sp) => { const k = (rw.kinder || {})[sp.id] || { status: "kein-konto" }; const b = STATUS[k.status] || STATUS.aus;
+        return `<div class="sub">${esc(sp.name)}: <span class="badge ${b[1]}">${b[0]}</span></div>`; }).join("")}
+      ${frei.map((sp) => rwFormular(sp.id, null, `<div class="title">Einfach so – für ${esc(sp.name.split(" ")[0])}</div><div class="sub">einmal pro Woche, unabhängig von Terminen</div>`)).join("")}
+      ${(rw.gesendet || []).length ? `<div class="list" style="margin-top:10px">${rw.gesendet.map((x) => `<div class="list-item" style="flex-direction:column;align-items:stretch;gap:3px">
+          <div class="sub">${fmtDateShort(x.at)} · ${esc(spielerName(x.playerId))}${x.terminTitel ? " · " + esc(x.terminTitel) : " · einfach so"}${x.status === "wartet" ? ' · <span class="badge warn">wartet</span>' : ""}</div>
+          <div style="font-size:.9rem">${(x.kacheln || []).map((k) => `<span class="badge good">${esc(k)}</span>`).join(" ")} ${esc(x.text || "")} ${esc(x.emoji || "")}</div>
+          ${x.reaktion || x.antwort ? `<div class="sub">↩️ ${esc(x.reaktion || "")} ${esc(x.antwort || "")}</div>` : ""}
+        </div>`).join("")}</div>` : ""}
+    </div>`;
+  }
+  function rwSpielerStart() {
+    if (istEltern()) return "";
+    const rw = P.daten.rueckenwind; if (!rw) return "";
+    const teile = [];
+    (rw.anfragen || []).forEach((a) => teile.push(`<div class="portal-termin">
+      <div class="title">💬 ${esc(a.name)} möchte dir Rückenwind schicken</div>
+      <p class="soft" style="margin:6px 0">Kurze, positive Rückmeldungen nach Terminen – nur du siehst sie, das Trainerteam nicht. Du entscheidest und kannst es jederzeit wieder ausschalten.</p>
+      <div class="portal-fahrer"><button class="btn sm" data-rwerlauben="${a.userId}" data-ok="1">Erlauben</button>
+        <button class="btn sm ghost" data-rwerlauben="${a.userId}" data-ok="0">Lieber nicht</button></div></div>`));
+    (rw.neu || []).forEach((x) => teile.push(`<div class="portal-termin" data-rwid="${x.id}">
+      <div class="title">💬 Rückenwind von ${esc(x.vonName)}</div>
+      <div class="sub">${x.terminTitel ? esc(x.terminTitel) + " · " : ""}${fmtDateShort(x.at)}</div>
+      <div style="margin:8px 0;font-size:1rem">${(x.kacheln || []).map((k) => `<div>✨ ${esc(k)}</div>`).join("")}${x.text ? `<div style="margin-top:4px">„${esc(x.text)}“</div>` : ""}${x.emoji ? `<div style="font-size:1.6rem;margin-top:4px">${esc(x.emoji)}</div>` : ""}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        ${RW_REAKT.map((r) => `<button class="btn sm ghost" data-rwreakt="${x.id}" data-r="${r}" style="font-size:1.1rem">${r}</button>`).join("")}
+        <input data-rwantwort="${x.id}" maxlength="140" placeholder="kurz antworten (optional)" style="flex:1;min-width:140px">
+        <button class="btn sm" data-rwantwortsenden="${x.id}">Senden</button>
+      </div></div>`));
+    if (!teile.length) return "";
+    return `<div class="card rw-neu" id="rwKarte"><h3>💬 Rückenwind</h3>${teile.join("")}</div>`;
+  }
+  function rwSpielerKonto() {
+    if (istEltern()) return "";
+    const rw = P.daten.rueckenwind; if (!rw) return "";
+    return `<div class="card"><h3>💬 Rückenwind</h3>
+      <p class="soft" style="margin-top:0">Deine Eltern können dir nach Terminen kurze, positive Rückmeldungen schicken. Nur du siehst sie. Du bestimmst, ob und von wem.</p>
+      <button class="toggle-item ${rw.an ? "an" : ""}" data-rwan aria-pressed="${rw.an ? "true" : "false"}"><span class="check">✓</span>
+        <div class="g"><div class="t">Rückenwind empfangen</div><div class="s">${rw.an ? "an – Eltern können nach Freigabe schicken" : "aus – niemand kann dir Rückenwind schicken"}</div></div></button>
+      ${(rw.sammlung || []).length ? `<div class="sub" style="margin-top:10px">Deine Sammlung (${rw.sammlung.length})</div><div class="list">${rw.sammlung.map((x) => `<div class="list-item" style="flex-direction:column;align-items:stretch;gap:2px">
+        <div class="sub">${fmtDateShort(x.at)} · von ${esc(x.vonName)}${x.terminTitel ? " · " + esc(x.terminTitel) : ""}${x.reaktion ? " · " + esc(x.reaktion) : ""}</div>
+        <div style="font-size:.9rem">${(x.kacheln || []).map((k) => `✨ ${esc(k)}`).join(" · ")}${x.text ? ` „${esc(x.text)}“` : ""} ${esc(x.emoji || "")}</div></div>`).join("")}</div>` : ""}
+    </div>`;
   }
 
   // ---------- Push-Nachfrage beim Öffnen (Eltern) ----------
@@ -1469,6 +1560,60 @@
     });
     wrap.querySelectorAll("[data-fotoweg]").forEach((b) => b.onclick = () =>
       aktion("/api/portal/profilbild", { playerId: b.dataset.fotoweg, fotoLoeschen: true }, "Foto entfernt", true));
+    // Rückenwind: Kacheln (max. 2) und Emoji wählen, senden
+    wrap.querySelectorAll("[data-rwkachel]").forEach((b) => b.onclick = () => {
+      const form = b.closest("[data-rwform]");
+      const an = form.querySelectorAll("[data-rwkachel].outline").length;
+      if (!b.classList.contains("outline") && an >= 2) { toast("Höchstens zwei Kacheln – weniger ist mehr", "bad"); return; }
+      b.classList.toggle("outline"); b.classList.toggle("ghost");
+    });
+    wrap.querySelectorAll("[data-rwemoji]").forEach((b) => b.onclick = () => {
+      const form = b.closest("[data-rwform]");
+      form.querySelectorAll("[data-rwemoji]").forEach((x) => { x.classList.remove("outline"); x.classList.add("ghost"); });
+      b.classList.add("outline"); b.classList.remove("ghost");
+    });
+    wrap.querySelectorAll("[data-rwsenden]").forEach((b) => b.onclick = async () => {
+      const form = b.closest("[data-rwform]");
+      const kacheln = Array.from(form.querySelectorAll("[data-rwkachel].outline")).map((x) => x.dataset.rwkachel);
+      const emoji = (form.querySelector("[data-rwemoji].outline") || {}).dataset ? form.querySelector("[data-rwemoji].outline").dataset.rwemoji : "";
+      const text = (form.querySelector("[data-rwtext]").value || "").trim();
+      if (!kacheln.length && text.length < 3) { toast("Mindestens eine Kachel oder ein kurzer Satz", "bad"); return; }
+      b.disabled = true;
+      const res = await api("/api/portal/rueckenwind", { playerId: form.dataset.rwpid, terminId: form.dataset.rwtermin || null, kacheln, text, emoji });
+      b.disabled = false;
+      if (!res.ok) { toast(res.data.error || "Senden fehlgeschlagen", "bad"); return; }
+      toast(res.data.status === "wartet" ? "Gesendet – wartet auf Freigabe deines Kindes" : "Rückenwind ist unterwegs 💬", "good");
+      await neuLaden(false);
+    });
+    wrap.querySelectorAll("[data-rwerlauben]").forEach((b) => b.onclick = async () => {
+      const res = await api("/api/portal/rueckenwind/einstellung", { erlauben: { userId: parseInt(b.dataset.rwerlauben, 10), ok: b.dataset.ok === "1" } });
+      if (!res.ok) { toast(res.data.error || "Fehler", "bad"); return; }
+      toast(b.dataset.ok === "1" ? "Freigegeben – viel Rückenwind! 💬" : "Okay, abgelehnt", "good");
+      await neuLaden(false);
+    });
+    wrap.querySelectorAll("[data-rwreakt]").forEach((b) => b.onclick = async () => {
+      const res = await api("/api/portal/rueckenwind/reaktion", { id: b.dataset.rwreakt, reaktion: b.dataset.r });
+      if (!res.ok) { toast(res.data.error || "Fehler", "bad"); return; }
+      toast("Reaktion geschickt " + b.dataset.r, "good");
+      await neuLaden(false);
+    });
+    wrap.querySelectorAll("[data-rwantwortsenden]").forEach((b) => b.onclick = async () => {
+      const id = b.dataset.rwantwortsenden;
+      const antwort = (wrap.querySelector(`[data-rwantwort="${id}"]`).value || "").trim();
+      if (antwort.length < 2) { toast("Bitte kurz etwas schreiben", "bad"); return; }
+      const res = await api("/api/portal/rueckenwind/reaktion", { id, antwort });
+      if (!res.ok) { toast(res.data.error || "Fehler", "bad"); return; }
+      toast("Antwort geschickt", "good");
+      await neuLaden(false);
+    });
+    const rwAn = wrap.querySelector("[data-rwan]");
+    if (rwAn) rwAn.onclick = async () => {
+      const neu = !(P.daten.rueckenwind || {}).an;
+      const res = await api("/api/portal/rueckenwind/einstellung", { an: neu });
+      if (!res.ok) { toast("Konnte nicht gespeichert werden", "bad"); return; }
+      toast(neu ? "Rückenwind ist an" : "Rückenwind ist aus");
+      await neuLaden(false);
+    };
     const nmSenden = wrap.querySelector("#nmSenden");
     if (nmSenden) nmSenden.onclick = async () => {
       const ta = wrap.querySelector("#nmText");

@@ -146,7 +146,7 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
   gelesen/ungelesen, löschen), Dashboard-Karte „Neue Nachrichten“; Antwort geht per Push ans Elternkonto
   (`/api/nachrichten/push`) und erscheint im Portal unter der Nachricht. Link `/#nachrichten`.
 
-## Teil G: „Rückenwind“ – wertschätzende Rückmeldung Eltern → Spieler:in (UMSETZUNGSPLAN)
+## Teil G: „Rückenwind“ – wertschätzende Rückmeldung Eltern → Spieler:in – UMGESETZT 2026-11-26 (Schritte 1–3)
 
 **Zielgruppe:** Jugendliche und junge Erwachsene (ca. 13–20). Daraus folgt der Ton: auf Augenhöhe,
 kurz, konkret, nie kindlich, nie bewertend. Die Spieler:innen behalten die Kontrolle.
@@ -203,11 +203,11 @@ Pflegbar in der Trainer-Ansicht (Liste `rueckenwindKacheln`), max. 12.
 - Datenschutz: Löschen mit Konto/Spieler:in (Aufräumen wie bei Einwilligungen), Export in der
   Datensicherung ohne Texte (nur Anzahl), Längenlimits, keine Links in Texten (werden entschärft).
 
-### Schritte und Aufwand
-1. Datenmodell, Routen, Opt-in-Logik, Tests (halber Tag).
-2. Elternkarte nach Termin + „einfach so“, Spielerkarte mit Reaktion/Antwort, Sammlung, Schalter (halber Tag).
-3. Kachelpflege in der Trainer-Ansicht (1 Stunde).
-4. „Dein Jahr“ (später, 1 Tag).
+### Stand
+1. ✅ Datenmodell, Routen (`server/rueckenwind.py`), Opt-in-Logik mit Altersregel, Limits, Pushs, Tests.
+2. ✅ Elternkarte nach Termin + „einfach so“ (Konto-Tab), Spielerkarte mit Anfrage/Reaktion/Antwort, Sammlung, Schalter.
+3. ✅ Kachelpflege in der Trainer-Ansicht „Nachrichten“ (Trainer sieht keine Inhalte).
+4. ⏳ „Dein Jahr“ zum Saisonende (offen).
 Freigabe nach Test auf der Test-Instanz; Start am besten mit einer Ankündigung an die Eltern, was
 Rückenwind ist und was nicht (keine Kritik, keine Ratschläge).
 
