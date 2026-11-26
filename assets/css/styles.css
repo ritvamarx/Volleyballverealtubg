@@ -782,3 +782,20 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
 .rm-chip .rm-note { font-weight: 400; font-size: .8rem; opacity: .85; margin-left: 2px; }
 .rm-chip .rm-bell { border: 0; background: transparent; font-size: 1rem; line-height: 1; padding: 4px 2px 4px 4px; cursor: pointer; }
 .rm-wahl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* Ampel in der Portal-Kopfzeile: offene Punkte (Aufgaben, Einverständnis, Rückmeldungen) */
+.ampel { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.85); margin-right: 8px; vertical-align: middle; font-size: .74rem; font-weight: 800;
+  color: #fff; cursor: pointer; box-shadow: 0 0 0 2px rgba(0,0,0,.12); }
+.ampel-gruen { background: #2e9e5b; }
+.ampel-gelb { background: #e8a13c; color: #2b1d00; }
+.ampel-rot { background: #d64545; animation: ampelPuls 1.6s ease-in-out 3; }
+@keyframes ampelPuls { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.18); } }
+.portal-nutzer { display: flex; align-items: center; gap: 6px; }
+.einw-digital > summary { list-style: none; }
+.einw-digital > summary::-webkit-details-marker { display: none; }
+/* Dialoge immer über Portal-Tableiste und Schnellleiste */
+.overlay { z-index: 600; }
+.modal { z-index: 610; }
+.toast-root { z-index: 620; }
+.portal-tabs, .quickbar { z-index: 60; }

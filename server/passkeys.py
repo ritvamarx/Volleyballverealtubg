@@ -150,6 +150,30 @@ def register(app, con, require, start_session, err, rate_limited, log_login, tag
         con().commit()
         return jsonify(dict(liste_json(sess["user_id"]), ok=True))
 
+    def pruefen(credential: dict, user_id: int) -> bool:
+        """Passkey-Bestätigung eines angemeldeten Kontos (z. B. digitale Einwilligung)."""
+        row = challenge_einloesen(credential or {}, "login")
+        if row is None:
+            return False
+        pk = con().execute("SELECT * FROM passkeys WHERE cred_id = ? AND user_id = ?",
+                           (str(credential.get("id") or ""), user_id)).fetchone()
+        if pk is None:
+            return False
+        try:
+            v = webauthn.verify_authentication_response(
+                credential=credential, expected_challenge=base64url_to_bytes(row["challenge"]),
+                expected_rp_id=rp_id(), expected_origin=origin(),
+                credential_public_key=pk["public_key"],
+                credential_current_sign_count=pk["sign_count"], require_user_verification=True)
+        except Exception as e:  # noqa: BLE001
+            app.logger.warning("Passkey-Bestätigung fehlgeschlagen: %s", e)
+            return False
+        con().execute("UPDATE passkeys SET sign_count = ?, last_used = ? WHERE id = ?",
+                      (v.new_sign_count, db.now(), pk["id"]))
+        con().commit()
+        return True
+    app.passkey_pruefen = pruefen
+
     # ---------- Anmelden (öffentlich) ----------
 
     @app.post("/api/passkey/login/start")

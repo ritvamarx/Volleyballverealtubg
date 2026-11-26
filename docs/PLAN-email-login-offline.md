@@ -106,6 +106,26 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
   `manage.py backup` sichert den Ordner mit.
 - Offen: bestehende Einverständnis-Uploads (Base64 im App-Datenpaket) in die Ablage überführen.
 
+## Teil D: Einverständnis-Workflow (aus dem Audit) – UMGESETZT 2026-11-26
+- **Datenmodell:** `einwilligungen[]` je Spieler:in und Vorlage (ja/nein, Datum, Saison, Quelle,
+  Beleg, Widerruf); `consents[]` sind nur noch Belege (Datei in der Dokumentenablage, kein Base64);
+  Vorlagen mit `gueltigkeit` (unbefristet/Saison) und `schutz: foto`. `consentOnFile` wird abgeleitet.
+- **Migration:** läuft automatisch beim ersten Trainer-Login (Dashboard/Einverständnis): Base64-Scans
+  → `data/dokumente`, Alt-Einträge → Einwilligungen, „Haken ohne Beleg“ → Papierbeleg.
+- **Trainer:** Kennzahlen nur aktive; Karten „Zu sichten“, „Fehlend“ (mit Push-Erinnerung ans
+  Elternkonto, Fallback Mail/WhatsApp), „Saison erneuern“, „Ausgetretene löschen“; Erfassen mit
+  Datei oder Papier-Vermerk und Checkliste je Erklärung; Status-Dialog je Spieler:in mit Widerruf;
+  Löschen eines Belegs räumt Einwilligungen und Datei auf; Spieler-Löschung räumt Belege auf;
+  „Musterstand 2026“ aktualisiert Vorlagentexte (Fotoveröffentlichung getrennt, Verantwortlicher,
+  Widerrufsweg, Mitunterschrift ab 16).
+- **Portal:** Konto-Tab zeigt Status je Erklärung; Eltern bestätigen digital (Passwort oder Passkey
+  als Unterschrift, PDF-Nachweis in der Ablage, für Eltern abrufbar) oder laden das Formular als
+  Datei hoch (→ „Zu sichten“); Spielerkonten sehen nur den Status; Startkarte bei fehlender
+  Erklärung; Link `/#einverstaendnis`; Profilfotos anderer nur mit Foto-Einwilligung.
+- **Ampel** in der Kopfzeile neben dem Profilbild: rot = überfällige Aufgabe oder fehlende
+  Erklärung, gelb = offene Aufgabe/eingereicht/unbeantworteter Termin (7 Tage), grün = nichts offen;
+  Antippen öffnet die Liste mit Sprung zur Stelle.
+
 ## Reihenfolge und Freigaben
 1. A1 + A2 auf Test → Freigabe → live.
 2. B1 auf Test (Messwerte) → Freigabe → live.

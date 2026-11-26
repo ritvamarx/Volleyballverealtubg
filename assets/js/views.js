@@ -147,7 +147,7 @@
      ====================================================================== */
   function dashboard(el) {
     const s = S();
-    const openConsents = s.players.filter((p) => !p.consentOnFile).length;
+    const openConsents = s.players.filter((p) => p.membershipStatus !== "inaktiv" && !p.consentOnFile).length;
     const openFees = s.finances.filter((f) => f.type === "fee" && !f.paid);
     const openJobs = s.jobs.filter((j) => !j.assignee || !j.done).length;
     const next = upcomingEvents(5);
@@ -259,6 +259,7 @@
     bindLinkActions(el);
     ladeDringend(el);
     ladePasskeyAngebot(el);
+    einwMigration();
   }
 
   // Karte „Schneller anmelden": Passkey (Face ID / Fingerabdruck) fürs Trainerkonto anbieten
@@ -470,7 +471,7 @@
               <td>${jahrgang(p.birthDate)}</td>
               <td class="soft">${esc(p.passNumber || "—")}</td>
               <td class="wrap">${contactCell(p)}</td>
-              <td>${p.consentOnFile ? '<span class="badge good">✓</span>' : '<span class="badge bad">fehlt</span>'}</td>
+              <td><span data-einw="${p.id}" style="cursor:pointer" title="Einwilligungen anzeigen">${einwBadge(p)}</span></td>
               <td>${statusBadge(p.membershipStatus)}</td>
               <td class="right nowrap">
                 <button class="btn sm ghost" data-mail="${p.id}" title="Kontaktieren">✉️</button>
@@ -485,9 +486,11 @@
     $("[data-add]", el).onclick = () => playerForm();
     $("[data-io]", el).onclick = () => playerIO();
     $$("[data-edit]", el).forEach((b) => b.onclick = () => playerForm(Store.byId("players", b.dataset.edit)));
+    $$("[data-einw]", el).forEach((b) => b.onclick = () => einwStatusModal(b.dataset.einw));
     $$("[data-del]", el).forEach((b) => b.onclick = () => {
       const p = Store.byId("players", b.dataset.del);
-      confirmDialog(`Spieler „${p.firstName} ${p.lastName}“ wirklich löschen?`, () => {
+      confirmDialog(`Spieler „${p.firstName} ${p.lastName}“ wirklich löschen? Einverständnis-Belege werden mit gelöscht.`, async () => {
+        await einwSpielerAufraeumen(p.id);
         Store.remove("players", p.id); toast("Spieler gelöscht"); reload();
       });
     });
@@ -2172,56 +2175,213 @@
   /* ======================================================================
      EINVERSTÄNDNISERKLÄRUNGEN
      ====================================================================== */
+  /* ======================================================================
+     EINVERSTÄNDNIS – Einwilligung je Erklärung, Belege in der Dokumentenablage
+     ====================================================================== */
+  const EINW_QUELLE = { papier: ["Papier", ""], trainer: ["Upload Trainer", "info"], portal: ["Portal-Upload", "accent"],
+    digital: ["digital bestätigt", "good"], widerruf: ["Widerruf", "bad"] };
+  const heuteISO = () => new Date().toISOString().slice(0, 10);
+  const saisonJahr = (s) => (s.season && s.season.year) || new Date().getFullYear();
+
+  // Status je Spieler:in – gleiche Regeln wie server/einwilligung.py
+  function einwStatus(s, pid) {
+    const saison = saisonJahr(s);
+    const eigene = (s.einwilligungen || []).filter((e) => e.playerId === pid);
+    const belege = (s.consents || []).filter((c) => c.playerId === pid);
+    const vorlagen = (s.consentTemplates || []).map((t) => {
+      const kand = eigene.filter((e) => e.vorlageId === t.id);
+      let e = null, status = "offen";
+      if (kand.length) {
+        e = kand.reduce((a, b) => (String(a.datum || "") + String(a.erfasstAm || "")) >= (String(b.datum || "") + String(b.erfasstAm || "")) ? a : b);
+        if (e.widerrufenAm) status = "nein";
+        else if (t.gueltigkeit === "saison" && Number(e.saison || 0) !== saison) status = "abgelaufen";
+        else status = e.status === "ja" || e.status === "nein" ? e.status : "offen";
+      }
+      return { id: t.id, name: t.name, required: !!t.required, schutz: t.schutz || "", status,
+               datum: e ? e.datum : null, quelle: e ? e.quelle : null, widerrufenAm: e ? e.widerrufenAm : null };
+    });
+    const offen = vorlagen.filter((v) => v.required && (v.status === "offen" || v.status === "abgelaufen"));
+    const fotoV = vorlagen.filter((v) => v.schutz === "foto");
+    return { vollstaendig: !offen.length, offen: offen.map((v) => v.id), vorlagen, belege,
+             eingereicht: belege.some((c) => c.gesichtet === false),
+             foto: fotoV.length ? fotoV.every((v) => v.status === "ja") : null };
+  }
+  // Altfeld consentOnFile für alle Spieler:innen nachziehen (Dashboard, Tabellen, Portal)
+  function einwFlagsSync() {
+    const s = S();
+    s.players.forEach((p) => {
+      const v = einwStatus(s, p.id).vollstaendig;
+      if (!!p.consentOnFile !== v) Store.update("players", p.id, { consentOnFile: v });
+    });
+  }
+  function einwBadge(p) {
+    const st = einwStatus(S(), p.id);
+    const foto = st.foto === false ? ' <span class="badge warn" title="Keine Foto-Einwilligung – Profilfoto wird im Portal nicht gezeigt">📷🚫</span>' : "";
+    if (st.vollstaendig) return '<span class="badge good">✓</span>' + foto;
+    if (st.eingereicht) return '<span class="badge info" title="Formular eingereicht – bitte sichten">eingereicht</span>' + foto;
+    const pflicht = st.vorlagen.filter((v) => v.required).length;
+    return `<span class="badge bad" title="${esc(st.vorlagen.filter((v) => st.offen.includes(v.id)).map((v) => v.name).join(", "))}">${pflicht - st.offen.length}/${pflicht}</span>` + foto;
+  }
+
+  // Belege eines Spielers samt Dateien vom Server löschen (bei Spieler-Löschung)
+  async function einwSpielerAufraeumen(pid) {
+    const s = S();
+    for (const c of s.consents.filter((x) => x.playerId === pid)) {
+      if (c.dokumentId && window.Sync && Sync.active) await apiZugang(`/api/dokumente/${c.dokumentId}`, null, "DELETE");
+      Store.remove("consents", c.id);
+    }
+    (s.einwilligungen || []).filter((e) => e.playerId === pid).forEach((e) => Store.remove("einwilligungen", e.id));
+  }
+
+  // Einmalige Umstellung: Base64-Scans in die Dokumentenablage, alte Einträge → Einwilligungen
+  let _einwMigrationLaeuft = false;
+  async function einwMigration() {
+    const s = S();
+    if (_einwMigrationLaeuft || !window.Sync || !Sync.active) return;
+    if (s.einwilligungVersion >= 2 && !s.consents.some((c) => typeof c.dataUrl === "string" && c.dataUrl.startsWith("data:"))) return;
+    _einwMigrationLaeuft = true;
+    let verschoben = 0, fehler = 0;
+    try {
+      for (const c of s.consents.filter((x) => typeof x.dataUrl === "string" && x.dataUrl.startsWith("data:"))) {
+        try {
+          // data:-URL ohne fetch() dekodieren (CSP connect-src erlaubt nur 'self')
+          const m = /^data:([^;,]+);base64,(.*)$/s.exec(c.dataUrl);
+          if (!m) { fehler++; continue; }
+          const bin = atob(m[2]);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const blob = new Blob([bytes], { type: m[1] });
+          let name = c.fileName || "einverstaendnis";
+          if (!/\.[a-z0-9]{2,5}$/i.test(name)) name += "." + ({ "application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" }[blob.type] || "pdf");
+          const fd = new FormData();
+          fd.append("datei", blob, name); fd.append("art", "einverstaendnis"); fd.append("playerId", c.playerId);
+          const res = await fetch("/api/dokumente", { method: "POST", body: fd, credentials: "same-origin",
+            headers: Sync.csrf ? { "X-CSRF-Token": Sync.csrf } : {} });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) { fehler++; continue; }
+          Store.update("consents", c.id, { dokumentId: data.dokument.id, fileName: data.dokument.name, dataUrl: null });
+          verschoben++;
+        } catch (e) { fehler++; }
+      }
+      // Alte Einträge ohne Einwilligungen → Einwilligungen ableiten (bisherige Bedeutung erhalten)
+      const s2 = S();
+      const saison = saisonJahr(s2);
+      const pflicht = s2.consentTemplates.filter((t) => t.required);
+      const hatEinw = (belegId) => (s2.einwilligungen || []).some((e) => e.belegId === belegId);
+      s2.consents.forEach((c) => {
+        if (c.migriert || hatEinw(c.id)) return;
+        const t = s2.consentTemplates.find((x) => x.name === c.type);
+        const ziele = t ? [t] : pflicht;
+        ziele.forEach((v) => Store.add("einwilligungen", { playerId: c.playerId, vorlageId: v.id, status: "ja",
+          datum: String(c.uploadedAt || heuteISO()).slice(0, 10), saison, quelle: c.quelle || "papier",
+          belegId: c.id, erfasstVon: "Umstellung", erfasstAm: new Date().toISOString() }));
+        Store.update("consents", c.id, { migriert: true, gesichtet: c.gesichtet === false ? false : true, quelle: c.quelle || "trainer" });
+      });
+      // Haken „liegt vor" ohne Beleg → als Papierbeleg übernehmen
+      s2.players.forEach((p) => {
+        if (!p.consentOnFile || !pflicht.length) return;
+        if (einwStatus(S(), p.id).vollstaendig) return;
+        if (S().consents.some((c) => c.playerId === p.id)) return;
+        const beleg = Store.add("consents", { playerId: p.id, type: "Papier (vor Umstellung)", fileName: "Papier im Ordner",
+          dokumentId: null, signedBy: "—", uploadedAt: new Date().toISOString(), quelle: "papier", gesichtet: true, migriert: true });
+        pflicht.forEach((v) => Store.add("einwilligungen", { playerId: p.id, vorlageId: v.id, status: "ja", datum: heuteISO(),
+          saison, quelle: "papier", belegId: beleg.id, erfasstVon: "Umstellung", erfasstAm: new Date().toISOString() }));
+      });
+      S().einwilligungVersion = fehler ? 1 : 2; Store.save();
+      einwFlagsSync();
+      if (verschoben || fehler) toast(`${verschoben} Einverständnis-Scan(s) in die Dokumentenablage verschoben${fehler ? `, ${fehler} fehlgeschlagen (später erneut)` : ""}`, fehler ? "bad" : "good");
+    } finally { _einwMigrationLaeuft = false; }
+  }
+
   function consents(el) {
     const s = S();
-    const missing = s.players.filter((p) => !p.consentOnFile);
+    const aktive = s.players.filter((p) => p.membershipStatus !== "inaktiv");
+    const stat_ = (p) => einwStatus(s, p.id);
+    const voll = aktive.filter((p) => stat_(p).vollstaendig);
+    const offen = aktive.filter((p) => !stat_(p).vollstaendig);
+    const zuSichten = s.consents.filter((c) => c.gesichtet === false);
+    const fotoGesperrt = aktive.filter((p) => stat_(p).foto === false);
+    const ausgetreten = s.players.filter((p) => p.membershipStatus === "inaktiv" && s.consents.some((c) => c.playerId === p.id));
+    const abgelaufen = aktive.filter((p) => stat_(p).vorlagen.some((v) => v.status === "abgelaufen"));
+    const saison = saisonJahr(s);
+    const quelleBadge = (q) => { const b = EINW_QUELLE[q] || ["", ""]; return b[0] ? `<span class="badge ${b[1]}">${b[0]}</span>` : ""; };
+    const dateiLink = (c) => c.dokumentId ? `<a href="/api/dokumente/${c.dokumentId}/datei" target="_blank" rel="noopener">📎 ${esc(c.fileName)}</a>`
+      : (typeof c.dataUrl === "string" && c.dataUrl.startsWith("data:") ? `<a href="${c.dataUrl}" download="${esc(c.fileName)}">📎 ${esc(c.fileName)}</a> <span class="badge warn">wird verschoben</span>`
+      : `📄 ${esc(c.fileName || "Papier")}`);
+    const erinnert = (p) => p.einwErinnertAm ? ` · erinnert ${fmtDateShort(p.einwErinnertAm)}` : "";
+
     el.innerHTML = `
-      ${head("Einverständniserklärungen", "Von den Eltern unterschriebene Formulare erfassen und ablegen",
-        `<button class="btn" data-add>⬆️ Formular hochladen</button>`)}
-      <div class="grid grid-3 mb">
-        ${stat("📄", "Erfasste Formulare", s.consents.length)}
-        ${stat("✅", "Vollständig", s.players.filter((p) => p.consentOnFile).length, `von ${s.players.length}`)}
-        ${stat("⚠️", "Noch offen", missing.length, missing.length ? "bitte einholen" : "vollständig")}
+      ${head("Einverständniserklärungen", "Einwilligung je Erklärung erfassen, Belege sicher ablegen, Eltern erinnern",
+        `<button class="btn" data-add>⬆️ Erfassen / Hochladen</button>`)}
+      <div class="grid grid-4 mb">
+        ${stat("✅", "Vollständig", voll.length, `von ${aktive.length} aktiven`)}
+        ${stat("⚠️", "Offen", offen.length, offen.length ? "Pflicht-Erklärung fehlt" : "alles da")}
+        ${stat("👀", "Zu sichten", zuSichten.length, zuSichten.length ? "eingereichte Formulare prüfen" : "nichts offen")}
+        ${stat("📷", "Ohne Foto-Einwilligung", fotoGesperrt.length, "Profilfoto im Portal gesperrt")}
       </div>
 
-      ${missing.length ? `<div class="card mb"><div class="card-head"><h3>⚠️ Fehlende Einverständniserklärungen</h3></div>
-        <div class="table-wrap"><table><thead><tr><th>Spieler</th><th>Eltern</th><th>Kontakt</th><th class="right">Aktion</th></tr></thead>
-        <tbody>${missing.map((p) => `<tr>
-          <td>${esc(p.firstName)} ${esc(p.lastName)}</td><td>${esc(p.parentName)}</td>
-          <td class="soft">${mailtoLink(p.parentEmail) || "—"}</td>
-          <td class="right"><button class="btn sm outline" data-remind="${p.id}">Erinnern</button>
-          <button class="btn sm" data-upload="${p.id}">Hochladen</button></td></tr>`).join("")}</tbody></table></div></div>` : ""}
+      ${abgelaufen.length ? `<div class="card mb" style="border:1.5px solid #e8a13c"><div class="card-head"><h3>🔁 Saison ${saison}/${String(saison + 1).slice(2)}: Erklärungen erneuern</h3></div>
+        <p class="soft" style="margin-top:0">Bei ${abgelaufen.length} Spieler:in(nen) sind saisongebundene Erklärungen aus der Vorsaison abgelaufen:
+        ${abgelaufen.slice(0, 8).map((p) => esc(p.firstName + " " + p.lastName)).join(", ")}${abgelaufen.length > 8 ? " …" : ""}.
+        Am schnellsten per <strong>Serienbrief</strong> (unten) oder digital im Elternportal.</p></div>` : ""}
 
-      <div class="card mb" style="padding:0"><div class="card-head" style="padding:18px 18px 0"><h3>📁 Abgelegte Formulare</h3></div>
+      ${zuSichten.length ? `<div class="card mb" style="border:1.5px solid var(--primary-2,#2563eb)"><div class="card-head"><h3>👀 Eingereicht – bitte sichten (${zuSichten.length})</h3></div>
+        <p class="soft" style="margin-top:0;font-size:.85rem">Datei öffnen, Kreuze prüfen und je Erklärung festhalten, ob zugestimmt wurde. Erst dann gilt sie als erfasst.</p>
+        <div class="list">${zuSichten.map((c) => `<div class="list-item" style="flex-wrap:wrap">
+          <div class="grow" style="min-width:200px"><div class="title">${esc(playerName(c.playerId))}</div>
+            <div class="sub">${dateiLink(c)} · ${fmtDateShort(c.uploadedAt)} · ${esc(c.signedBy || "")}</div></div>
+          ${quelleBadge(c.quelle)}
+          <button class="btn sm" data-sichten="${c.id}">✔️ Sichten</button>
+          <button class="btn sm ghost" data-cdel="${c.id}" title="Beleg löschen">🗑️</button></div>`).join("")}</div></div>` : ""}
+
+      ${offen.length ? `<div class="card mb"><div class="card-head"><h3>⚠️ Fehlende Einverständniserklärungen (${offen.length})</h3></div>
+        <div class="list">${offen.map((p) => { const st = stat_(p); return `<div class="list-item" style="flex-wrap:wrap">
+          <div class="grow" style="min-width:200px"><div class="title">${esc(p.firstName)} ${esc(p.lastName)}
+            ${st.eingereicht ? '<span class="badge info">eingereicht</span>' : ""}</div>
+            <div class="sub">fehlt: ${st.vorlagen.filter((v) => st.offen.includes(v.id)).map((v) => esc(v.name) + (v.status === "abgelaufen" ? " (abgelaufen)" : "")).join(", ")}</div>
+            <div class="sub">${esc(p.parentName || "")}${p.parentEmail ? " · " + esc(p.parentEmail) : ""}${erinnert(p)}</div></div>
+          <button class="btn sm outline" data-remind="${p.id}" title="Push ans Elternkonto, sonst Mail/WhatsApp">🔔 Erinnern</button>
+          <button class="btn sm ghost" data-status="${p.id}" title="Status je Erklärung">📋</button>
+          <button class="btn sm" data-upload="${p.id}">Erfassen</button></div>`; }).join("")}</div></div>` : ""}
+
+      ${ausgetreten.length ? `<div class="card mb" style="border:1.5px solid #d64545"><div class="card-head"><h3>🗑️ Ausgetretene mit gespeicherten Erklärungen (${ausgetreten.length})</h3></div>
+        <p class="soft" style="margin-top:0;font-size:.85rem">Nach dem Austritt gibt es keinen Grund mehr, die Erklärungen aufzubewahren (Datenschutz: Speicherbegrenzung). Empfehlung: spätestens zum Saisonende löschen.</p>
+        <div class="list">${ausgetreten.map((p) => `<div class="list-item"><div class="grow"><div class="title">${esc(p.firstName)} ${esc(p.lastName)}</div>
+          <div class="sub">${s.consents.filter((c) => c.playerId === p.id).length} Beleg(e)</div></div>
+          <button class="btn sm danger" data-austritt="${p.id}">Erklärungen löschen</button></div>`).join("")}</div></div>` : ""}
+
+      <div class="card mb" style="padding:0"><div class="card-head" style="padding:18px 18px 0"><h3>📁 Belege (${s.consents.length})</h3></div>
         <div class="table-wrap"><table>
-          <thead><tr><th>Spieler</th><th>Art</th><th>Datei</th><th>Unterschrift</th><th>Erfasst am</th><th class="right"></th></tr></thead>
-          <tbody>${s.consents.map((c) => `<tr>
-            <td><strong>${esc(playerName(c.playerId))}</strong></td>
-            <td>${esc(c.type)}</td>
-            <td>${c.dataUrl ? `<a href="${c.dataUrl}" download="${esc(c.fileName)}">📎 ${esc(c.fileName)}</a>` : `📎 ${esc(c.fileName)} <span class="badge">Demo</span>`}</td>
-            <td>${esc(c.signedBy)}</td>
+          <thead><tr><th>Spieler</th><th>Quelle</th><th>Datei</th><th>Unterschrift</th><th>Datum</th><th class="right">Aktion</th></tr></thead>
+          <tbody>${s.consents.slice().sort((a, b) => String(b.uploadedAt).localeCompare(String(a.uploadedAt))).map((c) => `<tr>
+            <td><strong>${esc(playerName(c.playerId))}</strong> <button class="btn sm ghost" data-status="${c.playerId}" title="Status je Erklärung">📋</button></td>
+            <td>${quelleBadge(c.quelle || "trainer")}${c.gesichtet === false ? ' <span class="badge warn">ungesichtet</span>' : ""}</td>
+            <td>${dateiLink(c)}</td>
+            <td>${esc(c.signedBy || "—")}</td>
             <td class="soft">${fmtDateShort(c.uploadedAt)}</td>
-            <td class="right"><button class="btn sm ghost" data-cdel="${c.id}">🗑️</button></td></tr>`).join("")
-            || `<tr><td colspan="6">${empty("📄", "Noch keine Formulare erfasst")}</td></tr>`}</tbody>
+            <td class="right"><button class="btn sm ghost" data-cdel="${c.id}" title="Beleg und zugehörige Einwilligungen löschen">🗑️</button></td></tr>`).join("")
+            || `<tr><td colspan="6">${empty("📄", "Noch keine Belege erfasst")}</td></tr>`}</tbody>
         </table></div></div>
 
       <div class="card">
-        <div class="card-head"><h3>🗂️ Formular-Vorlagen</h3><span class="spacer"></span>
+        <div class="card-head"><h3>🗂️ Vorlagen (Erklärungen)</h3><span class="spacer"></span>
+          <button class="btn sm outline" data-muster title="Texte auf den Musterstand 2026 bringen (Verantwortlicher, Widerruf, Fotoeinwilligung getrennt)">📜 Musterstand 2026</button>
           <button class="btn sm" data-tadd>＋ Vorlage</button></div>
-        <p class="soft" style="font-size:.85rem;margin-top:0">Eigene Einverständnis-Vorlagen anlegen, ändern und löschen.
-        Vorlagen erscheinen als Auswahl beim Hochladen und lassen sich als Formular drucken/als PDF sichern.</p>
+        <p class="soft" style="font-size:.85rem;margin-top:0">Je Erklärung wird einzeln erfasst, ob zugestimmt wurde. „Saison" = muss jede Saison neu erklärt werden.
+        „Foto" = steuert, ob das Profilfoto im Portal anderen gezeigt wird.</p>
         <div class="list">
           ${s.consentTemplates.map((t) => {
-            const cnt = s.consents.filter((c) => c.type === t.name).length;
+            const ja = (s.einwilligungen || []).filter((e) => e.vorlageId === t.id && e.status === "ja" && !e.widerrufenAm).length;
             return `<div class="list-item">
-              <div class="grow"><div class="title">${esc(t.name)} ${t.required ? '<span class="badge bad">Pflicht</span>' : '<span class="badge">optional</span>'}</div>
+              <div class="grow"><div class="title">${esc(t.name)} ${t.required ? '<span class="badge bad">Pflicht</span>' : '<span class="badge">optional</span>'}
+                ${t.gueltigkeit === "saison" ? '<span class="badge warn">Saison</span>' : ""}${t.schutz === "foto" ? '<span class="badge accent">📷 Foto</span>' : ""}</div>
                 <div class="sub">${esc(t.text.slice(0, 110))}${t.text.length > 110 ? "…" : ""}</div></div>
-              <span class="badge info nowrap">${cnt}× erfasst</span>
+              <span class="badge info nowrap">${ja}× ja</span>
               <button class="btn sm ghost" data-tprint="${t.id}" title="Formular drucken">🖨️</button>
               <button class="btn sm ghost" data-tedit="${t.id}">✏️</button>
               <button class="btn sm ghost" data-tdel="${t.id}">🗑️</button>
             </div>`;
-          }).join("") || empty("🗂️", "Noch keine Vorlagen – jetzt anlegen")}
+          }).join("") || empty("🗂️", "Noch keine Vorlagen – „Musterstand 2026“ lädt die Standard-Erklärungen")}
         </div>
       </div>
 
@@ -2231,7 +2391,7 @@
         <p class="soft" style="font-size:.88rem;margin-top:0">Zum Saisonstart: <strong>alle Pflicht-Formulare in
         einem Dokument</strong> (${s.consentTemplates.filter((t) => t.required).length} Erklärungen). Der Spieler trägt seine Daten
         <strong>nur einmal</strong> ein, die Eltern unterschreiben <strong>nur einmal</strong> für alle Erklärungen –
-        jede Erklärung wird einzeln angekreuzt.</p>
+        jede Erklärung wird einzeln angekreuzt. Alternative ohne Papier: Eltern bestätigen im Portal digital.</p>
       </div>
 
       <div class="card mt">
@@ -2263,18 +2423,38 @@
 
     $("[data-add]", el).onclick = () => consentForm();
     $$("[data-upload]", el).forEach((b) => b.onclick = () => consentForm(b.dataset.upload));
-    $$("[data-remind]", el).forEach((b) => b.onclick = () => {
-      const p = Store.byId("players", b.dataset.remind); contactParent(p);
-    });
-    $$("[data-cdel]", el).forEach((b) => b.onclick = () => confirmDialog("Formular-Eintrag löschen?", () => {
-      Store.remove("consents", b.dataset.cdel); toast("Eintrag gelöscht"); reload();
+    $$("[data-sichten]", el).forEach((b) => b.onclick = () => consentForm(null, Store.byId("consents", b.dataset.sichten)));
+    $$("[data-status]", el).forEach((b) => b.onclick = () => einwStatusModal(b.dataset.status));
+    $$("[data-remind]", el).forEach((b) => b.onclick = () => einwErinnern(Store.byId("players", b.dataset.remind)));
+    $$("[data-cdel]", el).forEach((b) => b.onclick = () => confirmDialog("Beleg und die daraus erfassten Einwilligungen löschen?", async () => {
+      await einwBelegLoeschen(b.dataset.cdel); toast("Beleg gelöscht"); reload();
     }));
+    $$("[data-austritt]", el).forEach((b) => b.onclick = () => {
+      const p = Store.byId("players", b.dataset.austritt);
+      confirmDialog(`Alle Erklärungen und Belege von „${p.firstName} ${p.lastName}“ endgültig löschen?`, async () => {
+        await einwSpielerAufraeumen(p.id); einwFlagsSync(); toast("Erklärungen gelöscht"); reload();
+      });
+    });
     $("[data-tadd]", el).onclick = () => consentTemplateForm();
+    $("[data-muster]", el).onclick = () => confirmDialog(
+      "Vorlagen auf den Musterstand 2026 bringen? Gleichnamige Vorlagen (auch „Datennutzung & Fotorechte“ → „Fotoveröffentlichung“, „Kontaktaufnahme & WhatsApp-Gruppe“ → „WhatsApp-Gruppe“) bekommen den neuen Text, fehlende werden ergänzt. Bereits erfasste Einwilligungen bleiben erhalten.",
+      () => {
+        let neu = 0, aktualisiert = 0;
+        (window.MUSTER_VORLAGEN || []).forEach((m) => {
+          const t = S().consentTemplates.find((x) => x.name === m.name || (m.altName && x.name === m.altName));
+          const felder = { name: m.name, text: m.text, required: m.required, gueltigkeit: m.gueltigkeit, schutz: m.schutz };
+          if (t) { S().consents.forEach((c) => { if (c.type === t.name && t.name !== m.name) Store.update("consents", c.id, { type: m.name }); });
+            Store.update("consentTemplates", t.id, felder); aktualisiert++; }
+          else { Store.add("consentTemplates", felder); neu++; }
+        });
+        einwFlagsSync(); toast(`${aktualisiert} Vorlage(n) aktualisiert, ${neu} ergänzt`, "good"); reload();
+      }, "Übernehmen");
     $$("[data-tedit]", el).forEach((b) => b.onclick = () => consentTemplateForm(Store.byId("consentTemplates", b.dataset.tedit)));
     $$("[data-tdel]", el).forEach((b) => b.onclick = () => {
       const t = Store.byId("consentTemplates", b.dataset.tdel);
-      confirmDialog(`Vorlage „${t.name}" löschen? Bereits abgelegte Formulare bleiben erhalten.`, () => {
-        Store.remove("consentTemplates", t.id); toast("Vorlage gelöscht"); reload();
+      confirmDialog(`Vorlage „${t.name}" löschen? Bereits erfasste Einwilligungen dazu werden mit gelöscht.`, () => {
+        (S().einwilligungen || []).filter((e) => e.vorlageId === t.id).forEach((e) => Store.remove("einwilligungen", e.id));
+        Store.remove("consentTemplates", t.id); einwFlagsSync(); toast("Vorlage gelöscht"); reload();
       });
     });
     $$("[data-tprint]", el).forEach((b) => b.onclick = () => printConsentTemplate(Store.byId("consentTemplates", b.dataset.tprint)));
@@ -2287,6 +2467,88 @@
     });
     $$("[data-lprint]", el).forEach((b) => b.onclick = () => printParentLetter(Store.byId("letters", b.dataset.lprint)));
     $$("[data-lserial]", el).forEach((b) => b.onclick = () => serialLetterModal(Store.byId("letters", b.dataset.lserial)));
+    einwMigration().then(() => { if (S().consents.some((c) => c.migriert) && $("#view").contains(el)) { /* Ansicht bleibt – Zähler aktualisieren sich beim nächsten Öffnen */ } });
+  }
+
+  async function einwBelegLoeschen(belegId) {
+    const c = Store.byId("consents", belegId);
+    if (!c) return;
+    if (c.dokumentId && window.Sync && Sync.active) await apiZugang(`/api/dokumente/${c.dokumentId}`, null, "DELETE");
+    (S().einwilligungen || []).filter((e) => e.belegId === belegId).forEach((e) => Store.remove("einwilligungen", e.id));
+    Store.remove("consents", belegId);
+    einwFlagsSync();
+  }
+
+  async function einwErinnern(p) {
+    if (!window.Sync || !Sync.active) { contactParent(p); return; }
+    const r = await apiZugang("/api/einverstaendnis/erinnern", { playerId: p.id });
+    if (!r.ok) { toast(r.data.error || "Erinnerung nicht möglich", "bad"); return; }
+    if (!r.data.empfaenger) { toast("Kein Elternkonto verknüpft – Kontakt per Mail/WhatsApp", "bad"); contactParent(p); return; }
+    Store.update("players", p.id, { einwErinnertAm: new Date().toISOString() });
+    toast(`Erinnerung ans Elternkonto geschickt (${r.data.zugestellt} Gerät(e) erreicht)`, "good");
+    reload();
+  }
+
+  // Status je Erklärung für eine Spieler:in – mit Widerruf
+  function einwStatusModal(pid) {
+    const p = Store.byId("players", pid); if (!p) return;
+    const st = einwStatus(S(), pid);
+    const STATUS = { ja: ["zugestimmt", "good"], nein: ["abgelehnt / widerrufen", "bad"], offen: ["offen", "warn"], abgelaufen: ["abgelaufen (Vorsaison)", "warn"] };
+    modal({
+      title: `📋 ${esc(p.firstName)} ${esc(p.lastName)} – Einwilligungen`,
+      body: `<div class="list">${st.vorlagen.map((v) => { const b = STATUS[v.status]; return `<div class="list-item" style="flex-wrap:wrap">
+          <div class="grow" style="min-width:180px"><div class="title" style="font-size:.9rem">${esc(v.name)} ${v.required ? '<span class="badge bad">Pflicht</span>' : ""}${v.schutz === "foto" ? " 📷" : ""}</div>
+            <div class="sub">${v.datum ? `${fmtDateShort(v.datum)}` : ""}${v.quelle ? ` · ${(EINW_QUELLE[v.quelle] || [v.quelle])[0]}` : ""}${v.widerrufenAm ? ` · widerrufen ${fmtDateShort(v.widerrufenAm)}` : ""}</div></div>
+          <span class="badge ${b[1]}">${b[0]}</span>
+          ${v.status === "ja" ? `<button class="btn sm ghost" data-wr="${v.id}" title="Widerruf erfassen">↩️ Widerruf</button>` : ""}
+        </div>`; }).join("") || '<p class="soft">Keine Vorlagen vorhanden.</p>'}</div>
+        ${st.foto === false ? '<p class="soft" style="font-size:.82rem">📷 Ohne Foto-Einwilligung wird das Profilfoto im Portal anderen nicht gezeigt.</p>' : ""}`,
+      footer: `<button class="btn ghost" data-x>Schließen</button><button class="btn" data-e>⬆️ Erfassen</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-e]").onclick = () => { closeModal(); consentForm(pid); };
+        m.querySelectorAll("[data-wr]").forEach((b) => b.onclick = () => {
+          const v = st.vorlagen.find((x) => x.id === b.dataset.wr);
+          confirmDialog(`Widerruf für „${v.name}" erfassen? Die Einwilligung gilt ab heute als nicht erteilt.`, () => {
+            Store.add("einwilligungen", { playerId: pid, vorlageId: v.id, status: "nein", datum: heuteISO(), saison: saisonJahr(S()),
+              quelle: "widerruf", belegId: null, erfasstVon: (window.Sync && Sync.user && Sync.user.name) || "Trainer", erfasstAm: new Date().toISOString(), widerrufenAm: heuteISO() });
+            einwFlagsSync(); closeModal(); toast("Widerruf erfasst"); reload();
+          }, "Widerruf erfassen");
+        });
+      },
+    });
+  }
+
+  function consentTemplateForm(t) {
+    const isEdit = !!t;
+    t = t || { name: "", text: "", required: false, gueltigkeit: "unbefristet", schutz: "" };
+    modal({
+      title: isEdit ? "Vorlage bearbeiten" : "Neue Formular-Vorlage",
+      body: `<form id="tf"><div class="form-grid">
+        <div class="field full"><label>Name der Erklärung</label><input name="name" value="${esc(t.name)}" required placeholder="z. B. Teilnahme Turnierfahrt"></div>
+        <div class="field full"><label>Text / Inhalt der Erklärung</label><textarea name="text" rows="7" required placeholder="Hiermit erkläre ich mich einverstanden, dass …">${esc(t.text)}</textarea></div>
+        <div class="field"><label>Gültigkeit</label><select name="gueltigkeit">
+          <option value="unbefristet" ${t.gueltigkeit !== "saison" ? "selected" : ""}>unbefristet (bis Widerruf)</option>
+          <option value="saison" ${t.gueltigkeit === "saison" ? "selected" : ""}>je Saison neu</option></select></div>
+        <div class="field"><label>Wirkung</label><select name="schutz">
+          <option value="" ${t.schutz !== "foto" ? "selected" : ""}>keine besondere</option>
+          <option value="foto" ${t.schutz === "foto" ? "selected" : ""}>📷 steuert Fotoanzeige im Portal</option></select></div>
+        <div class="field full"><label><input type="checkbox" name="required" ${t.required ? "checked" : ""} style="width:auto"> Pflicht-Erklärung (muss für alle beantwortet sein)</label></div>
+      </div></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = closeModal;
+        m.querySelector("[data-s]").onclick = () => {
+          const f = m.querySelector("#tf"); if (!f.reportValidity()) return;
+          const d = formData(f);
+          if (isEdit) {
+            if (d.name !== t.name) S().consents.forEach((c) => { if (c.type === t.name) Store.update("consents", c.id, { type: d.name }); });
+            Store.update("consentTemplates", t.id, d);
+          } else Store.add("consentTemplates", d);
+          einwFlagsSync(); closeModal(); toast("Vorlage gespeichert", "good"); reload();
+        };
+      },
+    });
   }
 
   function letterForm(l) {
@@ -2385,9 +2647,10 @@
       <p><strong>Hiermit erkläre ich mich mit den nachfolgend angekreuzten Punkten einverstanden:</strong></p>
       ${secs}
 
-      <p class="note">Alle Einwilligungen sind freiwillig und können jederzeit mit Wirkung für die Zukunft schriftlich
-      widerrufen werden. Die Daten werden ausschließlich für die Vereinsarbeit des SKV Müritz genutzt.</p>
-      <div class="sign"><div>Ort, Datum</div><div>Unterschrift Erziehungsberechtigte/r</div></div>
+      <p class="note">Alle Einwilligungen sind freiwillig und können jederzeit mit Wirkung für die Zukunft formlos beim
+      Trainerteam widerrufen werden (z. B. über die Vereins-App oder per E-Mail). Verantwortlich: SKV Müritz e. V., Abteilung Volleyball –
+      Kontakt siehe Impressum der Vereins-App. Datenschutzhinweise: volleyball.nettverwaltet.de/datenschutz. Ab dem 16. Geburtstag bitte mit Unterschrift des Kindes.</p>
+      <div class="sign"><div>Ort, Datum</div><div>Unterschrift Erziehungsberechtigte/r</div><div>Unterschrift Spieler:in (ab 16)</div></div>
       </body></html>`;
     const w = window.open("", "_blank");
     if (!w) { toast("Bitte Pop-ups erlauben, um zu drucken", "bad"); return; }
@@ -2492,9 +2755,10 @@
       </div>
       <p><strong>Hiermit erkläre ich mich mit den nachfolgend angekreuzten Punkten einverstanden:</strong></p>
       ${secs}
-      <p class="note">Alle Einwilligungen sind freiwillig und können jederzeit mit Wirkung für die Zukunft schriftlich
-      widerrufen werden. Die Daten werden ausschließlich für die Vereinsarbeit des SKV Müritz genutzt.</p>
-      <div class="sign"><div>Ort, Datum</div><div>Unterschrift Erziehungsberechtigte/r</div></div>`;
+      <p class="note">Alle Einwilligungen sind freiwillig und können jederzeit mit Wirkung für die Zukunft formlos beim
+      Trainerteam widerrufen werden (z. B. über die Vereins-App oder per E-Mail). Verantwortlich: SKV Müritz e. V., Abteilung Volleyball –
+      Kontakt siehe Impressum der Vereins-App. Datenschutzhinweise: volleyball.nettverwaltet.de/datenschutz. Ab dem 16. Geburtstag bitte mit Unterschrift des Kindes.</p>
+      <div class="sign"><div>Ort, Datum</div><div>Unterschrift Erziehungsberechtigte/r</div><div>Unterschrift Spieler:in (ab 16)</div></div>`;
     };
     // Platzhalter {vorname} {nachname} {eltern} ersetzen (Serienbrief: je Spieler)
     const fill = (text, pl2) => String(text || "")
@@ -2785,8 +3049,8 @@
         B.push({ art: "sec", titel: `${i + 1}. ${t.name}`, text: t.text, ankreuz: true });
       });
       B.push({ art: "leer" });
-      p("Alle Einwilligungen sind freiwillig und können jederzeit mit Wirkung für die Zukunft schriftlich widerrufen werden. Die Daten werden ausschließlich für die Vereinsarbeit des SKV Müritz genutzt.");
-      B.push({ art: "linie", runs: [{ t: "Ort, Datum, Unterschrift Erziehungsberechtigte/r" }] });
+      p("Alle Einwilligungen sind freiwillig und können jederzeit mit Wirkung für die Zukunft formlos beim Trainerteam widerrufen werden (z. B. über die Vereins-App oder per E-Mail). Verantwortlich: SKV Müritz e. V., Abteilung Volleyball – Kontakt siehe Impressum der Vereins-App. Datenschutzhinweise: volleyball.nettverwaltet.de/datenschutz. Ab dem 16. Geburtstag bitte mit Unterschrift des Kindes.");
+      B.push({ art: "linie", runs: [{ t: "Ort, Datum, Unterschrift Erziehungsberechtigte/r (ab 16 auch Spieler:in)" }] });
     }
     return B;
   }
@@ -2927,33 +3191,6 @@
     });
   }
 
-  function consentTemplateForm(t) {
-    const isEdit = !!t;
-    t = t || { name: "", text: "", required: false };
-    modal({
-      title: isEdit ? "Vorlage bearbeiten" : "Neue Formular-Vorlage",
-      body: `<form id="tf"><div class="form-grid">
-        <div class="field full"><label>Name der Erklärung</label><input name="name" value="${esc(t.name)}" required placeholder="z. B. Teilnahme Turnierfahrt"></div>
-        <div class="field full"><label>Text / Inhalt der Erklärung</label><textarea name="text" rows="6" required placeholder="Hiermit erkläre ich mich einverstanden, dass …">${esc(t.text)}</textarea></div>
-        <div class="field full"><label><input type="checkbox" name="required" ${t.required ? "checked" : ""} style="width:auto"> Pflicht-Formular (für alle Spieler erforderlich)</label></div>
-      </div></form>`,
-      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
-      onOpen(m) {
-        m.querySelector("[data-x]").onclick = closeModal;
-        m.querySelector("[data-s]").onclick = () => {
-          const f = m.querySelector("#tf"); if (!f.reportValidity()) return;
-          const d = formData(f);
-          if (isEdit) {
-            // Umbenennung auch in bereits abgelegten Formularen nachziehen
-            if (d.name !== t.name) S().consents.forEach((c) => { if (c.type === t.name) Store.update("consents", c.id, { type: d.name }); });
-            Store.update("consentTemplates", t.id, d);
-          } else Store.add("consentTemplates", d);
-          closeModal(); toast("Vorlage gespeichert", "good"); reload();
-        };
-      },
-    });
-  }
-
   // Druckbares Formular (zum Austeilen an die Eltern) aus einer Vorlage
   function printConsentTemplate(t) {
     const html = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>${esc(t.name)}</title>
@@ -2980,52 +3217,78 @@
     setTimeout(() => w.print(), 300);
   }
 
-  function consentForm(preselectPlayer) {
+  // Erfassen: Datei hochladen (→ Dokumentenablage) oder Papier vermerken, dazu je Erklärung ja/nein.
+  // beleg (optional): eingereichten Portal-Upload sichten – dann keine Datei-Auswahl.
+  function consentForm(preselectPlayer, beleg) {
     const s = S();
+    const pid0 = beleg ? beleg.playerId : preselectPlayer;
+    const vorlagen = s.consentTemplates;
+    const zeile = (t) => `<div class="list-item" style="flex-wrap:wrap;gap:6px">
+        <div class="grow" style="min-width:160px"><div class="title" style="font-size:.88rem">${esc(t.name)} ${t.required ? '<span class="badge bad">Pflicht</span>' : ""}</div></div>
+        <div class="rm-wahl" style="display:flex;gap:4px">
+          ${[["ja", "✅ ja"], ["nein", "❌ nein"], ["offen", "– offen"]].map(([w, l]) => `<label class="btn sm ${w === "ja" ? "outline" : "ghost"}" style="cursor:pointer"><input type="radio" name="ew_${t.id}" value="${w}" ${(t.required ? "ja" : "offen") === w ? "checked" : ""} style="width:auto;margin-right:4px">${l}</label>`).join("")}
+        </div></div>`;
     modal({
-      title: "Einverständniserklärung hochladen",
+      title: beleg ? `👀 Sichten – ${esc(playerName(beleg.playerId))}` : "Einverständniserklärung erfassen",
+      wide: true,
       body: `<form id="cf"><div class="form-grid">
-        <div class="field"><label>Spieler</label><select name="playerId">
-          ${s.players.map((p) => `<option value="${p.id}" ${p.id === preselectPlayer ? "selected" : ""}>${esc(p.firstName)} ${esc(p.lastName)}</option>`).join("")}</select></div>
-        <div class="field"><label>Art der Erklärung (Vorlage)</label><select name="type">
-          ${s.consentTemplates.map((t) => `<option>${esc(t.name)}</option>`).join("")}
-          <option>Sonstige</option></select></div>
-        <div class="field"><label>Unterschrieben von</label><input name="signedBy" placeholder="Name Elternteil"></div>
-        <div class="field"><label>Datum der Erklärung</label><input type="date" name="datum" value="${new Date().toISOString().slice(0, 10)}" required></div>
-        <div class="field full"><label>Datei (PDF/Bild)</label>
+        <div class="field"><label>Spieler</label><select name="playerId" ${beleg ? "disabled" : ""}>
+          ${s.players.map((p) => `<option value="${p.id}" ${p.id === pid0 ? "selected" : ""}>${esc(p.firstName)} ${esc(p.lastName)}</option>`).join("")}</select></div>
+        <div class="field"><label>Datum der Erklärung</label><input type="date" name="datum" value="${beleg ? String(beleg.uploadedAt || "").slice(0, 10) || heuteISO() : heuteISO()}" required></div>
+        <div class="field full"><label>Unterschrieben von (Erziehungsberechtigte/r)</label><input name="signedBy" value="${esc(beleg ? (beleg.signedBy || "") : (Store.byId("players", pid0 || "") || {}).parentName || "")}" placeholder="Name Elternteil" required></div>
+        ${beleg ? `<div class="field full"><label>Eingereichte Datei</label><p style="margin:0">${beleg.dokumentId ? `<a href="/api/dokumente/${beleg.dokumentId}/datei" target="_blank" rel="noopener">📎 ${esc(beleg.fileName)}</a> – bitte öffnen und die Kreuze unten übernehmen` : esc(beleg.fileName || "")}</p></div>`
+        : `<div class="field full"><label>Datei (PDF/Bild, max. 20 MB) – oder unten „Papier liegt im Ordner“ wählen</label>
           <label class="file-drop" id="fd">📎 Klicken zum Auswählen<div class="sub" id="fdname"></div>
           <input type="file" name="file" accept="application/pdf,image/*" hidden></label></div>
+        <div class="field full"><label><input type="checkbox" name="papier" style="width:auto"> 🗄️ Papier liegt im Ordner (kein Scan)</label></div>`}
+        <div class="field full"><label>Je Erklärung: wurde zugestimmt?</label>
+          <div class="list">${vorlagen.map(zeile).join("") || '<p class="soft">Keine Vorlagen – zuerst anlegen oder „Musterstand 2026“ laden.</p>'}</div></div>
       </div><p class="muted" style="font-size:.8rem">${window.Sync && Sync.active
-        ? "Die Datei wird verschlüsselt (HTTPS) übertragen und auf dem Vereinsserver gespeichert – nur für angemeldete Trainer:innen sichtbar, Teil der täglichen Sicherung. Max. 4 MB je Datei."
-        : "Die Datei wird lokal in diesem Browser gespeichert (ohne Server)."}</p></form>`,
-      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+        ? "Die Datei wird verschlüsselt übertragen und in der Dokumentenablage des Vereinsservers gespeichert – nur für Trainer:innen sichtbar, Teil der Sicherung."
+        : "Ohne Server-Anmeldung kann keine Datei abgelegt werden – nur der Papier-Vermerk."}</p></form>`,
+      footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>${beleg ? "✔️ Gesichtet – speichern" : "Speichern"}</button>`,
       onOpen(m) {
         const fileInput = m.querySelector('input[name="file"]');
-        m.querySelector("#fd").onclick = () => fileInput.click();
-        const leseDatei = (f) => new Promise((ok, nein) => {
-          const rd = new FileReader(); rd.onload = () => ok(rd.result); rd.onerror = nein; rd.readAsDataURL(f);
-        });
-        fileInput.onchange = () => {
-          const f = fileInput.files[0]; if (!f) return;
-          if (f.size > 4 * 1024 * 1024) { toast("Datei zu groß (max. 4 MB)", "bad"); fileInput.value = ""; return; }
-          m.querySelector("#fdname").textContent = f.name;
-        };
+        if (fileInput) {
+          m.querySelector("#fd").onclick = () => fileInput.click();
+          fileInput.onchange = () => {
+            const f = fileInput.files[0]; if (!f) return;
+            if (f.size > 20 * 1024 * 1024) { toast("Datei zu groß (max. 20 MB)", "bad"); fileInput.value = ""; return; }
+            m.querySelector("#fdname").textContent = f.name;
+          };
+        }
         m.querySelector("[data-x]").onclick = closeModal;
         m.querySelector("[data-s]").onclick = async () => {
+          const f = m.querySelector("#cf"); if (!f.reportValidity()) return;
+          const d = formData(f);
+          const pid = beleg ? beleg.playerId : d.playerId;
+          const datei = fileInput && fileInput.files[0];
+          const antworten = vorlagen.map((t) => ({ t, w: (m.querySelector(`input[name="ew_${t.id}"]:checked`) || {}).value || "offen" })).filter((x) => x.w !== "offen");
+          if (!beleg && !datei && !d.papier) { toast("Bitte Datei auswählen oder „Papier liegt im Ordner“ ankreuzen", "bad"); return; }
+          if (!antworten.length) { toast("Bitte mindestens eine Erklärung mit ja/nein beantworten", "bad"); return; }
+          const knopf = m.querySelector("[data-s]"); knopf.disabled = true;
           try {
-            const d = formData(m.querySelector("#cf"));
-            const f = fileInput.files[0];
-            if (!f && !d.signedBy) { toast("Bitte Datei oder Unterschrift angeben", "bad"); return; }
-            // Datei erst beim Speichern lesen und darauf WARTEN – sonst wäre die
-            // Datei bei schnellem Klick noch nicht fertig eingelesen (dataUrl:null).
-            const dataUrl = f ? await leseDatei(f) : null;
-            Store.add("consents", { playerId: d.playerId, type: d.type, signedBy: d.signedBy || "—",
-              fileName: (f && f.name) || "manuell_erfasst.txt", dataUrl,
-              uploadedAt: d.datum ? d.datum + "T12:00:00" : new Date().toISOString() });
-            Store.update("players", d.playerId, { consentOnFile: true });
-            closeModal(); toast("Einverständnis abgelegt", "good"); reload();
+            let dokumentId = beleg ? beleg.dokumentId : null, fileName = beleg ? beleg.fileName : "Papier im Ordner";
+            if (datei) {
+              if (!window.Sync || !Sync.active) { toast("Datei-Ablage braucht die Server-Anmeldung", "bad"); knopf.disabled = false; return; }
+              const fd = new FormData();
+              fd.append("datei", datei); fd.append("art", "einverstaendnis"); fd.append("playerId", pid);
+              const res = await fetch("/api/dokumente", { method: "POST", body: fd, credentials: "same-origin",
+                headers: Sync.csrf ? { "X-CSRF-Token": Sync.csrf } : {} });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) { toast(data.error || "Upload fehlgeschlagen", "bad"); knopf.disabled = false; return; }
+              dokumentId = data.dokument.id; fileName = data.dokument.name;
+            }
+            const saison = saisonJahr(S());
+            const belegId = beleg ? beleg.id : Store.add("consents", { playerId: pid, type: antworten.length === 1 ? antworten[0].t.name : "Sammel-Einverständniserklärung",
+              fileName, dokumentId, signedBy: d.signedBy, uploadedAt: d.datum + "T12:00:00", quelle: datei ? "trainer" : "papier", gesichtet: true, migriert: true }).id;
+            if (beleg) Store.update("consents", beleg.id, { gesichtet: true, signedBy: d.signedBy, migriert: true });
+            antworten.forEach(({ t, w }) => Store.add("einwilligungen", { playerId: pid, vorlageId: t.id, status: w, datum: d.datum, saison,
+              quelle: beleg ? (beleg.quelle || "portal") : (datei ? "trainer" : "papier"), belegId, erfasstVon: (window.Sync && Sync.user && Sync.user.name) || "Trainer", erfasstAm: new Date().toISOString() }));
+            einwFlagsSync();
+            closeModal(); toast(beleg ? "Gesichtet und erfasst" : "Einverständnis erfasst", "good"); reload();
           } catch (e) {
-            toast("Speichern fehlgeschlagen – bitte erneut versuchen", "bad");
+            knopf.disabled = false; toast("Speichern fehlgeschlagen – bitte erneut versuchen", "bad");
           }
         };
       },

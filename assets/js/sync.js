@@ -169,10 +169,10 @@
       Passkey.merken(true);
       return { ok: true, passkeys: fin.data.passkeys || [] };
     },
-    // Anmelden – öffentlich. Rückgabe {ok, user, error}
-    async anmelden() {
+    // Passkey-Nachweis vom Gerät holen (für Anmeldung oder Bestätigung). Rückgabe {ok, credential} | {ok:false, error}
+    async credential() {
       const start = await api("/api/passkey/login/start", { method: "POST", body: "{}" });
-      if (!start.ok) return { ok: false, error: start.data.error || "Anmeldung nicht möglich" };
+      if (!start.ok) return { ok: false, error: start.data.error || "Passkey nicht möglich" };
       const o = start.data;
       o.challenge = b64uZuBytes(o.challenge);
       o.allowCredentials = (o.allowCredentials || []).map((c) => Object.assign({}, c, { id: b64uZuBytes(c.id) }));
@@ -183,7 +183,7 @@
         return { ok: false, abbruch: true, error: e && e.name === "NotAllowedError" ? "" : "Face ID / Fingerabdruck nicht verfügbar" };
       }
       const r = cred.response;
-      const nutzlast = {
+      return { ok: true, credential: {
         id: cred.id, rawId: bytesZuB64u(cred.rawId), type: cred.type,
         authenticatorAttachment: cred.authenticatorAttachment || null,
         clientExtensionResults: cred.getClientExtensionResults ? cred.getClientExtensionResults() : {},
@@ -193,7 +193,13 @@
           signature: bytesZuB64u(r.signature),
           userHandle: r.userHandle ? bytesZuB64u(r.userHandle) : null,
         },
-      };
+      } };
+    },
+    // Anmelden – öffentlich. Rückgabe {ok, user, error}
+    async anmelden() {
+      const c = await Passkey.credential();
+      if (!c.ok) return c;
+      const nutzlast = c.credential;
       const fin = await api("/api/passkey/login/finish", { method: "POST", body: JSON.stringify({ credential: nutzlast }) });
       if (!fin.ok) {
         if (fin.status === 401) Passkey.merken(false); // Passkey serverseitig weg → Knopf nicht mehr hervorheben

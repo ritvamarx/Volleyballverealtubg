@@ -7,6 +7,35 @@
 (function () {
   "use strict";
 
+  // Musterstand 2026 der Einverständnis-Vorlagen. Wird für neue Datenbestände
+  // genutzt und kann in der Trainer-Ansicht per Knopf auf bestehende Vorlagen
+  // übertragen werden (gleicher Name bzw. „altName" → Text wird aktualisiert).
+  const MUSTER_VORLAGEN = [
+    { name: "Fotoveröffentlichung", altName: "Datennutzung & Fotorechte", required: true, gueltigkeit: "unbefristet", schutz: "foto",
+      text: "Ich bin damit einverstanden, dass Fotos und kurze Videos, auf denen mein Kind beim Training, bei Spielen oder bei Vereinsveranstaltungen des SKV Müritz e. V. erkennbar ist, für folgende Zwecke verwendet werden: Vereinswebsite (skv-mueritz.de), Social-Media-Kanäle des Vereins, Berichte in der örtlichen Presse sowie vereinsintern in der Vereins-App (Mannschaftsliste, Profilbild).\n\n"
+          + "Verantwortlich ist der SKV Müritz e. V., Abteilung Volleyball (Kontakt: siehe Impressum der Vereins-App). Die Einwilligung ist freiwillig; ohne sie entstehen keine Nachteile – das Kind wird dann auf Aufnahmen nicht erkennbar gezeigt bzw. nicht veröffentlicht. Sie kann jederzeit mit Wirkung für die Zukunft formlos beim Trainerteam widerrufen werden; bereits veröffentlichte Aufnahmen werden dann, soweit technisch möglich, entfernt. Ab dem 16. Geburtstag sollte das Kind mitunterschreiben." },
+    { name: "Fahrten & Aufsicht", required: true, gueltigkeit: "unbefristet", schutz: "",
+      text: "Zu Auswärtsspielen fahren wir wann immer möglich mit dem Vereinsbus; es begleitet immer mindestens ein Mitglied des Trainerteams die Mannschaft. Reichen die Plätze im Vereinsbus nicht aus, erfolgt die Fahrt in privaten PKW einzelner Eltern (versichert über die jeweilige Kfz-Haftpflicht).\n\n"
+          + "Hiermit erkläre ich mich mit der Mitfahrt meines Kindes im Vereinsbus und in privaten PKW zu Auswärtsspielen sowie mit der Aufsicht durch das Trainerteam während Fahrten, Trainings und Spielen einverstanden. Die Aufsicht beginnt und endet an der Sporthalle bzw. am vereinbarten Treffpunkt." },
+    { name: "Medizinische Notfallversorgung", required: true, gueltigkeit: "unbefristet", schutz: "",
+      text: "Ich bin damit einverstanden, dass das Trainerteam im Notfall – wenn ich nicht erreichbar bin – notwendige ärztliche Maßnahmen (Erste Hilfe, Hinzuziehen eines Arztes oder Rettungsdienstes, Transport ins Krankenhaus) für mein Kind veranlasst.\n\n"
+          + "Wichtige gesundheitliche Hinweise (z. B. Allergien, Medikamente, Vorerkrankungen) teile ich dem Trainerteam gesondert und vertraulich mit; sie werden nur zum Schutz des Kindes verwendet." },
+    { name: "WhatsApp-Gruppe", altName: "Kontaktaufnahme & WhatsApp-Gruppe", required: false, gueltigkeit: "unbefristet", schutz: "",
+      text: "Die Kontaktdaten (Name, E-Mail, Mobilnummer) verarbeitet der Verein im Rahmen der Mitgliedschaft für Training, Spielbetrieb und Vereinskommunikation – dafür ist keine gesonderte Einwilligung nötig; alle Informationen erhalte ich über die Vereins-App und auf Wunsch per E-Mail.\n\n"
+          + "Zusätzlich bin ich einverstanden, in die WhatsApp-Elterngruppe der Mannschaft aufgenommen zu werden. Mir ist bekannt, dass WhatsApp Daten außerhalb der EU verarbeiten kann und die Teilnahme freiwillig ist. Diese Einwilligung kann jederzeit mit Wirkung für die Zukunft widerrufen werden." },
+    { name: "Teilnahme Trainingslager", required: false, gueltigkeit: "saison", schutz: "",
+      text: "Ich bin damit einverstanden, dass mein Kind am Trainingslager der Mannschaft in der laufenden Saison inklusive Übernachtung teilnimmt. Die Aufsicht übernimmt das Trainerteam; Details (Ort, Zeitraum, Kosten) werden rechtzeitig mitgeteilt." },
+    { name: "Teilnahme an der Erwachsenenliga", required: false, gueltigkeit: "saison", schutz: "",
+      text: "Hiermit erkläre ich mich damit einverstanden, dass mein Kind in der laufenden Saison am Spiel- und Trainingsbetrieb der Erwachsenenmannschaften des SKV Müritz (z. B. Herren I, Landesliga/Verbandsliga Mecklenburg-Vorpommern) teilnimmt.\n\n"
+          + "Mir ist bekannt, dass:\n"
+          + "• mein Kind dabei gemeinsam mit erwachsenen Spielern trainiert und Wettkämpfe bestreitet,\n"
+          + "• die Teilnahme im Rahmen der Jugendschutzbestimmungen und der Spielordnung des Volleyball-Verbands Mecklenburg-Vorpommern (VVMV) erfolgt,\n"
+          + "• für den Einsatz in Erwachsenenmannschaften ggf. eine gesonderte Spielberechtigung/Doppelspielrecht beim Verband beantragt wird,\n"
+          + "• die Aufsicht während Training und Spielen durch das Trainerteam gewährleistet ist.\n\n"
+          + "Diese Zustimmung gilt für die laufende Saison und kann jederzeit schriftlich widerrufen werden." },
+  ];
+  window.MUSTER_VORLAGEN = MUSTER_VORLAGEN;
+
   const KEY = "skv_vb_data_v5";
   const CLUB = "SKV Müritz";
   const WEBSITE = "https://www.skv-mueritz.de";
@@ -155,29 +184,8 @@
       ueb("Hallengewöhnung auswärts", "aufwaermen", 10, 6, 0, "Feste Routine für fremde Hallen: Decke und Licht mit hohen Bällen austesten, Boden- und Raumgefühl über Annahme-/Abwehrserien aufbauen, Aufschläge auf Zonen kalibrieren. Ablauf im Video – gibt dem Team Sicherheit am Auswärtsspieltag.", "volleyballkompass.de (Video)", "https://youtu.be/ZFJHjLLRUh8"),
     ];
 
-    // Vorlagen für Einverständniserklärungen (vom Trainer selbst verwaltbar)
-    const consentTemplates = [
-      ctpl("Datennutzung & Fotorechte", "Einverständnis zur Speicherung von Kontaktdaten sowie zur Veröffentlichung von Mannschafts- und Spielfotos auf Vereinswebsite und in Vereinsmedien.", true),
-      ctpl("Fahrten & Aufsicht",
-        "Zu Auswärtsspielen fahren wir wann immer möglich mit dem Vereinsbus; es begleitet immer mindestens ein Mitglied des Trainerteams die Mannschaft. " +
-        "Reichen die Plätze im Vereinsbus nicht aus, erfolgt die Fahrt in privaten PKW einzelner Eltern.\n\n" +
-        "Hiermit erkläre ich mich mit der Mitfahrt meines Kindes im Vereinsbus und in privaten PKW zu Auswärtsspielen sowie mit der Aufsicht durch das Trainerteam während Fahrten, Trainings und Spielen einverstanden.", true),
-      ctpl("Medizinische Notfallversorgung", "Einverständnis zur Veranlassung notwendiger ärztlicher Maßnahmen im Notfall, wenn die Eltern nicht erreichbar sind.", true),
-      ctpl("Teilnahme Trainingslager", "Einverständnis zur Teilnahme am Trainingslager inkl. Übernachtung.", false),
-      ctpl("Teilnahme an der Erwachsenenliga",
-        "Hiermit erkläre ich mich damit einverstanden, dass mein Kind am Spiel- und Trainingsbetrieb der Erwachsenenmannschaften des SKV Müritz (z. B. Herren I, Landesliga/Verbandsliga Mecklenburg-Vorpommern) teilnimmt.\n\n" +
-        "Mir ist bekannt, dass:\n" +
-        "• mein Kind dabei gemeinsam mit erwachsenen Spielern trainiert und Wettkämpfe bestreitet,\n" +
-        "• die Teilnahme im Rahmen der Jugendschutzbestimmungen und der Spielordnung des Volleyball-Verbands Mecklenburg-Vorpommern (VVMV) erfolgt,\n" +
-        "• für den Einsatz in Erwachsenenmannschaften ggf. eine gesonderte Spielberechtigung/Doppelspielrecht beim Verband beantragt wird,\n" +
-        "• die Aufsicht während Training und Spielen durch das Trainerteam gewährleistet ist.\n\n" +
-        "Diese Zustimmung gilt für die laufende Saison und kann jederzeit schriftlich widerrufen werden.", false),
-      ctpl("Kontaktaufnahme & WhatsApp-Gruppe",
-        "Hiermit erkläre ich mich damit einverstanden, dass das Trainerteam des SKV Müritz mich in Angelegenheiten des Trainings- und Spielbetriebs kontaktiert (z. B. Terminänderungen, Fahrten, Rückmeldungen).\n\n" +
-        "Dazu gebe ich freiwillig meine E-Mail-Adresse und meine Mobilnummer an (Felder unten) und stimme zu, dass diese ausschließlich für die Vereinskommunikation gespeichert und genutzt werden.\n\n" +
-        "☐ Ich bin außerdem einverstanden, in die WhatsApp-Elterngruppe der Mannschaft aufgenommen zu werden. Mir ist bekannt, dass WhatsApp Daten außerhalb der EU verarbeiten kann und die Teilnahme freiwillig ist; alle wichtigen Informationen erhalte ich auf Wunsch alternativ per E-Mail.\n\n" +
-        "Diese Einwilligung kann jederzeit mit Wirkung für die Zukunft widerrufen werden.", true),
-    ];
+    // Vorlagen für Einverständniserklärungen (vom Trainer selbst verwaltbar) – Musterstand 2026
+    const consentTemplates = MUSTER_VORLAGEN.map((m) => ctpl(m.name, m.text, m.required, m.gueltigkeit, m.schutz));
 
     // Kalender-Abos (iCal/RSS) für automatischen Termin-Import
     const calendarFeeds = [
@@ -372,6 +380,7 @@
       drivers: includeDemo ? drivers : [],
       jobs: includeDemo ? jobs : [],
       consents: includeDemo ? consents : [],
+      einwilligungen: [],
       calendarFeeds: includeDemo ? calendarFeeds : [],
       finances: includeDemo ? finances : [],
       clothingRequests: includeDemo ? clothingRequests : [],
@@ -422,8 +431,8 @@
     return { id: uid("ub"), name, kategorie, dauer, minSp: minSp || 0, maxSp: maxSp || 0,
              beschreibung: beschreibung || "", quelle: quelle || "", link: link || "" };
   }
-  function ctpl(name, text, required) {
-    return { id: uid("ct"), name, text, required: !!required };
+  function ctpl(name, text, required, gueltigkeit, schutz) {
+    return { id: uid("ct"), name, text, required: !!required, gueltigkeit: gueltigkeit || "unbefristet", schutz: schutz || "" };
   }
   function feed(name, url, type, autoSync) {
     return { id: uid("cf"), name, url, type: type || "ical", autoSync: !!autoSync, lastSync: null, lastResult: "" };

@@ -201,7 +201,10 @@
     }
     P.daten = res.data;
     P.pushAktiv = false;
+    if (location.hash === "#einverstaendnis") P.tab = "kontakt";
     render();  // sofort anzeigen – Push-Status/Wetter/Quiz ziehen im Hintergrund nach
+    const rot = offenePunkte().filter((x) => x.art === "rot").length;
+    if (rot) toast(`🔴 ${rot} dringende${rot === 1 ? "r Punkt" : " Punkte"} – Ampel oben antippen`, "bad");
     // Push-Abo-Prüfung nicht blockierend (nur fürs Konto-Tab relevant)
     pushAbo().then((abo) => { if (abo) { P.pushAktiv = true; render(); } }).catch(() => {});
     // Wetter für die Begrüßung (Spieler:innen UND Eltern), Quiz nur für Spieler:innen
@@ -368,6 +371,13 @@
         <p class="soft" style="font-size:.75rem;margin-bottom:0">Der Vergleich zeigt nur Durchschnitt und Platznummer – Namen oder Werte anderer Kinder sind nicht einsehbar.</p>
       </div>` : "";
 
+    const einwFehlt = (d.einverstaendnis || []).filter((e) => !e.vollstaendig && !e.eingereicht);
+    const einwKarteStart = einwFehlt.length ? `<div class="card" style="border:1.5px solid #e8a13c">
+        <h3>📝 Einverständniserklärung fehlt</h3>
+        <p class="soft">Für ${einwFehlt.map((e) => esc((d.spieler.find((x) => x.id === e.playerId) || {}).name || "")).join(", ")} fehlt noch die Erklärung des Trainerteams
+        ${istEltern() ? "– am schnellsten digital bestätigen, dauert zwei Minuten." : "– bitte deine Eltern, sie im Elternkonto zu bestätigen."}</p>
+        ${istEltern() ? `<button class="btn" data-gehkonto>✍️ Jetzt bestätigen</button>` : ""}
+      </div>` : "";
     const passkeyKarte = P.passkeyAngebot ? `<div class="card">
         <h3>🔐 Schneller anmelden</h3>
         <p class="soft">Nie wieder Passwort merken: Anmelden mit ${P.passkeyWort} – mit einem Tipp.
@@ -379,6 +389,7 @@
       </div>` : "";
     return `
       ${hallo}
+      ${einwKarteStart}
       ${passkeyKarte}
       ${istEltern() ? aufgabenKarte : ""}
       ${statistikKarte}
@@ -843,22 +854,7 @@
           </div>
         </div>
       </div>
-      <div class="card"><h3>📝 Einverständniserklärung</h3>
-        <p class="soft">Die unterschriebene Sammel-Einverständniserklärung kannst du hier direkt hochladen –
-        als <strong>PDF</strong> oder als <strong>Foto</strong> (Bilder werden automatisch verkleinert).</p>
-        ${d.spieler.map((sp) => {
-          const st = (d.einverstaendnis || []).find((e) => e.playerId === sp.id) || {};
-          return `<div class="portal-termin">
-            <div class="title" style="font-size:.92rem">${esc(sp.name)}
-              ${st.vorhanden ? '<span class="badge good">✓ liegt vor</span>' : '<span class="badge warn">fehlt noch</span>'}</div>
-            ${st.fileName ? `<div class="sub">zuletzt: ${esc(st.fileName)}${st.uploadedAt ? " · " + fmtDateShort(st.uploadedAt) : ""}</div>` : ""}
-            <div class="portal-fahrer">
-              <input type="file" data-updatei="${sp.id}" accept="application/pdf,image/*" style="flex:1;min-width:150px">
-              <button class="btn sm" data-upsenden="${sp.id}">⬆️ Hochladen</button>
-            </div>
-          </div>`;
-        }).join("")}
-      </div>
+      ${einwKarte()}
       <div class="card"><h3>🎟️ Weiteren Einladungscode einlösen</h3>
         <p class="soft">${eltern ? "Du hast mehrere Kinder im Verein? Löse hier den Code für das weitere Kind ein – dann siehst du alle in einem Konto." : "Hier kannst du einen weiteren Code mit deinem Konto verknüpfen."}</p>
         <form id="portalCode" class="portal-fahrer">
@@ -910,6 +906,115 @@
       </div>`;
   }
 
+  // ---------- Einverständnis: Status je Erklärung, Upload (Eltern), digitale Bestätigung ----------
+  const EINW_STATUS = { ja: ["✅ zugestimmt", "good"], nein: ["❌ nicht zugestimmt", "bad"],
+    offen: ["⏳ offen", "warn"], abgelaufen: ["🔁 erneuern (Vorsaison)", "warn"] };
+  function einwVon(pid) { return (P.daten.einverstaendnis || []).find((e) => e.playerId === pid) || { vorlagen: [], vollstaendig: true }; }
+  function einwKarte() {
+    const d = P.daten;
+    const eltern = istEltern();
+    const vorlagen = d.vorlagen || [];
+    return `<div class="card" id="einwKarte"><h3>📝 Einverständniserklärung</h3>
+      <p class="soft">${eltern
+        ? "Je Erklärung zählt deine Entscheidung einzeln. Am einfachsten <strong>digital bestätigen</strong> – ohne Papier, mit Passwort oder Face ID als Unterschrift. Alternativ das unterschriebene Formular als PDF oder Foto hochladen."
+        : "Die Erklärungen geben deine Eltern über ihr Elternkonto ab – hier siehst du den Stand."}</p>
+      ${d.spieler.map((sp) => {
+        const st = einwVon(sp.id);
+        const kontakt = (d.kontakte || []).find((k) => k.id === sp.id) || {};
+        return `<div class="portal-termin" data-einwsp="${sp.id}">
+          <div class="title" style="font-size:.95rem">${esc(sp.name)}
+            ${st.vollstaendig ? '<span class="badge good">✓ vollständig</span>' : st.eingereicht ? '<span class="badge info">eingereicht – wird geprüft</span>' : '<span class="badge warn">fehlt noch</span>'}</div>
+          <div class="list" style="margin:8px 0">
+            ${(st.vorlagen || []).map((v) => `<div class="list-item" style="padding:6px 8px"><div class="grow">
+              <div class="title" style="font-size:.86rem">${esc(v.name)} ${v.required ? '<span class="badge bad">Pflicht</span>' : ""}</div>
+              ${v.datum ? `<div class="sub">${fmtDateShort(v.datum)}${v.quelle === "digital" ? " · digital" : ""}</div>` : ""}</div>
+              <span class="badge ${EINW_STATUS[v.status][1]}">${EINW_STATUS[v.status][0]}</span></div>`).join("")}
+          </div>
+          ${st.beleg ? `<div class="sub">zuletzt: ${st.beleg.dokumentId && st.beleg.quelle === "digital" && eltern ? `<a href="/api/dokumente/${st.beleg.dokumentId}/datei" target="_blank" rel="noopener">📎 ${esc(st.beleg.fileName)}</a>` : esc(st.beleg.fileName || "")}${st.beleg.uploadedAt ? " · " + fmtDateShort(st.beleg.uploadedAt) : ""}</div>` : ""}
+          ${eltern && vorlagen.length ? `<details class="einw-digital" style="margin-top:10px" ${st.vollstaendig ? "" : "open"}>
+            <summary class="btn sm" style="display:inline-block;cursor:pointer">✍️ Digital bestätigen (ohne Papier)</summary>
+            <div style="margin-top:10px">
+              <p class="soft" style="font-size:.84rem">Jede Erklärung lesen und entscheiden. Die Bestätigung mit Passwort oder Face ID / Fingerabdruck gilt wie eine Unterschrift; ein PDF-Nachweis wird für dich und das Trainerteam gespeichert. Jede Einwilligung ist freiwillig und jederzeit widerrufbar.</p>
+              ${vorlagen.map((t) => `<div class="portal-termin" style="margin:8px 0">
+                <div class="title" style="font-size:.9rem">${esc(t.name)} ${t.required ? '<span class="badge bad">Pflicht</span>' : '<span class="badge">optional</span>'}${t.gueltigkeit === "saison" ? ' <span class="badge warn">je Saison</span>' : ""}</div>
+                <details style="margin:4px 0"><summary class="soft" style="cursor:pointer;font-size:.82rem">📄 Text lesen</summary><p style="font-size:.84rem;white-space:pre-line;margin:6px 0 0">${esc(t.text)}</p></details>
+                <div class="rm-wahl" style="margin-top:6px">
+                  <label class="btn sm outline" style="cursor:pointer"><input type="radio" name="ew_${sp.id}_${t.id}" value="ja" style="width:auto;margin-right:6px">✅ Ich stimme zu</label>
+                  <label class="btn sm ghost" style="cursor:pointer"><input type="radio" name="ew_${sp.id}_${t.id}" value="nein" style="width:auto;margin-right:6px">❌ Ich stimme nicht zu</label>
+                </div></div>`).join("")}
+              <div class="field" style="margin-top:8px"><label>Name der erklärenden Person (Erziehungsberechtigte/r)</label>
+                <input data-ewname="${sp.id}" value="${esc(kontakt.parentName || d.user.name)}" autocomplete="name"></div>
+              <div class="field"><label>Passwort zur Bestätigung</label><input type="password" data-ewpw="${sp.id}" autocomplete="current-password" placeholder="dein Portal-Passwort"></div>
+              <div class="portal-fahrer">
+                <button class="btn sm" data-ewsenden="${sp.id}" data-art="passwort">🔏 Mit Passwort bestätigen</button>
+                ${window.Passkey && Passkey.hier() ? `<button class="btn sm outline" data-ewsenden="${sp.id}" data-art="passkey">🔐 Mit ${P.passkeyWort || "Face ID / Fingerabdruck"} bestätigen</button>` : ""}
+              </div>
+            </div></details>` : ""}
+          ${eltern ? `<details style="margin-top:8px" data-upbereich="${sp.id}"><summary class="soft" style="cursor:pointer;font-size:.84rem">📎 Stattdessen unterschriebenes Formular hochladen (PDF oder Foto)</summary>
+            <div class="field" style="margin-top:8px"><label>Unterschrieben von</label><input data-upname="${sp.id}" value="${esc(kontakt.parentName || d.user.name)}"></div>
+            <div class="portal-fahrer">
+              <input type="file" data-updatei="${sp.id}" accept="application/pdf,image/*" style="flex:1;min-width:150px">
+              <button class="btn sm" data-upsenden="${sp.id}">⬆️ Hochladen</button>
+            </div></details>` : ""}
+        </div>`;
+      }).join("")}
+    </div>`;
+  }
+
+  // Ampel: offene Punkte des Kontos (Aufgaben, Einverständnis, Rückmeldungen der nächsten 7 Tage)
+  function offenePunkte() {
+    const d = P.daten; if (!d) return [];
+    const heute = new Date().toISOString().slice(0, 10);
+    const punkte = [];
+    (d.aufgaben || []).filter((t) => !t.erledigt).forEach((t) => punkte.push({
+      art: t.due && t.due < heute ? "rot" : "gelb", text: t.title,
+      sub: t.due ? "fällig " + fmtDateShort(t.due) : "Aufgabe vom Trainerteam", tab: "start" }));
+    (d.einverstaendnis || []).forEach((e) => {
+      const sp = d.spieler.find((x) => x.id === e.playerId) || {};
+      if (e.vollstaendig) return;
+      if (e.eingereicht) punkte.push({ art: "gelb", text: `Einverständnis für ${sp.name || ""} wird geprüft`, sub: "vom Trainerteam gesichtet, sobald möglich", tab: "kontakt" });
+      else punkte.push({ art: "rot", text: `Einverständniserklärung für ${sp.name || "dich"} fehlt`,
+        sub: istEltern() ? "im Konto digital bestätigen oder hochladen" : "deine Eltern bestätigen sie im Elternkonto", tab: "kontakt" });
+    });
+    const termine = [...(d.trainings || []), ...(d.spiele || [])].filter((t) => !t.abgesagt);
+    termine.forEach((t) => {
+      const tage = (new Date(String(t.start).slice(0, 10)) - new Date(heute)) / 86400000;
+      if (tage < 0 || tage > 7) return;
+      const fehlt = d.spieler.filter((sp) => !((t.meine || {})[sp.id]));
+      if (!fehlt.length) return;
+      punkte.push({ art: "gelb", text: `Rückmeldung fehlt: ${t.title || "Termin"}`, sub: `${fmtDateShort(t.start)}${d.spieler.length > 1 ? " · " + fehlt.map((x) => x.name.split(" ")[0]).join(", ") : ""}`, tab: "termine", termin: t.id });
+    });
+    return punkte;
+  }
+  function ampelHTML() {
+    const p = offenePunkte();
+    const farbe = p.some((x) => x.art === "rot") ? "rot" : p.length ? "gelb" : "gruen";
+    const titel = farbe === "gruen" ? "Alles erledigt" : `${p.length} offene${p.length === 1 ? "r Punkt" : " Punkte"}`;
+    return `<button class="ampel ampel-${farbe}" data-ampel title="${titel}" aria-label="${titel}">${p.length ? p.length : "✓"}</button>`;
+  }
+  function ampelListe() {
+    const p = offenePunkte();
+    U.modal({
+      title: p.length ? `🚦 ${p.length} offene${p.length === 1 ? "r Punkt" : " Punkte"}` : "🚦 Alles erledigt",
+      body: p.length ? `<div class="list">${p.map((x, i) => `<button class="list-item" data-ampelgo="${i}" style="text-align:left;width:100%;background:none;border:1px solid var(--border);border-radius:10px;margin-bottom:6px;cursor:pointer">
+          <span style="font-size:1.1rem">${x.art === "rot" ? "🔴" : "🟡"}</span>
+          <div class="grow"><div class="title" style="font-size:.9rem">${esc(x.text)}</div><div class="sub">${esc(x.sub || "")}</div></div><span class="arr">›</span></button>`).join("")}</div>`
+        : `<p class="soft">Keine offenen Aufgaben, alle Erklärungen liegen vor und die Termine der nächsten Woche sind beantwortet. 🟢</p>`,
+      footer: `<button class="btn ghost" data-x>Schließen</button>`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = U.closeModal;
+        m.querySelectorAll("[data-ampelgo]").forEach((b) => b.onclick = () => {
+          const x = p[parseInt(b.dataset.ampelgo, 10)];
+          U.closeModal(); P.tab = x.tab; render();
+          setTimeout(() => {
+            const ziel = x.termin ? document.querySelector(`[data-termin="${x.termin}"]`) : (x.tab === "kontakt" ? document.querySelector("#einwKarte") : null);
+            if (ziel) { ziel.scrollIntoView({ behavior: "smooth", block: "center" }); ziel.classList.add("termin-blitz"); }
+          }, 60);
+        });
+      },
+    });
+  }
+
   // ---------- Dokumente (vom Trainerteam freigegeben) ----------
   const DOK_ICON = (e) => ({ pdf: "📕", png: "🖼️", jpg: "🖼️", jpeg: "🖼️", webp: "🖼️", gif: "🖼️", heic: "🖼️",
     doc: "📘", docx: "📘", odt: "📘", xls: "📗", xlsx: "📗", ods: "📗", ppt: "📙", pptx: "📙",
@@ -957,7 +1062,7 @@
           const sp = (P.daten.spieler || [])[0] || {};
           const bild = sp.foto ? `<img src="${sp.foto}" alt="" class="portal-kopf-avatar">`
             : sp.avatarEmoji ? `<span class="portal-kopf-avatar" style="font-size:1.15rem;background:#ffffff22">${esc(sp.avatarEmoji)}</span>` : "";
-          return bild + esc(P.daten.user.name);
+          return ampelHTML() + bild + esc(P.daten.user.name);
         })()}</div>
       </header>
       <main class="portal-inhalt">${inhalt()}</main>
@@ -1208,14 +1313,46 @@
     });
     wrap.querySelectorAll("[data-fotoweg]").forEach((b) => b.onclick = () =>
       aktion("/api/portal/profilbild", { playerId: b.dataset.fotoweg, fotoLoeschen: true }, "Foto entfernt", true));
-    // Einverständnis-Upload: PDF direkt, Fotos vorher aufs Handliche verkleinern
-    const dateiZuDataUrl = (datei) => new Promise((ok, nein) => {
-      if (datei.type === "application/pdf" || !datei.type.startsWith("image/")) {
-        const r = new FileReader();
-        r.onload = () => ok(r.result); r.onerror = nein;
-        r.readAsDataURL(datei);
-        return;
+    const ampel = wrap.querySelector("[data-ampel]");
+    if (ampel) ampel.onclick = ampelListe;
+    const gehKonto = wrap.querySelector("[data-gehkonto]");
+    if (gehKonto) gehKonto.onclick = () => { P.tab = "kontakt"; render(); setTimeout(() => { const z = document.querySelector("#einwKarte"); if (z) z.scrollIntoView({ behavior: "smooth", block: "start" }); }, 60); };
+    // Digitale Bestätigung der Erklärungen (Eltern) – Passwort oder Passkey als Unterschrift
+    wrap.querySelectorAll("[data-ewsenden]").forEach((b) => b.onclick = async () => {
+      if (P.busy) return;
+      const pid = b.dataset.ewsenden;
+      const antworten = {};
+      let fehlt = null;
+      (P.daten.vorlagen || []).forEach((t) => {
+        const w = wrap.querySelector(`input[name="ew_${pid}_${t.id}"]:checked`);
+        if (w) antworten[t.id] = w.value; else if (t.required && !fehlt) fehlt = t.name;
+      });
+      if (fehlt) { toast(`Bitte bei „${fehlt}“ zustimmen oder ablehnen`, "bad"); return; }
+      if (!Object.keys(antworten).length) { toast("Bitte mindestens eine Erklärung beantworten", "bad"); return; }
+      const name = (wrap.querySelector(`[data-ewname="${pid}"]`) || {}).value || "";
+      if (!name.trim()) { toast("Bitte den Namen der erklärenden Person angeben", "bad"); return; }
+      let bestaetigung;
+      if (b.dataset.art === "passkey") {
+        toast("Gerät fragt nach " + (P.passkeyWort || "Face ID / Fingerabdruck") + " …");
+        const c = await Passkey.credential();
+        if (!c.ok) { if (c.error) toast(c.error, "bad"); return; }
+        bestaetigung = { art: "passkey", credential: c.credential };
+      } else {
+        const pw = (wrap.querySelector(`[data-ewpw="${pid}"]`) || {}).value || "";
+        if (!pw) { toast("Bitte dein Passwort zur Bestätigung eingeben", "bad"); return; }
+        bestaetigung = { art: "passwort", passwort: pw };
       }
+      b.disabled = true;
+      P.busy = true;
+      const res = await api("/api/portal/einwilligung", { playerId: pid, antworten, unterschriebenVon: name.trim(), bestaetigung });
+      P.busy = false; b.disabled = false;
+      if (!res.ok) { toast(res.data.error || "Bestätigung fehlgeschlagen", "bad"); return; }
+      toast("Danke – Erklärung verbindlich abgegeben, Nachweis gespeichert 📝", "good");
+      await neuLaden(false);
+    });
+    // Einverständnis-Upload: PDF direkt, Fotos vorher aufs Handliche verkleinern
+    const dateiZuBlob = (datei) => new Promise((ok, nein) => {
+      if (datei.type === "application/pdf" || !datei.type.startsWith("image/")) { ok(datei); return; }
       const bild = new Image();
       const url = URL.createObjectURL(datei);
       bild.onload = () => {
@@ -1226,7 +1363,7 @@
         c.height = Math.round(bild.height * faktor);
         c.getContext("2d").drawImage(bild, 0, 0, c.width, c.height);
         URL.revokeObjectURL(url);
-        ok(c.toDataURL("image/jpeg", 0.82));
+        c.toBlob((blob) => blob ? ok(blob) : nein(new Error("leer")), "image/jpeg", 0.82);
       };
       bild.onerror = nein;
       bild.src = url;
@@ -1239,14 +1376,28 @@
         const eingabe = wrap.querySelector(`[data-updatei="${pid}"]`);
         const datei = eingabe && eingabe.files && eingabe.files[0];
         if (!datei) { toast("Bitte zuerst eine PDF- oder Bilddatei auswählen", "bad"); return; }
-        if (datei.size > 15 * 1024 * 1024) { toast("Datei zu groß (max. 15 MB Original)", "bad"); return; }
+        if (datei.size > 20 * 1024 * 1024) { toast("Datei zu groß (max. 20 MB)", "bad"); return; }
         toast("Wird hochgeladen …");
-        let dataUrl;
-        try { dataUrl = await dateiZuDataUrl(datei); }
+        let blob;
+        try { blob = await dateiZuBlob(datei); }
         catch (e) { toast("Datei konnte nicht gelesen werden", "bad"); return; }
-        if (dataUrl.length > 5_500_000) { toast("Datei nach Umwandlung zu groß – bitte als Foto (nicht Scan) versuchen", "bad"); return; }
-        aktion("/api/portal/einverstaendnis", { playerId: pid, fileName: datei.name, dataUrl },
-          "Einverständniserklärung hochgeladen – danke! 📝");
+        let name = datei.name || "einverstaendnis";
+        if (blob !== datei && !/\.jpe?g$/i.test(name)) name = name.replace(/\.[a-z0-9]+$/i, "") + ".jpg";
+        const fd = new FormData();
+        fd.append("datei", blob, name); fd.append("playerId", pid);
+        fd.append("unterschriebenVon", (wrap.querySelector(`[data-upname="${pid}"]`) || {}).value || "");
+        if (P.busy) return;
+        P.busy = true;
+        let res;
+        try {
+          res = await fetch("/api/portal/einverstaendnis", { method: "POST", body: fd, credentials: "same-origin",
+            headers: window.Sync && Sync.csrf ? { "X-CSRF-Token": Sync.csrf } : {} });
+        } catch (e2) { P.busy = false; toast("Keine Verbindung – bitte später erneut versuchen", "bad"); return; }
+        P.busy = false;
+        let data = {}; try { data = await res.json(); } catch (e3) { /* leer */ }
+        if (!res.ok) { toast(data.error || "Hochladen fehlgeschlagen", "bad"); return; }
+        toast("Einverständniserklärung hochgeladen – das Trainerteam sichtet sie. Danke! 📝", "good");
+        await neuLaden(false);
       } catch (e) {
         toast("Hochladen fehlgeschlagen – bitte erneut versuchen", "bad");
       }

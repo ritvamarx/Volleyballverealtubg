@@ -130,7 +130,9 @@ CREATE TABLE IF NOT EXISTS dokumente (
     beschreibung    TEXT NOT NULL DEFAULT '',
     hochgeladen_von TEXT NOT NULL DEFAULT '',
     created_at      INTEGER NOT NULL,
-    updated_at      INTEGER NOT NULL
+    updated_at      INTEGER NOT NULL,
+    player_id       TEXT NOT NULL DEFAULT '',     -- Spielerbezug (z. B. Einverständnis-Beleg)
+    art             TEXT NOT NULL DEFAULT ''      -- '' = normale Ablage | 'einverstaendnis'
 );
 CREATE TABLE IF NOT EXISTS webauthn_challenges (
     challenge   TEXT PRIMARY KEY,
@@ -163,7 +165,9 @@ def init_db() -> None:
                        "quiz_stand ADD COLUMN woche TEXT NOT NULL DEFAULT ''",
                        "quiz_stand ADD COLUMN fehlversuche TEXT NOT NULL DEFAULT '{}'",
                        "users ADD COLUMN email TEXT",
-                       "users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0"):
+                       "users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0",
+                       "dokumente ADD COLUMN player_id TEXT NOT NULL DEFAULT ''",
+                       "dokumente ADD COLUMN art TEXT NOT NULL DEFAULT ''"):
             try:
                 con.execute("ALTER TABLE " + spalte)
             except sqlite3.OperationalError:

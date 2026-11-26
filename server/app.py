@@ -817,10 +817,12 @@ def create_app() -> Flask:
             },
             "statistik": statistik,
             # Team-Avatare für die „Wer ist dabei?"-Anzeige – nur unter Spieler:innen
+            # Foto nur, wenn die Foto-Einwilligung vorliegt (eigene Kinder/sich selbst immer)
             "team": ([{"id": p["id"],
                        "name": f"{p.get('firstName', '')} {p.get('lastName', '')}".strip(),
                        "avatarEmoji": p.get("avatarEmoji") or "",
-                       "foto": foto_von(p.get("foto"))}
+                       "foto": (foto_von(p.get("foto"))
+                                if (p["id"] in meine_ids or _einw.foto_erlaubt(daten, p["id"])) else "")}
                       for p in daten.get("players", [])
                       if p.get("membershipStatus") != "inaktiv"]
                      if rolle == "spieler" else []),
@@ -875,12 +877,14 @@ def create_app() -> Flask:
                  for a in daten.get("abwesenheiten", [])
                  if a.get("playerId") in meine_ids and str(a.get("bis") or "") >= heute],
                 key=lambda a: str(a.get("von") or "")),
-            "einverstaendnis": [dict(
-                {"playerId": p["id"], "vorhanden": bool(p.get("consentOnFile"))},
-                **({"fileName": c.get("fileName"), "uploadedAt": c.get("uploadedAt")}
-                   if (c := next((x for x in reversed(daten.get("consents", []))
-                                  if x.get("playerId") == p["id"]), None)) else {}))
-                for p in meine],
+            "einverstaendnis": [dict(_einw.status(daten, p["id"]), playerId=p["id"],
+                                     vorhanden=_einw.status(daten, p["id"])["vollstaendig"])
+                                for p in meine],
+            # Vorlagen für die digitale Bestätigung (nur Eltern)
+            "vorlagen": ([{"id": t["id"], "name": t.get("name") or "", "text": t.get("text") or "",
+                           "required": bool(t.get("required")), "gueltigkeit": t.get("gueltigkeit") or "unbefristet",
+                           "schutz": t.get("schutz") or ""} for t in _einw.vorlagen(daten)]
+                         if rolle == "eltern" else []),
             "kontakte": [{"id": p["id"], "firstName": p.get("firstName"), "lastName": p.get("lastName"),
                           "parentName": p.get("parentName") or "", "parent2Name": p.get("parent2Name") or "",
                           "parentEmail": p.get("parentEmail") or "", "parentPhone": p.get("parentPhone") or "",
@@ -1597,41 +1601,13 @@ def create_app() -> Flask:
             return err(409, "Speichern gerade nicht möglich – bitte erneut versuchen")
         return jsonify({"ok": True})
 
-    # ---------- Einverständniserklärung hochladen (Portal, PDF oder Bild) ----------
-
-    @app.post("/api/portal/einverstaendnis")
-    def api_portal_einverstaendnis():
-        sess, failure = require_portal()
-        if failure:
-            return failure
-        body = request.get_json(silent=True) or {}
-        pid = body.get("playerId")
-        datei_name = str(body.get("fileName") or "einverstaendnis")[:120]
-        data_url = str(body.get("dataUrl") or "")
-        if pid not in sess_player_ids(sess):
-            return err(403, "Spieler:in ist nicht mit deinem Konto verknüpft")
-        if not re.match(r"^data:(application/pdf|image/(jpeg|png|webp|heic));base64,", data_url):
-            return err(400, "Bitte eine PDF- oder Bilddatei hochladen")
-        if len(data_url) > 5_600_000:  # ≈ 4 MB Binärdaten
-            return err(413, "Datei zu groß (max. ca. 4 MB) – bitte Foto verkleinern")
-
-        def mut(d):
-            # Früherer Portal-Upload derselben Spieler:in wird ersetzt
-            liste = [c for c in d.get("consents", [])
-                     if not (c.get("playerId") == pid and c.get("quelle") == "portal")]
-            liste.append({"id": neue_id("co"), "playerId": pid,
-                          "type": "Sammel-Einverständniserklärung (Portal-Upload)",
-                          "fileName": datei_name, "dataUrl": data_url,
-                          "signedBy": sess["name"], "uploadedAt": iso_jetzt(),
-                          "quelle": "portal"})
-            d["consents"] = liste
-            for p in d.get("players", []):
-                if p.get("id") == pid:
-                    p["consentOnFile"] = True
-
-        if speichere_portal_aenderung(mut, f"{sess['name']} (Portal)") is None:
-            return err(409, "Speichern gerade nicht möglich – bitte erneut versuchen")
-        return jsonify({"ok": True})
+    # Einverständnis/Einwilligungen (Portal-Upload, digitale Bestätigung, Erinnerung) – server/einwilligung.py
+    import einwilligung as _einw
+    _einw.register(app, con, require, require_portal, err, {
+        "sess_player_ids": sess_player_ids, "eigene_spieler": eigene_spieler,
+        "speichere_portal_aenderung": speichere_portal_aenderung, "lade_state": lade_state,
+        "neue_id": neue_id, "iso_jetzt": iso_jetzt, "client_ip": client_ip, "log_login": log_login,
+        "push": _push, "auth": auth, "pdf_brief": __import__("pdf_brief")})
 
     # ---------- Benachrichtigungs-Einstellungen (Portal) ----------
 

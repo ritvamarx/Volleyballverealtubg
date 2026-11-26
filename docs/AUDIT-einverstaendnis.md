@@ -1,5 +1,12 @@
 # Audit: Workflow Einverständniserklärung
 
+> **Umsetzungsstand 2026-11-26:** Punkte 1–5 des Prioritätsvorschlags sind umgesetzt
+> (Ablage in `data/dokumente` mit automatischer Migration der Base64-Scans, Sofortmaßnahmen,
+> Einwilligung je Erklärung mit Foto-Sperre/Saison/Widerruf, Musterstand 2026 der Vorlagen,
+> digitale Bestätigung im Elternportal mit Passwort oder Passkey und PDF-Nachweis).
+> Zusätzlich: Ampel in der Portal-Kopfzeile für offene Aufgaben, fehlende Erklärungen und
+> unbeantwortete Termine. Details: `docs/PLAN-email-login-offline.md`, Teil D.
+
 Stand 2026-11-26, Codebasis `main` e8f0d1e. Geprüft: Trainer-Ansicht „Einverständnis“
 (`assets/js/views.js`), Portal Konto-Tab (`assets/js/portal.js`), Server-Endpunkte
 `/api/portal` und `/api/portal/einverstaendnis` (`server/app.py`), PDF-Erzeugung

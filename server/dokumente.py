@@ -41,10 +41,76 @@ INLINE = {"pdf", "png", "jpg", "jpeg", "webp", "gif", "txt"}  # im Browser anzei
 
 
 def sichtbar_fuer(rolle: str):
-    """SQL-Bedingung + Parameter: welche Freigaben diese Rolle sehen darf."""
+    """SQL-Bedingung + Parameter: welche Freigaben diese Rolle sehen darf (normale Ablage)."""
     if rolle == "trainer":
-        return "1=1", ()
-    return "freigabe IN (?, 'alle')", (rolle,)
+        return "art = ''", ()
+    return "art = '' AND freigabe IN (?, 'alle')", (rolle,)
+
+
+def sauberer_name(roh: str, fallback: str = "Dokument") -> str:
+    return re.sub(r"[\\/:*?\"<>|\r\n\t]+", " ", str(roh or "")).strip()[:140] or fallback
+
+
+def datei_ablegen(con, quelle, name: str, ordner: str, freigabe: str, von: str,
+                  player_id: str = "", art: str = ""):
+    """Datei (Stream oder bytes) unter data/dokumente ablegen und Zeile anlegen.
+
+    Rückgabe: (zeile, fehler) – fehler = (status, meldung) bei Ablehnung.
+    """
+    os.makedirs(DOK_DIR, exist_ok=True)
+    name = sauberer_name(name)
+    endung = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+    if endung not in TYPEN:
+        return None, (400, f"Dateityp .{endung or '?'} wird nicht unterstützt (erlaubt: "
+                           + ", ".join(sorted(TYPEN)) + ")")
+    if freigabe not in FREIGABEN:
+        return None, (400, "Ungültige Freigabe")
+    token = secrets.token_hex(16)
+    datei = f"{token}.{endung}"
+    ziel = os.path.join(DOK_DIR, datei)
+    groesse = 0
+    lesen = (lambda: quelle.read(1024 * 1024)) if hasattr(quelle, "read") else None
+    with open(ziel, "wb") as out:
+        if lesen is None:
+            groesse = len(quelle)
+            if groesse > DOK_MAX_BYTES:
+                out.close(); os.remove(ziel)
+                return None, (413, f"Datei zu groß (max. {DOK_MAX_BYTES // (1024 * 1024)} MB)")
+            out.write(quelle)
+        else:
+            while True:
+                block = lesen()
+                if not block:
+                    break
+                groesse += len(block)
+                if groesse > DOK_MAX_BYTES:
+                    out.close(); os.remove(ziel)
+                    return None, (413, f"Datei zu groß (max. {DOK_MAX_BYTES // (1024 * 1024)} MB)")
+                out.write(block)
+    if groesse == 0:
+        os.remove(ziel)
+        return None, (400, "Die Datei ist leer")
+    jetzt = db.now()
+    cur = con.execute(
+        "INSERT INTO dokumente (name, datei, endung, mime, groesse, ordner, freigabe, beschreibung,"
+        " hochgeladen_von, created_at, updated_at, player_id, art) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (name, datei, endung, TYPEN[endung], groesse, (ordner or "Allgemein")[:60], freigabe, "",
+         (von or "")[:80], jetzt, jetzt, (player_id or "")[:60], (art or "")[:30]))
+    con.commit()
+    return con.execute("SELECT * FROM dokumente WHERE id = ?", (cur.lastrowid,)).fetchone(), None
+
+
+def datei_loeschen(con, dok_id: int) -> bool:
+    r = con.execute("SELECT * FROM dokumente WHERE id = ?", (dok_id,)).fetchone()
+    if r is None:
+        return False
+    con.execute("DELETE FROM dokumente WHERE id = ?", (dok_id,))
+    con.commit()
+    try:
+        os.remove(os.path.join(DOK_DIR, r["datei"]))
+    except OSError:
+        pass
+    return True
 
 
 def register(app, con, require, err, push_modul=None):
@@ -54,7 +120,7 @@ def register(app, con, require, err, push_modul=None):
         return {"id": r["id"], "name": r["name"], "ordner": r["ordner"], "freigabe": r["freigabe"],
                 "beschreibung": r["beschreibung"], "groesse": r["groesse"], "endung": r["endung"],
                 "von": r["hochgeladen_von"], "seit": r["created_at"], "geaendert": r["updated_at"],
-                "inline": r["endung"] in INLINE}
+                "inline": r["endung"] in INLINE, "playerId": r["player_id"], "art": r["art"]}
 
     def liste(rolle: str) -> list:
         bed, par = sichtbar_fuer(rolle)
@@ -65,6 +131,20 @@ def register(app, con, require, err, push_modul=None):
 
     def pfad_von(r) -> str:
         return os.path.join(DOK_DIR, r["datei"])
+
+    def eigene_player_ids(sess) -> set:
+        try:
+            return {str(i) for i in json.loads(sess["player_ids"] or "[]")}
+        except Exception:
+            return set()
+
+    def darf_lesen(sess, r) -> bool:
+        if sess["role"] == "trainer":
+            return True
+        if r["art"] == "einverstaendnis":
+            # Eigener Beleg (z. B. Nachweis der digitalen Einwilligung) – nur Elternkonto
+            return sess["role"] == "eltern" and r["player_id"] in eigene_player_ids(sess)
+        return r["freigabe"] in (sess["role"], "alle")
 
     @app.get("/api/dokumente")
     def api_dokumente():
@@ -82,44 +162,26 @@ def register(app, con, require, err, push_modul=None):
         f = request.files.get("datei")
         if f is None or not f.filename:
             return err(400, "Bitte eine Datei auswählen")
-        name = re.sub(r"[\\/:*?\"<>|\r\n\t]+", " ", f.filename).strip()[:140] or "Dokument"
-        endung = name.rsplit(".", 1)[-1].lower() if "." in name else ""
-        if endung not in TYPEN:
-            return err(400, f"Dateityp .{endung or '?'} wird nicht unterstützt (erlaubt: "
-                            + ", ".join(sorted(TYPEN)) + ")")
+        name = f.filename
         ordner = str(request.form.get("ordner") or "Allgemein").strip()[:60] or "Allgemein"
         freigabe = str(request.form.get("freigabe") or "trainer")
-        if freigabe not in FREIGABEN:
-            return err(400, "Ungültige Freigabe")
         beschreibung = str(request.form.get("beschreibung") or "").strip()[:300]
-        token = secrets.token_hex(16)
-        datei = f"{token}.{endung}"
-        ziel = os.path.join(DOK_DIR, datei)
-        groesse = 0
-        with open(ziel, "wb") as out:
-            while True:
-                block = f.stream.read(1024 * 1024)
-                if not block:
-                    break
-                groesse += len(block)
-                if groesse > DOK_MAX_BYTES:
-                    out.close()
-                    os.remove(ziel)
-                    return err(413, f"Datei zu groß (max. {DOK_MAX_BYTES // (1024 * 1024)} MB)")
-                out.write(block)
-        if groesse == 0:
-            os.remove(ziel)
-            return err(400, "Die Datei ist leer")
-        jetzt = db.now()
-        cur = con().execute(
-            "INSERT INTO dokumente (name, datei, endung, mime, groesse, ordner, freigabe, beschreibung,"
-            " hochgeladen_von, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            (name, datei, endung, TYPEN[endung], groesse, ordner, freigabe, beschreibung,
-             sess["name"], jetzt, jetzt))
-        con().commit()
-        neu = con().execute("SELECT * FROM dokumente WHERE id = ?", (cur.lastrowid,)).fetchone()
+        art = "einverstaendnis" if request.form.get("art") == "einverstaendnis" else ""
+        player_id = str(request.form.get("playerId") or "").strip()[:60] if art else ""
+        if art:
+            freigabe = "trainer"  # Belege sind nie für das Portal freigegeben
+            ordner = "Einverständnis"
+        neu, fehler = datei_ablegen(con(), f.stream, name, ordner, freigabe, sess["name"],
+                                    player_id=player_id, art=art)
+        if fehler:
+            return err(*fehler)
+        name = neu["name"]
+        if beschreibung:
+            con().execute("UPDATE dokumente SET beschreibung = ? WHERE id = ?", (beschreibung, neu["id"]))
+            con().commit()
+            neu = con().execute("SELECT * FROM dokumente WHERE id = ?", (neu["id"],)).fetchone()
         benachrichtigt = 0
-        if request.form.get("push") in ("1", "true", "on") and freigabe != "trainer" and push_modul:
+        if request.form.get("push") in ("1", "true", "on") and freigabe != "trainer" and not art and push_modul:
             rollen = ("spieler", "eltern") if freigabe == "alle" else (freigabe,)
             platz = ",".join("?" * len(rollen))
             ids = [r["id"] for r in con().execute(
@@ -162,15 +224,8 @@ def register(app, con, require, err, push_modul=None):
         _sess, failure = require(role="trainer")
         if failure:
             return failure
-        r = con().execute("SELECT * FROM dokumente WHERE id = ?", (dok_id,)).fetchone()
-        if r is None:
+        if not datei_loeschen(con(), dok_id):
             return err(404, "Dokument nicht gefunden")
-        con().execute("DELETE FROM dokumente WHERE id = ?", (dok_id,))
-        con().commit()
-        try:
-            os.remove(pfad_von(r))
-        except OSError:
-            pass
         return jsonify({"ok": True, "dokumente": liste("trainer")})
 
     @app.get("/api/dokumente/<int:dok_id>/datei")
@@ -178,9 +233,8 @@ def register(app, con, require, err, push_modul=None):
         sess, failure = require(csrf=False)
         if failure:
             return failure
-        bed, par = sichtbar_fuer(sess["role"])
-        r = con().execute(f"SELECT * FROM dokumente WHERE id = ? AND {bed}", (dok_id, *par)).fetchone()
-        if r is None:
+        r = con().execute("SELECT * FROM dokumente WHERE id = ?", (dok_id,)).fetchone()
+        if r is None or not darf_lesen(sess, r):
             return err(404, "Dokument nicht gefunden oder nicht freigegeben")
         pfad = pfad_von(r)
         if not os.path.isfile(pfad):
