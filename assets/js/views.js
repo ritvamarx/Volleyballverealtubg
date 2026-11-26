@@ -349,7 +349,7 @@
         <div class="flex" style="gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
           <button class="btn" type="submit" id="dokUp">📤 Hochladen</button><span class="soft" id="dokStatus"></span></div></form>
       </div>
-      <div class="grid-3 mb" id="dokStat"></div>
+      <div class="grid grid-3 mb" id="dokStat"></div>
       <div id="dokListe"><p class="soft">Lade …</p></div>`;
     let daten = [];
     const zeichnen = () => {
