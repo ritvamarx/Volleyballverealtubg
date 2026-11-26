@@ -53,6 +53,68 @@ def cmd_create_trainer(args) -> None:
     print(f"Trainerkonto '{args.username}' angelegt. Beim ersten Login wird 2FA eingerichtet.")
 
 
+def cmd_test_konten(args) -> None:
+    """Testkonten für Trainer, Spieler:in und Eltern anlegen (oder Passwörter neu setzen).
+
+    Legt bei Bedarf eine Testspieler:in „Mia Muster“ im Datenbestand an und verknüpft
+    Spieler- und Elternkonto damit. Mehrfach ausführbar: vorhandene Konten bekommen
+    nur ein neues Passwort. Gedacht für die TEST-Instanz.
+    """
+    import json
+    import secrets as _sec
+    db.init_db()
+    con = db.connect()
+    # Testspieler:in im Datenbestand sicherstellen
+    row = db.get_state(con)
+    daten = json.loads(row["data"]) if row else {}
+    spieler = [p for p in daten.get("players", []) if isinstance(p, dict)]
+    pid = next((p["id"] for p in spieler if p.get("lastName") == "Muster" and p.get("firstName") == "Mia"), None)
+    if pid is None:
+        pid = "pl_test_mia"
+        spieler.append({"id": pid, "firstName": "Mia", "lastName": "Muster", "birthDate": "2011-05-14",
+                        "position": "Außen", "jerseyNumber": 99, "team": "", "parentName": "Petra Muster",
+                        "parent2Name": "", "parentEmail": "", "parentPhone": "", "playerEmail": "", "playerPhone": "",
+                        "consentOnFile": False, "membershipStatus": "aktiv", "notes": "Testspielerin",
+                        "gender": "w", "passNumber": "", "departmentId": None, "departmentIds": []})
+        daten["players"] = spieler
+        if row is None:
+            con.execute("INSERT INTO app_state (id, version, data, updated_at, updated_by) VALUES (1, 1, ?, ?, ?)",
+                        (json.dumps(daten, ensure_ascii=False), db.now(), "manage.py test-konten"))
+            con.commit()
+        else:
+            db.put_state(con, row["version"], json.dumps(daten, ensure_ascii=False), "manage.py test-konten")
+        print("Testspielerin „Mia Muster“ angelegt.")
+    konten = (("test-trainer", "Test Trainer", "trainer", []),
+              ("test-spieler", "Mia Muster", "spieler", [pid]),
+              ("test-eltern", "Petra Muster", "eltern", [pid]))
+    zeilen = []
+    with con:
+        for username, name, rolle, pids in konten:
+            pw = args.passwort or _sec.token_urlsafe(9)
+            vorhanden = con.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+            if vorhanden:
+                con.execute("UPDATE users SET pw_hash = ?, active = 1, player_ids = ?, name = ? WHERE id = ?",
+                            (auth.hash_password(pw), json.dumps(pids), name, vorhanden["id"]))
+                con.execute("DELETE FROM sessions WHERE user_id = ?", (vorhanden["id"],))
+                if rolle == "trainer" and args.reset_2fa:
+                    con.execute("UPDATE users SET totp_secret = NULL, totp_enabled = 0, backup_codes = '[]' WHERE id = ?",
+                                (vorhanden["id"],))
+                stand = "Passwort neu gesetzt"
+            else:
+                con.execute("INSERT INTO users (username, name, role, pw_hash, player_ids, created_at)"
+                            " VALUES (?,?,?,?,?,?)",
+                            (username, name, rolle, auth.hash_password(pw), json.dumps(pids), db.now()))
+                stand = "neu angelegt"
+            zeilen.append((rolle, username, pw, stand))
+    print()
+    print(f"{'Rolle':<9} {'Benutzername':<14} {'Passwort':<16} Stand")
+    for rolle, username, pw, stand in zeilen:
+        print(f"{rolle:<9} {username:<14} {pw:<16} {stand}")
+    print()
+    print("Trainer: beim ersten Login wird die 2FA (Authenticator-App) eingerichtet.")
+    print("Spieler/Eltern: Anmeldung mit Benutzername + Passwort, danach im Portal Passkey möglich.")
+
+
 def cmd_create_invite(args) -> None:
     db.init_db()
     con = db.connect()
@@ -190,6 +252,11 @@ def main() -> None:
     s.add_argument("--name", default="")
     s.add_argument("--password", default="", help="nur für Skripte; sonst interaktive Abfrage")
     s.set_defaults(func=cmd_create_trainer)
+
+    s = sub.add_parser("test-konten", help="Testkonten (Trainer, Spieler:in, Eltern) anlegen bzw. Passwörter neu setzen")
+    s.add_argument("--passwort", help="festes Passwort für alle drei Konten (sonst zufällig, wird ausgegeben)")
+    s.add_argument("--reset-2fa", action="store_true", help="2FA des Test-Trainers zurücksetzen")
+    s.set_defaults(func=cmd_test_konten)
 
     s = sub.add_parser("create-invite", help="Einladungscode erzeugen")
     s.add_argument("--role", choices=["trainer", "spieler", "eltern"], required=True)
