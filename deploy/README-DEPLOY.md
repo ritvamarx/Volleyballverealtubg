@@ -174,3 +174,12 @@ Adresse ist). Anmelden geht mit E-Mail-Adresse oder Benutzername.
 „Passwort vergessen“ schickt einen Einmal-Link (60 Minuten) an die hinterlegte
 Adresse; ohne Adresse läuft weiterhin der Code-Weg über das Trainerteam.
 Sitzungen von Spieler-/Elternkonten gelten 180 Tage, Trainer 30 Tage (2FA).
+
+### Passkeys (Face ID / Touch ID / Fingerabdruck)
+
+Spieler-/Elternkonten können im Portal einen Passkey einrichten und sich danach
+am Anmeldebildschirm ohne Passwort anmelden (WebAuthn, Bibliothek `webauthn`
+in `server/requirements.txt`, Modul `server/passkeys.py`). Passkeys gelten je
+Domain – Test- und Live-Instanz haben getrennte. Keine Server-Einrichtung nötig,
+HTTPS ist Voraussetzung (Caddy). Passkeys bleiben bei Passwort-Reset erhalten;
+das Trainerteam kann ein Konto deaktivieren, dann greift auch der Passkey nicht mehr.

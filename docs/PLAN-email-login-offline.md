@@ -49,6 +49,15 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
 3. Sitzungsdauer von 30 auf 180 Tage für Spieler/Eltern, damit seltener Passwörter nötig sind. – UMGESETZT (mit A1)
 4. Login-Hinweis „Benutzername, nicht dein Name“ entfällt, weil die E-Mail eindeutig ist.
 
+### A3b Passkeys: Face ID / Touch ID / Fingerabdruck – UMGESETZT 2026-11-26
+- Spieler:innen und Eltern richten nach einer Anmeldung im Portal einen Passkey ein
+  (Karte „Schneller anmelden“ auf der Übersicht, Verwaltung im Konto-Tab).
+- Anmeldebildschirm: Knopf „Mit Face ID / Fingerabdruck anmelden“; auf einem Gerät mit
+  eingerichtetem Passkey steht er ganz oben – ein Tipp genügt.
+- Technik: WebAuthn (py_webauthn), Resident Keys mit Pflicht-Nutzerverifikation, Tabellen
+  `passkeys` und `webauthn_challenges`. Passwort- und Code-Weg bleiben unverändert.
+- Trainerkonten vorerst ausgenommen (2FA-Pflicht); Freischaltung später möglich.
+
 ### A4 Später, nach Freigabe
 - Codeweg nur noch als Trainer-Notfall sichtbar.
 - Optional: Anmeldelink per E-Mail ohne Passwort („Magic Link“), falls gewünscht.

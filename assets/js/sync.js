@@ -106,6 +106,114 @@
     return true;
   }
 
+  // ---------- Passkeys: Face ID / Touch ID / Fingerabdruck ----------
+  // Base64url ↔ Bytes, weil ältere Safari/Chrome die *FromJSON-Helfer nicht haben
+  const b64uZuBytes = (s) => Uint8Array.from(atob(String(s).replace(/-/g, "+").replace(/_/g, "/")), (c) => c.charCodeAt(0));
+  const bytesZuB64u = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  const Passkey = {
+    FLAG: "skv_passkey_geraet",           // "1" = auf diesem Gerät eingerichtet
+    NEIN: "skv_passkey_spaeter",          // Zeitstempel: Hinweis bis dahin nicht zeigen
+    moeglich: () => !!(window.PublicKeyCredential && navigator.credentials && window.isSecureContext),
+    async plattform() {
+      if (!Passkey.moeglich()) return false;
+      try { return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable(); }
+      catch (e) { return false; }
+    },
+    hier: () => { try { return localStorage.getItem(Passkey.FLAG) === "1"; } catch (e) { return false; } },
+    merken: (ja) => { try { if (ja) localStorage.setItem(Passkey.FLAG, "1"); else localStorage.removeItem(Passkey.FLAG); } catch (e) { /* leer */ } },
+    geraetName() {
+      const ua = navigator.userAgent;
+      const g = /iPhone/.test(ua) ? "iPhone" : /iPad|Macintosh.*Mobile/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android"
+              : /Macintosh/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : "Gerät";
+      const b = /CriOS|Chrome/.test(ua) && !/Edg/.test(ua) ? "Chrome" : /Edg/.test(ua) ? "Edge" : /Firefox|FxiOS/.test(ua) ? "Firefox" : /Safari/.test(ua) ? "Safari" : "";
+      return b ? `${g} · ${b}` : g;
+    },
+    // Einrichten – nur angemeldet (Portal). Rückgabe {ok, error}
+    async einrichten() {
+      const start = await api("/api/passkey/register/start", { method: "POST", body: "{}" });
+      if (!start.ok) return { ok: false, error: start.data.error || "Einrichtung nicht möglich" };
+      const o = start.data;
+      o.challenge = b64uZuBytes(o.challenge);
+      o.user.id = b64uZuBytes(o.user.id);
+      o.excludeCredentials = (o.excludeCredentials || []).map((c) => Object.assign({}, c, { id: b64uZuBytes(c.id) }));
+      let cred;
+      try {
+        cred = await navigator.credentials.create({ publicKey: o });
+      } catch (e) {
+        if (e && e.name === "InvalidStateError") { Passkey.merken(true); return { ok: true, schon: true }; }
+        return { ok: false, error: e && e.name === "NotAllowedError" ? "Abgebrochen" : "Gerät hat die Einrichtung abgelehnt" };
+      }
+      const r = cred.response;
+      const nutzlast = {
+        id: cred.id, rawId: bytesZuB64u(cred.rawId), type: cred.type,
+        authenticatorAttachment: cred.authenticatorAttachment || null,
+        clientExtensionResults: cred.getClientExtensionResults ? cred.getClientExtensionResults() : {},
+        response: {
+          clientDataJSON: bytesZuB64u(r.clientDataJSON),
+          attestationObject: bytesZuB64u(r.attestationObject),
+          transports: r.getTransports ? r.getTransports() : [],
+        },
+      };
+      const fin = await api("/api/passkey/register/finish", {
+        method: "POST", body: JSON.stringify({ credential: nutzlast, geraet: Passkey.geraetName() }),
+      });
+      if (!fin.ok) return { ok: false, error: fin.data.error || "Passkey konnte nicht gespeichert werden" };
+      Passkey.merken(true);
+      return { ok: true, passkeys: fin.data.passkeys || [] };
+    },
+    // Anmelden – öffentlich. Rückgabe {ok, user, error}
+    async anmelden() {
+      const start = await api("/api/passkey/login/start", { method: "POST", body: "{}" });
+      if (!start.ok) return { ok: false, error: start.data.error || "Anmeldung nicht möglich" };
+      const o = start.data;
+      o.challenge = b64uZuBytes(o.challenge);
+      o.allowCredentials = (o.allowCredentials || []).map((c) => Object.assign({}, c, { id: b64uZuBytes(c.id) }));
+      let cred;
+      try {
+        cred = await navigator.credentials.get({ publicKey: o });
+      } catch (e) {
+        return { ok: false, abbruch: true, error: e && e.name === "NotAllowedError" ? "" : "Face ID / Fingerabdruck nicht verfügbar" };
+      }
+      const r = cred.response;
+      const nutzlast = {
+        id: cred.id, rawId: bytesZuB64u(cred.rawId), type: cred.type,
+        authenticatorAttachment: cred.authenticatorAttachment || null,
+        clientExtensionResults: cred.getClientExtensionResults ? cred.getClientExtensionResults() : {},
+        response: {
+          clientDataJSON: bytesZuB64u(r.clientDataJSON),
+          authenticatorData: bytesZuB64u(r.authenticatorData),
+          signature: bytesZuB64u(r.signature),
+          userHandle: r.userHandle ? bytesZuB64u(r.userHandle) : null,
+        },
+      };
+      const fin = await api("/api/passkey/login/finish", { method: "POST", body: JSON.stringify({ credential: nutzlast }) });
+      if (!fin.ok) {
+        if (fin.status === 401) Passkey.merken(false); // Passkey serverseitig weg → Knopf nicht mehr hervorheben
+        return { ok: false, error: fin.data.error || "Anmeldung fehlgeschlagen" };
+      }
+      Passkey.merken(true);
+      return { ok: true, user: fin.data.user };
+    },
+  };
+  window.Passkey = Passkey;
+
+  const pkBtn = $("#passkeyLogin");
+  if (pkBtn && Passkey.moeglich()) {
+    pkBtn.hidden = false;
+    // Auf einem Gerät mit eingerichtetem Passkey steht der Knopf oben – ein Tipp genügt
+    if (Passkey.hier()) { pkBtn.classList.remove("outline"); $("#auth-login").prepend(pkBtn); }
+    pkBtn.addEventListener("click", async () => {
+      authMsg("Face ID / Fingerabdruck …");
+      pkBtn.disabled = true;
+      const r = await Passkey.anmelden();
+      pkBtn.disabled = false;
+      if (!r.ok) { authMsg(r.error || "", !!r.error); return; }
+      authMsg("");
+      Sync.user = r.user;
+      await afterFullLogin();
+    });
+  }
+
   // ---------- Anmeldung ----------
   $("#auth-login").addEventListener("submit", async (ev) => {
     ev.preventDefault();

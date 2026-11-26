@@ -107,6 +107,24 @@ CREATE TABLE IF NOT EXISTS passwort_anfragen (
     username    TEXT NOT NULL,
     created_at  INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS passkeys (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    cred_id     TEXT NOT NULL UNIQUE,            -- Credential-ID, base64url
+    public_key  BLOB NOT NULL,                   -- COSE-Public-Key
+    sign_count  INTEGER NOT NULL DEFAULT 0,
+    transports  TEXT NOT NULL DEFAULT '[]',
+    geraet      TEXT NOT NULL DEFAULT '',        -- z. B. "iPhone · Safari"
+    created_at  INTEGER NOT NULL,
+    last_used   INTEGER
+);
+CREATE TABLE IF NOT EXISTS webauthn_challenges (
+    challenge   TEXT PRIMARY KEY,
+    user_id     INTEGER,
+    art         TEXT NOT NULL,                   -- 'reg' | 'login'
+    created_at  INTEGER NOT NULL,
+    expires_at  INTEGER NOT NULL
+);
 """
 
 

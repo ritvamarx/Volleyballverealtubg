@@ -168,6 +168,11 @@ def create_app() -> Flask:
         con().execute("DELETE FROM login_log WHERE ts < ?", (db.now() - 7 * 86400,))
         con().commit()
 
+    # Passkeys (Face ID / Fingerabdruck) – siehe server/passkeys.py
+    import passkeys
+    passkeys.register(app, con, require, start_session, err, rate_limited, log_login,
+                      SESSION_DAYS_PORTAL)
+
     # ---------- API: Sitzung ----------
 
     @app.post("/api/login")

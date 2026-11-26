@@ -210,7 +210,34 @@
       api("/api/portal/quiz").then((r) => { if (r.ok) { P.quiz = r.data; render(); } });
     }
     pushAuffrischen();
+    passkeyStatus();
   };
+
+  // Passkey-Angebot: nur wenn das Gerät Face ID/Touch ID/Fingerabdruck kann,
+  // hier noch keiner eingerichtet ist und „Später" nicht in den letzten 30 Tagen gedrückt wurde
+  async function passkeyStatus() {
+    if (!window.Passkey || !Passkey.moeglich()) return;
+    const ua = navigator.userAgent;
+    P.passkeyWort = /iPhone|iPad|Macintosh/.test(ua) ? "Face ID / Touch ID" : "Fingerabdruck / Gesicht";
+    const r = await api("/api/passkey/liste");
+    if (!r.ok) return;
+    P.passkeys = r.data;
+    let spaeter = 0;
+    try { spaeter = parseInt(localStorage.getItem(Passkey.NEIN) || "0", 10); } catch (e) { /* leer */ }
+    const plattform = await Passkey.plattform();
+    P.passkeyAngebot = plattform && r.data.erlaubt !== false && !Passkey.hier() && Date.now() > spaeter;
+    render();
+  }
+
+  async function passkeyEinrichten() {
+    toast("Gerät fragt nach " + (P.passkeyWort || "Face ID / Fingerabdruck") + " …");
+    const r = await Passkey.einrichten();
+    if (!r.ok) { if (r.error !== "Abgebrochen") toast(r.error, "bad"); return; }
+    P.passkeyAngebot = false;
+    if (r.passkeys) P.passkeys = Object.assign({}, P.passkeys, { passkeys: r.passkeys });
+    toast(r.schon ? "Auf diesem Gerät ist schon ein Passkey eingerichtet" : "Fertig – beim nächsten Mal reicht ein Tipp 🔐", "good");
+    render();
+  }
 
   // Nach Aktionen wird der Portal-Payload neu geladen – standardmäßig „leicht"
   // (ohne die großen Base64-Fotos), die wir aus dem ersten vollen Load behalten.
@@ -334,8 +361,18 @@
         <p class="soft" style="font-size:.75rem;margin-bottom:0">Der Vergleich zeigt nur Durchschnitt und Platznummer – Namen oder Werte anderer Kinder sind nicht einsehbar.</p>
       </div>` : "";
 
+    const passkeyKarte = P.passkeyAngebot ? `<div class="card">
+        <h3>🔐 Schneller anmelden</h3>
+        <p class="soft">Nie wieder Passwort merken: Anmelden mit ${P.passkeyWort} – mit einem Tipp.
+        Sicher gespeichert auf diesem Gerät, Passwort und Code funktionieren weiterhin.</p>
+        <div class="portal-fahrer" style="margin-top:6px">
+          <button class="btn" data-pkneu>🔐 ${P.passkeyWort} einrichten</button>
+          <button class="btn sm ghost" data-pkspaeter>Später</button>
+        </div>
+      </div>` : "";
     return `
       ${hallo}
+      ${passkeyKarte}
       ${istEltern() ? aufgabenKarte : ""}
       ${statistikKarte}
       ${schnell}
@@ -847,6 +884,17 @@
           ${tog("email", "✉️ Zusätzlich per E-Mail", mailSub)}
         </div></div>`;
       })()}
+      ${window.Passkey && Passkey.moeglich() && P.passkeys && P.passkeys.erlaubt !== false ? `<div class="card"><h3>🔐 Anmeldung ohne Passwort</h3>
+        <p class="soft">${P.passkeyWort || "Face ID / Fingerabdruck"} statt Passwort – ein Passkey je Gerät.
+        ${istIosOhneApp() ? "<br>Tipp: Als App installiert (Teilen → „Zum Home-Bildschirm“) klappt es am zuverlässigsten." : ""}</p>
+        ${(P.passkeys.passkeys || []).length ? `<div class="list" style="margin-bottom:10px">
+          ${P.passkeys.passkeys.map((k) => `<div class="list-item" style="padding:8px 10px"><div class="grow">
+            <div class="title" style="font-size:.88rem">🔐 ${esc(k.geraet || "Gerät")}</div>
+            <div class="sub">eingerichtet ${fmtDateShort(new Date(k.seit * 1000).toISOString())}${k.zuletzt ? ` · zuletzt ${fmtDateShort(new Date(k.zuletzt * 1000).toISOString())}` : ""}</div></div>
+            <button class="btn sm ghost" data-pkweg="${k.id}" title="Passkey entfernen">🗑️</button></div>`).join("")}
+        </div>` : `<p class="soft" style="font-size:.82rem">Noch kein Passkey eingerichtet.</p>`}
+        <button class="btn sm" data-pkneu>🔐 Auf diesem Gerät einrichten</button>
+      </div>` : ""}
       <div class="card">
         <button class="btn secondary" id="portalAbmelden">Abmelden</button>
         <p class="soft" style="font-size:.78rem;margin:12px 0 0;text-align:center">
@@ -1234,6 +1282,19 @@
         return;
       }
       if (res.data && res.data.prefs) box.prefs = res.data.prefs;
+    });
+    wrap.querySelectorAll("[data-pkneu]").forEach((b) => b.onclick = passkeyEinrichten);
+    wrap.querySelectorAll("[data-pkspaeter]").forEach((b) => b.onclick = () => {
+      try { localStorage.setItem(Passkey.NEIN, String(Date.now() + 30 * 86400000)); } catch (e) { /* leer */ }
+      P.passkeyAngebot = false; render();
+    });
+    wrap.querySelectorAll("[data-pkweg]").forEach((b) => b.onclick = async () => {
+      if (!confirm("Diesen Passkey entfernen? Die Anmeldung geht dann wieder nur mit Passwort.")) return;
+      const r = await api("/api/passkey/loeschen", { id: parseInt(b.dataset.pkweg, 10) });
+      if (!r.ok) { toast("Konnte nicht entfernt werden", "bad"); return; }
+      P.passkeys = Object.assign({}, P.passkeys, { passkeys: r.data.passkeys || [] });
+      if (!P.passkeys.passkeys.length) Passkey.merken(false);
+      toast("Passkey entfernt"); render();
     });
     const abmelden = $("#portalAbmelden", wrap);
     if (abmelden) abmelden.onclick = async () => {
