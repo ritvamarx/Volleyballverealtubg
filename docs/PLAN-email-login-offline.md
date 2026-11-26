@@ -126,6 +126,16 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
   Erklärung, gelb = offene Aufgabe/eingereicht/unbeantworteter Termin (7 Tage), grün = nichts offen;
   Antippen öffnet die Liste mit Sprung zur Stelle.
 
+## Teil E: Eltern-Startseite und Mithelfen – UMGESETZT 2026-11-26
+- Nächste Termine: Titel, 🟡 „Rückmeldung fehlt“, Countdown bis zum Spiel (läuft alle 30 s mit),
+  Wetter + Kartenlink, offene Heimspiel-Jobs direkt übernehmbar, Mitfahr-Hinweis bei Auswärtsspielen.
+- Kompakte Verbandstabelle mit eigenem Platz (Nachbarn ±1, Link zur ganzen Tabelle).
+- Abzeichen der Kinder mit Beschreibung; Helfer-Abzeichen für Eltern (Jobs: 🤝/🥉/🥈/🥇,
+  Fahrten: 🚗/🚐/🚌, gesamt: ⭐/🏆) mit Fortschritt zum nächsten Abzeichen; zählt erst nach dem Termin.
+- Mithelfen: Spieltage mit mehreren Spielen (gleicher Tag + Ort) zu einem Block zusammengefasst,
+  Jobs mit Uhrzeit, Fahrer-Angebot gilt für alle Spiele des Tages, motivierende Texte je Job-Art.
+- Konto: nach abgegebener Erklärung „Erklärungen ändern oder widerrufen“ mit vorbelegten Entscheidungen.
+
 ## Reihenfolge und Freigaben
 1. A1 + A2 auf Test → Freigabe → live.
 2. B1 auf Test (Messwerte) → Freigabe → live.

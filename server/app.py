@@ -712,6 +712,45 @@ def create_app() -> Flask:
                                  "category": j.get("category") or "other",
                                  "title": j.get("title") or "", "meiner": meiner})
 
+        # Eltern-Abzeichen: übernommene Heimspiel-Jobs und Fahrten der laufenden Saison.
+        # Zählt erst, wenn der Termin vorbei ist (also wirklich geholfen wurde).
+        ELTERN_STUFEN = {
+            "jobs": [(1, "🤝", "Erste Hilfe", "Ersten Heimspiel-Job übernommen"),
+                     (3, "🥉", "Helferherz Bronze", "3 Heimspiel-Jobs gestemmt"),
+                     (6, "🥈", "Helferherz Silber", "6 Heimspiel-Jobs gestemmt"),
+                     (10, "🥇", "Helferherz Gold", "10 Heimspiel-Jobs – das Rückgrat jedes Heimspiels")],
+            "fahrten": [(1, "🚗", "Mitfahr-Taxi", "Erste Fahrt zu einem Auswärtsspiel angeboten"),
+                        (3, "🚐", "Tour-Guide", "3 Auswärtsfahrten angeboten"),
+                        (6, "🚌", "Reiseleitung", "6 Auswärtsfahrten – ohne dich kein Auswärtssieg")],
+            "gesamt": [(5, "⭐", "Vereinsstütze", "5 Einsätze für das Team"),
+                       (12, "🏆", "MVP der Eltern", "12 Einsätze – Most Valuable Parent")],
+        }
+
+        def eltern_abzeichen() -> dict:
+            if rolle != "eltern":
+                return None
+            jetzt_iso = iso_jetzt()
+            vorbei = {e.get("id") for e in daten.get("events", [])
+                      if str(e.get("start") or "") < jetzt_iso and not e.get("abgesagt")}
+            n_jobs = sum(1 for j in daten.get("jobs", [])
+                         if j.get("userId") == sess["user_id"] and (j.get("done") or j.get("eventId") in vorbei))
+            n_fahrten = sum(1 for d_ in daten.get("drivers", [])
+                            if d_.get("userId") == sess["user_id"] and int(d_.get("seats") or 0) > 0
+                            and d_.get("eventId") in vorbei)
+            werte = {"jobs": n_jobs, "fahrten": n_fahrten, "gesamt": n_jobs + n_fahrten}
+            erhalten, naechste = [], []
+            for art, stufen in ELTERN_STUFEN.items():
+                for ziel, emoji, name, text in stufen:
+                    if werte[art] >= ziel:
+                        erhalten.append({"emoji": emoji, "name": name, "text": text, "art": art})
+                    else:
+                        naechste.append({"emoji": emoji, "name": name, "fehlt": ziel - werte[art], "art": art,
+                                         "text": {"jobs": "Heimspiel-Job(s)", "fahrten": "Auswärtsfahrt(en)",
+                                                  "gesamt": "Einsatz/Einsätze"}[art]})
+                        break
+            naechste.sort(key=lambda n: n["fehlt"])
+            return {"jobs": n_jobs, "fahrten": n_fahrten, "erhalten": erhalten, "naechstes": naechste[0] if naechste else None}
+
         # Vergangene, nicht abgesagte Termine der laufenden Saison + Antwort-Index –
         # einmal aufbereitet, von Abzeichen UND Eltern-Statistik gemeinsam genutzt.
         # Saisonbeginn 1. Juli 00:00 Europe/Berlin (deckt sich mit der Trainer-App).
@@ -755,8 +794,13 @@ def create_app() -> Flask:
                     zaehler = zusagen if d.get("typ") == "teilnahme" else geantwortet
                     quote = round(zaehler / len(evs) * 100)
                     if quote >= (d.get("schwelle") or 0):
+                        bereich_txt = {"training": "Trainings", "spiel": "Spiele"}.get(d.get("bereich") or "alle", "Termine")
+                        text = d.get("beschreibung") or (
+                            f"Bei mindestens {d.get('schwelle') or 0} % der {bereich_txt} dabei gewesen"
+                            if d.get("typ") == "teilnahme"
+                            else f"Mindestens {d.get('schwelle') or 0} % der {bereich_txt} rechtzeitig beantwortet")
                         erhalten.append({"name": d.get("name") or "", "emoji": d.get("emoji") or "🏅",
-                                         "wert": quote})
+                                         "wert": quote, "text": f"{text} – aktuell {quote} %."})
                 out[pid] = erhalten
             return out
 
@@ -855,6 +899,7 @@ def create_app() -> Flask:
                       for l in daten.get("links", [])],
             "fahrer": fahrer,
             "jobs": jobs,
+            "elternAbzeichen": eltern_abzeichen(),
             "quizFragen": [{k: q.get(k) for k in ("id", "kapitel", "f", "a", "r", "stufe")}
                            for q in daten.get("quizFragen", [])],
             "kleidung": [dict({k: c.get(k) for k in ("id", "name", "description", "price", "sizes", "kind", "color")},

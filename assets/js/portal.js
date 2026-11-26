@@ -214,6 +214,11 @@
     }
     pushAuffrischen();
     passkeyStatus();
+    if (!P.countdownTimer) {
+      P.countdownTimer = setInterval(() => {
+        document.querySelectorAll("[data-countdown]").forEach((el) => { el.textContent = countdownText(el.dataset.countdown); });
+      }, 30000);
+    }
     // Freigegebene Dokumente – Tab erscheint nur, wenn es welche gibt
     api("/api/dokumente").then((r) => {
       if (!r.ok) return;
@@ -329,8 +334,9 @@
       <div class="card"><h3>🏅 ${istEltern() ? "Abzeichen" : "Deine Abzeichen"}</h3>
         ${mitAbzeichen.map((sp) => `<div class="portal-termin">
           ${d.spieler.length > 1 ? `<div class="title">${esc(sp.name)}</div>` : ""}
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
-            ${sp.abzeichen.map((a) => `<span class="badge good" title="${esc(a.name)}" style="font-size:.85rem">${esc(a.emoji)} ${esc(a.name)}</span>`).join("")}
+          <div class="list" style="margin-top:4px">
+            ${sp.abzeichen.map((a) => `<div class="list-item" style="padding:6px 8px"><span style="font-size:1.4rem">${esc(a.emoji)}</span>
+              <div class="grow"><div class="title" style="font-size:.88rem">${esc(a.name)}</div><div class="sub">${esc(a.text || "")}</div></div></div>`).join("")}
           </div>
         </div>`).join("")}
         <p class="soft" style="font-size:.78rem;margin-bottom:0">Abzeichen gibt es fürs zuverlässige Zurückmelden und fürs Dabeisein – sie gelten für die laufende Saison.</p>
@@ -390,6 +396,7 @@
     return `
       ${hallo}
       ${einwKarteStart}
+      ${istEltern() ? elternAbzeichenKarte() : ""}
       ${passkeyKarte}
       ${istEltern() ? aufgabenKarte : ""}
       ${statistikKarte}
@@ -412,11 +419,30 @@
           <div class="title">${esc(a.title)}</div><div class="sub">${esc(a.body)}</div></div></div>`).join("")}
       </div></div>` : ""}
       <div class="card"><h3>📅 Die nächsten Termine</h3><div class="list">
-        ${naechste.length ? naechste.map((e) => `<div class="list-item" data-gehzu="${e.id}" role="link" tabindex="0" style="cursor:pointer"><div class="grow">
-            <div class="title">${e.art === "misc" ? esc(e.kategorie) + ": " : (ICON[e.art] || "📌") + " "}${esc(e.title || "")}${e.opponent ? " gegen " + esc(e.opponent) : ""}</div>
+        ${naechste.length ? naechste.map((e) => {
+          const spiel = e.art === "home" || e.art === "away";
+          const offen = (e.art === "training" || spiel) && !e.abgesagt
+            ? d.spieler.filter((sp) => !((e.meine || {})[sp.id])) : [];
+          const jobsHier = e.art === "home" ? (d.jobs || []).filter((j) => j.eventId === e.id) : [];
+          const fahrt = e.art === "away" && istEltern() ? (d.fahrer || []).find((f) => f.eventId === e.id) : null;
+          return `<div class="list-item" data-gehzu="${e.id}" role="link" tabindex="0" style="cursor:pointer;flex-wrap:wrap"><div class="grow" style="min-width:200px">
+            <div class="title">${e.art === "misc" ? esc(e.kategorie) + ": " : (ICON[e.art] || "📌") + " "}${esc(e.title || "")}${e.opponent ? " gegen " + esc(e.opponent) : ""}
+              ${e.abgesagt ? '<span class="badge bad">abgesagt</span>' : ""}
+              ${offen.length ? `<span class="badge warn" title="Noch keine Rückmeldung${d.spieler.length > 1 ? ": " + esc(offen.map((x) => x.name.split(" ")[0]).join(", ")) : ""}">🟡 Rückmeldung fehlt</span>` : ""}
+              ${spiel && !e.abgesagt ? `<span class="badge accent" data-countdown="${esc(e.start)}">${countdownText(e.start)}</span>` : ""}</div>
             <div class="sub">${fmtDate(e.start)} · ${fmtTime(e.start)} Uhr${e.location ? " · " + esc(e.location) : ""}</div>
-          </div><span class="arr">›</span></div>`).join("") : `<p class="soft">Aktuell stehen keine Termine an.</p>`}
+            ${ortZeile(e)}
+          </div><span class="arr">›</span>
+          ${jobsHier.length ? `<div style="flex-basis:100%;margin-top:6px"><div class="sub" style="margin-bottom:4px">🙌 Hilfe gesucht – einfach übernehmen:</div>
+            ${jobsHier.map((j) => `<div class="flex" style="justify-content:space-between;align-items:center;gap:8px;padding:4px 0;border-top:1px dashed var(--border)">
+              <span style="font-size:.86rem">${JOB_KAT[j.category] || "📌"} ${esc(j.title)}${j.meiner ? ' <span class="badge good">deiner 💪</span>' : ""}</span>
+              ${j.meiner ? `<button class="btn sm ghost" data-jobab="${j.id}">Abgeben</button>` : `<button class="btn sm" data-job="${j.id}">Übernehmen</button>`}
+            </div>`).join("")}</div>` : ""}
+          ${e.art === "away" && istEltern() && !e.abgesagt ? `<div style="flex-basis:100%;margin-top:6px" class="sub">🚗 ${fahrt && fahrt.seats ? `Du bietest ${fahrt.seats} Mitfahrplätze an – danke!` : `Mitfahrplätze gesucht – <a href="#" data-gehtab="mithelfen">jetzt anbieten</a>`}</div>` : ""}
+          </div>`;
+        }).join("") : `<p class="soft">Aktuell stehen keine Termine an.</p>`}
       </div></div>
+      ${tabelleKompakt()}
       ${d.links.length ? `<div class="card"><h3>🔗 Links</h3><div class="list">
         ${d.links.map((l) => `<a class="list-item" href="${escUrl(l.url)}" target="_blank" rel="noopener"><div class="grow">
           <div class="title">${esc(l.icon)} ${esc(l.title)}</div><div class="sub">${esc(l.sub)}</div></div><span class="arr">›</span></a>`).join("")}
@@ -700,42 +726,60 @@
 
   function tabMithelfen() {
     const d = P.daten;
-    const auswaerts = d.spiele.filter((s) => s.type === "away");
-    const angebot = (eid) => d.fahrer.find((f) => f.eventId === eid);
-    const KAT = { catering: "🥗", helper: "🙌", other: "📌" };
-    const jobsProSpiel = new Map();
-    d.jobs.forEach((j) => {
-      if (!jobsProSpiel.has(j.eventId)) jobsProSpiel.set(j.eventId, []);
-      jobsProSpiel.get(j.eventId).push(j);
-    });
-    const spielVon = (eid) => d.spiele.find((s) => s.id === eid);
+    const tagKey = (e) => `${String(e.start).slice(0, 10)}|${(e.location || "").trim().toLowerCase()}`;
+    // Spieltage: mehrere Spiele am selben Tag am selben Ort = ein Block
+    const gruppen = (liste) => {
+      const m = new Map();
+      liste.forEach((e) => { const k = tagKey(e); if (!m.has(k)) m.set(k, []); m.get(k).push(e); });
+      return Array.from(m.values());
+    };
+    const spieleText = (evs) => evs.map((e) => `${fmtTime(e.start)} Uhr${e.opponent ? " gegen " + esc(e.opponent) : (e.title ? " " + esc(e.title) : "")}`).join(" · ");
+    const auswaerts = gruppen(d.spiele.filter((s) => s.type === "away" && !s.abgesagt));
+    const angebot = (eid) => (d.fahrer || []).find((f) => f.eventId === eid);
+    const ea = d.elternAbzeichen;
+    const heim = gruppen(d.spiele.filter((s) => s.type === "home" && !s.abgesagt)
+      .filter((s) => (d.jobs || []).some((j) => j.eventId === s.id)));
     return `
+      ${ea ? `<div class="card"><h3>💪 Mithelfen lohnt sich</h3>
+        <p class="soft" style="margin-top:0">Heimspiel-Jobs und Mitfahrplätze halten den Spielbetrieb am Laufen – und bringen dir Helfer-Abzeichen.
+        Bisher <strong>${ea.jobs}</strong> Job(s) und <strong>${ea.fahrten}</strong> Fahrt(en).${ea.naechstes ? ` Nächstes Abzeichen: ${esc(ea.naechstes.emoji)} <strong>${esc(ea.naechstes.name)}</strong> – noch ${ea.naechstes.fehlt} ${esc(ea.naechstes.text)}.` : ""}</p>
+        ${ea.erhalten.length ? `<div style="display:flex;flex-wrap:wrap;gap:6px">${ea.erhalten.map((x) => `<span class="badge good" title="${esc(x.text)}">${esc(x.emoji)} ${esc(x.name)}</span>`).join("")}</div>` : ""}
+      </div>` : ""}
       <div class="card"><h3>🚗 Fahrer:in für Auswärtsspiele</h3>
       <p class="soft">Trage ein, wie viele Plätze du anbieten kannst – die Zuordnung der Mitfahrer:innen
-      übernimmt das Trainerteam und meldet sich bei dir.</p>
-      ${auswaerts.length ? auswaerts.map((s) => {
-        const a = angebot(s.id);
+      übernimmt das Trainerteam und meldet sich bei dir. Jede Fahrt zählt für dein Helfer-Abzeichen.</p>
+      ${auswaerts.length ? auswaerts.map((evs) => {
+        const s0 = evs[0];
+        const a = angebot(s0.id);
+        const ids = evs.map((e) => e.id).join(",");
         return `<div class="portal-termin">
-          <div class="title">🚌 ${fmtDate(s.start)}${s.opponent ? " gegen " + esc(s.opponent) : ""}${s.location ? " · " + esc(s.location) : ""}</div>
-          ${a ? `<div class="sub">Dein Angebot: <strong>${a.seats} Plätze</strong>${a.phone ? " · " + esc(a.phone) : ""}</div>` : `<div class="sub">Noch kein Angebot von dir.</div>`}
+          <div class="title">🚌 ${fmtDate(s0.start)}${s0.location ? " · " + esc(s0.location) : ""}</div>
+          <div class="sub">${evs.length > 1 ? `${evs.length} Spiele: ` : ""}${spieleText(evs)}</div>
+          ${ortZeile(s0)}
+          ${a && a.seats ? `<div class="sub">Dein Angebot: <strong>${a.seats} Plätze</strong>${a.phone ? " · " + esc(a.phone) : ""}</div>` : `<div class="sub">Noch kein Angebot von dir.</div>`}
           <div class="portal-fahrer">
-            <select data-fseats="${s.id}">${[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) =>
+            <select data-fseats="${s0.id}">${[0, 1, 2, 3, 4, 5, 6, 7, 8].map((n) =>
               `<option value="${n}" ${a && a.seats === n ? "selected" : ""}>${n === 0 ? "kein Angebot" : n + " Plätze"}</option>`).join("")}</select>
-            <input data-fphone="${s.id}" placeholder="Mobilnummer für Rückfragen" value="${esc(a ? a.phone : "")}">
-            <button class="btn sm" data-fsave="${s.id}">Speichern</button>
+            <input data-fphone="${s0.id}" placeholder="Mobilnummer für Rückfragen" value="${esc(a ? a.phone : "")}">
+            <button class="btn sm" data-fsave="${s0.id}" data-fids="${ids}">Speichern</button>
           </div>
         </div>`;
       }).join("") : `<p class="soft">Keine anstehenden Auswärtsspiele.</p>`}
       </div>
       <div class="card"><h3>🙌 Heimspiel-Jobs</h3>
       <p class="soft">Offene Aufgaben rund um unsere Heimspiele – einfach übernehmen, das Trainerteam sieht deinen Namen.</p>
-      ${jobsProSpiel.size ? Array.from(jobsProSpiel.entries()).map(([eid, jobs]) => {
-        const s = spielVon(eid);
+      ${heim.length ? heim.map((evs) => {
+        const s0 = evs[0];
+        const jobs = (d.jobs || []).filter((j) => evs.some((e) => e.id === j.eventId));
+        const zeit = (j) => evs.length > 1 ? ` <span class="soft">(${fmtTime((evs.find((e) => e.id === j.eventId) || s0).start)} Uhr)</span>` : "";
+        const kats = Array.from(new Set(jobs.map((j) => j.category || "other")));
         return `<div class="portal-termin">
-          <div class="title">🏟️ ${s ? `${fmtDate(s.start)}${s.opponent ? " gegen " + esc(s.opponent) : ""}` : "Heimspiel"}</div>
+          <div class="title">🏟️ Heimspieltag ${fmtDate(s0.start)}${s0.location ? " · " + esc(s0.location) : ""}</div>
+          <div class="sub">${evs.length > 1 ? `${evs.length} Spiele: ` : ""}${spieleText(evs)}</div>
+          ${kats.map((k) => `<div class="sub" style="margin-top:4px">${JOB_KAT[k] || "📌"} ${esc(JOB_TEXT[k] || JOB_TEXT.other)}</div>`).join("")}
           <div class="list" style="margin-top:8px">
           ${jobs.map((j) => `<div class="list-item"><div class="grow">
-              <div class="title" style="font-size:.9rem">${KAT[j.category] || "📌"} ${esc(j.title)}</div>
+              <div class="title" style="font-size:.9rem">${JOB_KAT[j.category] || "📌"} ${esc(j.title)}${zeit(j)}</div>
               ${j.meiner ? `<div class="sub">Du hast diesen Job übernommen – danke! 💪</div>` : ""}
             </div>
             ${j.meiner ? `<button class="btn sm ghost" data-jobab="${j.id}">Abgeben</button>`
@@ -905,6 +949,54 @@
       </div>`;
   }
 
+  // ---------- Countdown bis zum Spiel, Kompakttabelle, Eltern-Abzeichen ----------
+  function countdownText(start) {
+    const diff = new Date(start) - Date.now();
+    if (diff <= 0) return diff > -3 * 3600000 ? "⏱️ läuft" : "vorbei";
+    const min = Math.floor(diff / 60000), h = Math.floor(min / 60), tage = Math.floor(h / 24);
+    if (tage >= 2) return `⏳ noch ${tage} Tage`;
+    if (tage === 1) return `⏳ noch 1 Tag ${h - 24} Std`;
+    if (h >= 1) return `⏳ noch ${h} Std ${min - h * 60} Min`;
+    return `⏳ noch ${min} Min`;
+  }
+  const JOB_KAT = { catering: "🥗", helper: "🙌", other: "📌" };
+  const JOB_TEXT = {
+    catering: "Kuchen, Brötchen, Getränke: Mit dem Buffet finanzieren wir Bälle, Netze und Trikots – und Gäste wie Spieler lieben es.",
+    helper: "Auf- und Abbau, Kampfgericht, Einlass, Anschreiben: Ohne helfende Hände findet kein Heimspiel statt.",
+    other: "Kleine Aufgabe, große Wirkung – jede Hilfe entlastet das Trainerteam und die Mannschaft.",
+  };
+  function tabelleKompakt() {
+    const rows = P.daten.tabelle || [];
+    if (!rows.length) return "";
+    const wir = rows.map((r, i) => ({ r, i })).filter((x) => /skv|müritz|mueritz/i.test(x.r.team || ""));
+    if (!wir.length) return "";
+    const zeigen = new Set();
+    wir.forEach((x) => [x.i - 1, x.i, x.i + 1].forEach((k) => { if (k >= 0 && k < rows.length) zeigen.add(k); }));
+    const liste = Array.from(zeigen).sort((a, b) => a - b);
+    return `<div class="card"><h3>📊 Tabelle${P.daten.tabelleMeta && P.daten.tabelleMeta.liga ? " · " + esc(P.daten.tabelleMeta.liga) : " Verbandsliga MV"}</h3>
+      <div class="portal-tabelle"><table><tbody>
+        ${liste.map((k, idx) => { const r = rows[k]; const uns = /skv|müritz|mueritz/i.test(r.team || "");
+          return `${idx > 0 && liste[idx - 1] !== k - 1 ? '<tr><td colspan="4" class="soft" style="text-align:center">…</td></tr>' : ""}
+          <tr class="${uns ? "wir" : ""}"><td><strong>${k + 1}.</strong></td><td>${uns ? "🏐 " : ""}${esc(r.team || "")}</td>
+          <td>${r.games == null ? "" : r.games + " Sp."}</td><td><strong>${r.points == null ? "" : r.points + " Pkt."}</strong></td></tr>`; }).join("")}
+      </tbody></table></div>
+      <p class="soft" style="font-size:.78rem;margin-bottom:0">${wir.map((x) => `<strong>${esc(x.r.team)}</strong>: Platz ${x.i + 1} von ${rows.length}`).join(" · ")} · <a href="#" data-gehtab="termine">ganze Tabelle</a></p>
+    </div>`;
+  }
+  function elternAbzeichenKarte() {
+    const ea = P.daten.elternAbzeichen;
+    if (!ea) return "";
+    const n = ea.naechstes;
+    return `<div class="card"><h3>🏅 Deine Helfer-Abzeichen</h3>
+      ${ea.erhalten.length ? `<div class="list">${ea.erhalten.map((a) => `<div class="list-item" style="padding:6px 8px"><span style="font-size:1.4rem">${esc(a.emoji)}</span>
+        <div class="grow"><div class="title" style="font-size:.88rem">${esc(a.name)}</div><div class="sub">${esc(a.text)}</div></div></div>`).join("")}</div>`
+        : `<p class="soft" style="margin-top:0">Noch keins – aber das erste ist nah: Ein übernommener Heimspiel-Job oder eine Auswärtsfahrt genügt. 💪</p>`}
+      <p class="soft" style="font-size:.82rem;margin-bottom:0">Bisher: <strong>${ea.jobs}</strong> Heimspiel-Job(s) · <strong>${ea.fahrten}</strong> Auswärtsfahrt(en).
+      ${n ? ` Nächstes Abzeichen: ${esc(n.emoji)} <strong>${esc(n.name)}</strong> – noch ${n.fehlt} ${esc(n.text)}.` : " Alle Abzeichen geholt – Wahnsinn! 🏆"}
+      <a href="#" data-gehtab="mithelfen">Mithelfen</a></p>
+    </div>`;
+  }
+
   // ---------- Einverständnis: Status je Erklärung, Upload (Eltern), digitale Bestätigung ----------
   const EINW_STATUS = { ja: ["✅ zugestimmt", "good"], nein: ["❌ nicht zugestimmt", "bad"],
     offen: ["⏳ offen", "warn"], abgelaufen: ["🔁 erneuern (Vorsaison)", "warn"] };
@@ -930,16 +1022,20 @@
               <span class="badge ${EINW_STATUS[v.status][1]}">${EINW_STATUS[v.status][0]}</span></div>`).join("")}
           </div>
           ${st.beleg ? `<div class="sub">zuletzt: ${st.beleg.dokumentId && st.beleg.quelle === "digital" && eltern ? `<a href="/api/dokumente/${st.beleg.dokumentId}/datei" target="_blank" rel="noopener">📎 ${esc(st.beleg.fileName)}</a>` : esc(st.beleg.fileName || "")}${st.beleg.uploadedAt ? " · " + fmtDateShort(st.beleg.uploadedAt) : ""}</div>` : ""}
-          ${eltern && vorlagen.length ? `<details class="einw-digital" style="margin-top:10px" ${st.vollstaendig ? "" : "open"}>
-            <summary class="btn sm" style="display:inline-block;cursor:pointer">✍️ Digital bestätigen (ohne Papier)</summary>
+          ${eltern && vorlagen.length ? (() => { const abgegeben = (st.vorlagen || []).some((v) => v.status === "ja" || v.status === "nein");
+            const wahl = (tid) => ((st.vorlagen || []).find((v) => v.id === tid) || {}).status;
+            return `<details class="einw-digital" style="margin-top:10px" ${st.vollstaendig ? "" : "open"}>
+            <summary class="btn sm ${abgegeben ? "outline" : ""}" style="display:inline-block;cursor:pointer">${abgegeben ? "✍️ Erklärungen ändern oder widerrufen" : "✍️ Digital bestätigen (ohne Papier)"}</summary>
             <div style="margin-top:10px">
-              <p class="soft" style="font-size:.84rem">Jede Erklärung lesen und entscheiden. Die Bestätigung mit Passwort oder Face ID / Fingerabdruck gilt wie eine Unterschrift; ein PDF-Nachweis wird für dich und das Trainerteam gespeichert. Jede Einwilligung ist freiwillig und jederzeit widerrufbar.</p>
+              <p class="soft" style="font-size:.84rem">${abgegeben
+                ? "Du kannst jede Entscheidung jederzeit ändern oder eine Einwilligung widerrufen – einfach neu auswählen und erneut bestätigen. Es gilt immer die neueste Abgabe; der Widerruf wirkt ab sofort für die Zukunft, ein neuer PDF-Nachweis wird gespeichert."
+                : "Jede Erklärung lesen und entscheiden. Die Bestätigung mit Passwort oder Face ID / Fingerabdruck gilt wie eine Unterschrift; ein PDF-Nachweis wird für dich und das Trainerteam gespeichert. Jede Einwilligung ist freiwillig und jederzeit widerrufbar."}</p>
               ${vorlagen.map((t) => `<div class="portal-termin" style="margin:8px 0">
                 <div class="title" style="font-size:.9rem">${esc(t.name)} ${t.required ? '<span class="badge bad">Pflicht</span>' : '<span class="badge">optional</span>'}${t.gueltigkeit === "saison" ? ' <span class="badge warn">je Saison</span>' : ""}</div>
                 <details style="margin:4px 0"><summary class="soft" style="cursor:pointer;font-size:.82rem">📄 Text lesen</summary><p style="font-size:.84rem;white-space:pre-line;margin:6px 0 0">${esc(t.text)}</p></details>
                 <div class="rm-wahl" style="margin-top:6px">
-                  <label class="btn sm outline" style="cursor:pointer"><input type="radio" name="ew_${sp.id}_${t.id}" value="ja" style="width:auto;margin-right:6px">✅ Ich stimme zu</label>
-                  <label class="btn sm ghost" style="cursor:pointer"><input type="radio" name="ew_${sp.id}_${t.id}" value="nein" style="width:auto;margin-right:6px">❌ Ich stimme nicht zu</label>
+                  <label class="btn sm outline" style="cursor:pointer"><input type="radio" name="ew_${sp.id}_${t.id}" value="ja" ${wahl(t.id) === "ja" ? "checked" : ""} style="width:auto;margin-right:6px">✅ Ich stimme zu</label>
+                  <label class="btn sm ghost" style="cursor:pointer"><input type="radio" name="ew_${sp.id}_${t.id}" value="nein" ${wahl(t.id) === "nein" ? "checked" : ""} style="width:auto;margin-right:6px">❌ Ich stimme nicht zu</label>
                 </div></div>`).join("")}
               <div class="field" style="margin-top:8px"><label>Name der erklärenden Person (Erziehungsberechtigte/r)</label>
                 <input data-ewname="${sp.id}" value="${esc(kontakt.parentName || d.user.name)}" autocomplete="name"></div>
@@ -948,7 +1044,7 @@
                 <button class="btn sm" data-ewsenden="${sp.id}" data-art="passwort">🔏 Mit Passwort bestätigen</button>
                 ${window.Passkey && Passkey.hier() ? `<button class="btn sm outline" data-ewsenden="${sp.id}" data-art="passkey">🔐 Mit ${P.passkeyWort || "Face ID / Fingerabdruck"} bestätigen</button>` : ""}
               </div>
-            </div></details>` : ""}
+            </div></details>`; })() : ""}
           ${eltern ? `<details style="margin-top:8px" data-upbereich="${sp.id}"><summary class="soft" style="cursor:pointer;font-size:.84rem">📎 Stattdessen unterschriebenes Formular hochladen (PDF oder Foto)</summary>
             <div class="field" style="margin-top:8px"><label>Was lädst du hoch?</label><select data-upart="${sp.id}">
               <option value="Sammel-Einverständniserklärung">📑 Sammel-Einverständniserklärung (alle Erklärungen)</option>
@@ -1191,7 +1287,11 @@
       render();
     });
     // Übersicht: ein Tipp auf einen Termin springt zum Termine-Tab und hebt ihn hervor
-    wrap.querySelectorAll("[data-gehzu]").forEach((n) => n.onclick = () => {
+    wrap.querySelectorAll("[data-gehtab]").forEach((n) => n.onclick = (ev) => {
+      ev.preventDefault(); ev.stopPropagation(); P.tab = n.dataset.gehtab; render(); window.scrollTo(0, 0);
+    });
+    wrap.querySelectorAll("[data-gehzu]").forEach((n) => n.onclick = (ev) => {
+      if (ev && ev.target && ev.target.closest("button, a, select, input")) return;
       const id = n.dataset.gehzu;
       P.tab = "termine";
       render();
@@ -1259,13 +1359,17 @@
       aktion("/api/portal/driver", { eventId: eid, seats: plaetze },
         plaetze ? "Danke – deine Mitfahrgelegenheit ist eingetragen! 🚗" : "Mitfahr-Angebot zurückgezogen");
     });
-    wrap.querySelectorAll("[data-fsave]").forEach((b) => b.onclick = () => {
+    wrap.querySelectorAll("[data-fsave]").forEach((b) => b.onclick = async () => {
       const eid = b.dataset.fsave;
-      aktion("/api/portal/driver", {
-        eventId: eid,
-        seats: parseInt(wrap.querySelector(`[data-fseats="${eid}"]`).value, 10) || 0,
-        phone: wrap.querySelector(`[data-fphone="${eid}"]`).value.trim(),
-      }, "Fahrer-Angebot gespeichert – danke!");
+      const ids = (b.dataset.fids || eid).split(",").filter(Boolean);
+      const seats = parseInt(wrap.querySelector(`[data-fseats="${eid}"]`).value, 10) || 0;
+      const phone = wrap.querySelector(`[data-fphone="${eid}"]`).value.trim();
+      // Spieltag mit mehreren Spielen: Angebot gilt für alle Spiele des Tages
+      for (let i = 0; i < ids.length; i++) {
+        const letzte = i === ids.length - 1;
+        if (!letzte) { const r = await api("/api/portal/driver", { eventId: ids[i], seats, phone }); if (!r.ok) { toast(r.data.error || "Speichern fehlgeschlagen", "bad"); return; } }
+        else await aktion("/api/portal/driver", { eventId: ids[i], seats, phone }, "Fahrer-Angebot gespeichert – danke!");
+      }
     });
     wrap.querySelectorAll("[data-job]").forEach((b) => b.onclick = () =>
       aktion("/api/portal/job", { jobId: b.dataset.job }, "Job übernommen – danke!"));
