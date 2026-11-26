@@ -320,6 +320,127 @@
   }
 
   /* ======================================================================
+     DOKUMENTE – Ablage auf dem Vereinsserver mit Freigabe
+     ====================================================================== */
+  const DOK_ICON = (e) => ({ pdf: "📕", png: "🖼️", jpg: "🖼️", jpeg: "🖼️", webp: "🖼️", gif: "🖼️", heic: "🖼️",
+    doc: "📘", docx: "📘", odt: "📘", xls: "📗", xlsx: "📗", ods: "📗", ppt: "📙", pptx: "📙",
+    zip: "🗜️", ics: "📅", csv: "📊", txt: "📄", md: "📄" }[e] || "📄");
+  const DOK_FREIGABE = { trainer: ["Nur Trainerteam", ""], spieler: ["Spieler:innen", "info"],
+    eltern: ["Eltern", "good"], alle: ["Spieler:innen + Eltern", "accent"] };
+  const dokGroesse = (b) => b >= 1048576 ? (b / 1048576).toFixed(1).replace(".", ",") + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+  const dokDatum = (ts) => fmtDateShort(new Date(ts * 1000).toISOString());
+
+  function dokumente(el) {
+    if (!window.Sync || !Sync.active) {
+      el.innerHTML = `<div class="card"><h3>📁 Dokumente</h3><p class="soft">Die Dokumentenablage liegt auf dem Vereinsserver und ist nur in der Online-Version verfügbar.</p></div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="card mb"><div class="card-head"><h3>📤 Hochladen</h3></div>
+        <form id="dokForm"><div class="form-grid">
+          <div class="field full"><label>Datei(en) – PDF, Bilder, Office, max. 20 MB je Datei</label>
+            <input type="file" name="dateien" multiple required></div>
+          <div class="field"><label>Ordner</label><input name="ordner" list="dokOrdner" placeholder="z. B. Formulare" value="Allgemein"><datalist id="dokOrdner"></datalist></div>
+          <div class="field"><label>Freigabe</label><select name="freigabe">
+            ${Object.entries(DOK_FREIGABE).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join("")}</select></div>
+          <div class="field full"><label>Kurzbeschreibung (optional)</label><input name="beschreibung" maxlength="300" placeholder="Worum geht es, bis wann relevant?"></div>
+          <div class="field full"><label class="flex" style="gap:8px;align-items:center;cursor:pointer"><input type="checkbox" name="push" style="width:auto"> Freigegebene Personen per Push informieren</label></div>
+        </div>
+        <div class="flex" style="gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn" type="submit" id="dokUp">📤 Hochladen</button><span class="soft" id="dokStatus"></span></div></form>
+      </div>
+      <div class="grid-3 mb" id="dokStat"></div>
+      <div id="dokListe"><p class="soft">Lade …</p></div>`;
+    let daten = [];
+    const zeichnen = () => {
+      const ordner = {};
+      daten.forEach((d) => { (ordner[d.ordner] = ordner[d.ordner] || []).push(d); });
+      $("#dokOrdner", el).innerHTML = Object.keys(ordner).sort().map((o) => `<option value="${esc(o)}">`).join("");
+      const gesamt = daten.reduce((a, d) => a + d.groesse, 0);
+      $("#dokStat", el).innerHTML = `
+        ${stat("📁", "Dokumente", daten.length, `in ${Object.keys(ordner).length} Ordner${Object.keys(ordner).length === 1 ? "" : "n"}`)}
+        ${stat("🔓", "Freigegeben", daten.filter((d) => d.freigabe !== "trainer").length, "für Portal sichtbar")}
+        ${stat("💾", "Speicher", dokGroesse(gesamt), "auf dem Vereinsserver")}`;
+      $("#dokListe", el).innerHTML = Object.keys(ordner).sort((a, b) => a.localeCompare(b, "de")).map((o) => `
+        <div class="card mb"><div class="card-head"><h3>📂 ${esc(o)}</h3><span class="spacer"></span><span class="soft">${ordner[o].length}</span></div>
+          <div class="list">${ordner[o].map((d) => `
+            <div class="list-item" style="flex-wrap:wrap">
+              <div class="grow" style="min-width:200px">
+                <div class="title"><a href="/api/dokumente/${d.id}/datei" target="_blank" rel="noopener">${DOK_ICON(d.endung)} ${esc(d.name)}</a></div>
+                ${d.beschreibung ? `<div class="sub">${esc(d.beschreibung)}</div>` : ""}
+                <div class="sub">${dokGroesse(d.groesse)} · ${dokDatum(d.seit)} · ${esc(d.von)}</div>
+              </div>
+              <span class="badge ${DOK_FREIGABE[d.freigabe][1]}">${DOK_FREIGABE[d.freigabe][0]}</span>
+              <a class="btn sm ghost" href="/api/dokumente/${d.id}/datei?download=1" title="Herunterladen">⬇️</a>
+              <button class="btn sm ghost" data-dokedit="${d.id}" title="Umbenennen, Ordner, Freigabe">✏️</button>
+              <button class="btn sm ghost" data-dokdel="${d.id}" title="Löschen">🗑️</button>
+            </div>`).join("")}</div></div>`).join("") || `<div class="card"><p class="soft">Noch keine Dokumente – oben die erste Datei hochladen.</p></div>`;
+      $$("[data-dokdel]", el).forEach((b) => b.onclick = () => {
+        const d = daten.find((x) => String(x.id) === b.dataset.dokdel);
+        confirmDialog(`„${d.name}“ endgültig vom Server löschen?`, async () => {
+          const r = await apiZugang(`/api/dokumente/${d.id}`, null, "DELETE");
+          if (!r.ok) { toast(r.data.error || "Löschen fehlgeschlagen", "bad"); return; }
+          daten = r.data.dokumente; zeichnen(); toast("Gelöscht");
+        });
+      });
+      $$("[data-dokedit]", el).forEach((b) => b.onclick = () => {
+        const d = daten.find((x) => String(x.id) === b.dataset.dokedit);
+        modal({
+          title: `✏️ ${esc(d.name)}`,
+          body: `<form id="dokEdit"><div class="form-grid">
+            <div class="field full"><label>Name</label><input name="name" value="${esc(d.name)}" required></div>
+            <div class="field"><label>Ordner</label><input name="ordner" list="dokOrdner" value="${esc(d.ordner)}"></div>
+            <div class="field"><label>Freigabe</label><select name="freigabe">
+              ${Object.entries(DOK_FREIGABE).map(([k, v]) => `<option value="${k}" ${d.freigabe === k ? "selected" : ""}>${v[0]}</option>`).join("")}</select></div>
+            <div class="field full"><label>Kurzbeschreibung</label><input name="beschreibung" maxlength="300" value="${esc(d.beschreibung)}"></div>
+          </div></form>`,
+          footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
+          onOpen(m) {
+            m.querySelector("[data-x]").onclick = closeModal;
+            m.querySelector("[data-s]").onclick = async () => {
+              const f = m.querySelector("#dokEdit"); if (!f.reportValidity()) return;
+              const r = await apiZugang(`/api/dokumente/${d.id}`, formData(f));
+              if (!r.ok) { toast(r.data.error || "Speichern fehlgeschlagen", "bad"); return; }
+              daten = r.data.dokumente; closeModal(); zeichnen(); toast("Gespeichert", "good");
+            };
+          },
+        });
+      });
+    };
+    (async () => {
+      const r = await apiZugang("/api/dokumente");
+      if (!r.ok) { $("#dokListe", el).innerHTML = ladeFehler("Dokumente", r); return; }
+      daten = r.data.dokumente; zeichnen();
+    })();
+    $("#dokForm", el).onsubmit = async (ev) => {
+      ev.preventDefault();
+      const f = ev.target;
+      const dateien = Array.from(f.dateien.files);
+      if (!dateien.length) { toast("Bitte Datei auswählen", "bad"); return; }
+      const knopf = $("#dokUp", el); knopf.disabled = true;
+      let ok = 0, benachrichtigt = 0;
+      for (let i = 0; i < dateien.length; i++) {
+        $("#dokStatus", el).textContent = `Lade ${i + 1}/${dateien.length}: ${dateien[i].name} …`;
+        const fd = new FormData();
+        fd.append("datei", dateien[i]);
+        fd.append("ordner", f.ordner.value); fd.append("freigabe", f.freigabe.value);
+        fd.append("beschreibung", f.beschreibung.value); fd.append("push", f.push.checked ? "1" : "0");
+        let res;
+        try {
+          res = await fetch("/api/dokumente", { method: "POST", body: fd, credentials: "same-origin",
+            headers: Sync.csrf ? { "X-CSRF-Token": Sync.csrf } : {} });
+        } catch (e) { toast("Keine Verbindung zum Server", "bad"); break; }
+        let data = {}; try { data = await res.json(); } catch (e) { /* leer */ }
+        if (!res.ok) { toast(`${dateien[i].name}: ${data.error || "Upload fehlgeschlagen"}`, "bad"); continue; }
+        ok += 1; benachrichtigt += data.benachrichtigt || 0; daten = data.dokumente;
+      }
+      knopf.disabled = false; $("#dokStatus", el).textContent = "";
+      if (ok) { f.dateien.value = ""; f.beschreibung.value = ""; zeichnen();
+        toast(`${ok} Datei${ok === 1 ? "" : "en"} hochgeladen${benachrichtigt ? ` · ${benachrichtigt} Push verschickt` : ""}`, "good"); }
+    };
+  }
+
+  /* ======================================================================
      SPIELERVERWALTUNG
      ====================================================================== */
   function players(el) {
@@ -4965,6 +5086,6 @@
   window.Views = {
     dashboard, players, departments, calendar, training, analyse, drivers, jobs, consents,
     birthdays, finances, clothing, sponsors, standings, wiki,
-    announcements, tasks, inventory, verbandsmeldung, backup, zugaenge,
+    announcements, tasks, inventory, verbandsmeldung, backup, zugaenge, dokumente,
   };
 })();

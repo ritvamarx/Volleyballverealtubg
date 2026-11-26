@@ -184,3 +184,11 @@ in `server/requirements.txt`, Modul `server/passkeys.py`). Passkeys gelten je
 Domain – Test- und Live-Instanz haben getrennte. Keine Server-Einrichtung nötig,
 HTTPS ist Voraussetzung (Caddy). Passkeys bleiben bei Passwort-Reset erhalten;
 das Trainerteam kann ein Konto deaktivieren, dann greift auch der Passkey nicht mehr.
+
+### Dokumentenablage
+
+Dateien liegen unter `data/dokumente/` (persistentes Volume), Metadaten in der
+Tabelle `dokumente`. `./manage.py backup ZIEL` sichert die Datenbank und
+spiegelt den Dokumentenordner nach `ZIEL/dokumente`. Beim zentralen Backup
+(`/opt/backup-server.sh`) muss das Verzeichnis `/opt/volleyball/data` komplett
+enthalten sein, damit die Dokumente mitgesichert werden.

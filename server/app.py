@@ -36,7 +36,8 @@ INVITE_DAYS = 14
 def create_app() -> Flask:
     app = Flask(__name__, static_folder=None)
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "")
-    app.config["MAX_CONTENT_LENGTH"] = STATE_MAX_BYTES + 1024 * 1024
+    import dokumente as _dok
+    app.config["MAX_CONTENT_LENGTH"] = max(STATE_MAX_BYTES, _dok.DOK_MAX_BYTES) + 1024 * 1024
     db.init_db()
     try:
         _c = db.connect()
@@ -167,6 +168,9 @@ def create_app() -> Flask:
         )
         con().execute("DELETE FROM login_log WHERE ts < ?", (db.now() - 7 * 86400,))
         con().commit()
+
+    # Dokumentenablage mit Freigabe – siehe server/dokumente.py
+    _dok.register(app, con, require, err, _push)
 
     # Passkeys (Face ID / Fingerabdruck) – siehe server/passkeys.py
     import passkeys
@@ -2088,7 +2092,9 @@ def create_app() -> Flask:
             resp.headers.setdefault(key, value)
         if is_secure_request():
             resp.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
-        if request.path.startswith("/api/"):
+        # API nie zwischenspeichern – außer Dokument-Dateien (unveränderlich je ID,
+        # „private": nur im Browser des angemeldeten Nutzers, nie in Zwischenproxys)
+        if request.path.startswith("/api/") and not re.fullmatch(r"/api/dokumente/\d+/datei", request.path):
             resp.headers["Cache-Control"] = "no-store"
         return resp
 

@@ -118,6 +118,20 @@ CREATE TABLE IF NOT EXISTS passkeys (
     created_at  INTEGER NOT NULL,
     last_used   INTEGER
 );
+CREATE TABLE IF NOT EXISTS dokumente (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT NOT NULL,                 -- Anzeigename inkl. Endung
+    datei           TEXT NOT NULL UNIQUE,          -- Dateiname auf der Platte (token.ext)
+    endung          TEXT NOT NULL,
+    mime            TEXT NOT NULL,
+    groesse         INTEGER NOT NULL,
+    ordner          TEXT NOT NULL DEFAULT 'Allgemein',
+    freigabe        TEXT NOT NULL DEFAULT 'trainer' CHECK (freigabe IN ('trainer','spieler','eltern','alle')),
+    beschreibung    TEXT NOT NULL DEFAULT '',
+    hochgeladen_von TEXT NOT NULL DEFAULT '',
+    created_at      INTEGER NOT NULL,
+    updated_at      INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS webauthn_challenges (
     challenge   TEXT PRIMARY KEY,
     user_id     INTEGER,

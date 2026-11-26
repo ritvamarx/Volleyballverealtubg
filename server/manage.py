@@ -142,6 +142,23 @@ def cmd_backup(args) -> None:
     src.close()
     dst.close()
     print(f"Sicherung geschrieben: {target}")
+    # Dokumentenablage (data/dokumente) mitsichern: neue Dateien kopieren, gelöschte entfernen
+    import shutil
+    quelle = os.path.join(db.DATA_DIR, "dokumente")
+    if os.path.isdir(quelle):
+        ziel_dok = os.path.join(args.ziel, "dokumente")
+        os.makedirs(ziel_dok, exist_ok=True)
+        vorhanden = set(os.listdir(quelle))
+        kopiert = 0
+        for name in vorhanden:
+            z = os.path.join(ziel_dok, name)
+            if not os.path.exists(z):
+                shutil.copy2(os.path.join(quelle, name), z)
+                kopiert += 1
+        for name in os.listdir(ziel_dok):
+            if name not in vorhanden:
+                os.remove(os.path.join(ziel_dok, name))
+        print(f"Dokumente: {len(vorhanden)} Dateien gesichert ({kopiert} neu).")
     # alte Sicherungen ausdünnen (die letzten 30 behalten)
     backups = sorted(
         f for f in os.listdir(args.ziel) if f.startswith("volleyball_") and f.endswith(".db")

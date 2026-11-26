@@ -211,6 +211,13 @@
     }
     pushAuffrischen();
     passkeyStatus();
+    // Freigegebene Dokumente – Tab erscheint nur, wenn es welche gibt
+    api("/api/dokumente").then((r) => {
+      if (!r.ok) return;
+      P.dokumente = r.data.dokumente || [];
+      if (location.hash === "#dokumente" && P.dokumente.length) P.tab = "dokumente";
+      render();
+    });
   };
 
   // Passkey-Angebot: nur wenn das Gerät Face ID/Touch ID/Fingerabdruck kann,
@@ -903,6 +910,27 @@
       </div>`;
   }
 
+  // ---------- Dokumente (vom Trainerteam freigegeben) ----------
+  const DOK_ICON = (e) => ({ pdf: "📕", png: "🖼️", jpg: "🖼️", jpeg: "🖼️", webp: "🖼️", gif: "🖼️", heic: "🖼️",
+    doc: "📘", docx: "📘", odt: "📘", xls: "📗", xlsx: "📗", ods: "📗", ppt: "📙", pptx: "📙",
+    zip: "🗜️", ics: "📅", csv: "📊", txt: "📄", md: "📄" }[e] || "📄");
+  const dokGroesse = (b) => b >= 1048576 ? (b / 1048576).toFixed(1).replace(".", ",") + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
+  function tabDokumente() {
+    const liste = P.dokumente || [];
+    const ordner = {};
+    liste.forEach((d) => { (ordner[d.ordner] = ordner[d.ordner] || []).push(d); });
+    const neu = (d) => Date.now() / 1000 - d.seit < 14 * 86400;
+    return `<div class="card"><h3>📁 Dokumente</h3>
+      <p class="soft">Vom Trainerteam für dich freigegeben. Antippen öffnet die Datei – sie wird nur einmal geladen und danach auf dem Gerät behalten.</p></div>
+      ${Object.keys(ordner).sort((a, b) => a.localeCompare(b, "de")).map((o) => `<div class="card"><h3>📂 ${esc(o)}</h3><div class="list">
+        ${ordner[o].map((d) => `<a class="list-item" href="/api/dokumente/${d.id}/datei" target="_blank" rel="noopener"><div class="grow">
+          <div class="title">${DOK_ICON(d.endung)} ${esc(d.name)} ${neu(d) ? '<span class="badge accent">neu</span>' : ""}</div>
+          ${d.beschreibung ? `<div class="sub">${esc(d.beschreibung)}</div>` : ""}
+          <div class="sub">${dokGroesse(d.groesse)} · ${fmtDateShort(new Date(d.seit * 1000).toISOString())}</div>
+        </div><span class="arr">›</span></a>`).join("")}
+      </div></div>`).join("")}`;
+  }
+
   // ---------- Rahmen & Ereignisse ----------
 
   const TABS = () => [
@@ -911,6 +939,7 @@
     ...(istEltern() ? [{ id: "mithelfen", label: "Mithelfen", icon: "🤝" }] : []),
     // Vereinskleidung fordern Spieler:innen selbst an – für Eltern ausgeblendet
     ...(istEltern() ? [] : [{ id: "kleidung", label: "Kleidung", icon: "👕" }]),
+    ...((P.dokumente || []).length ? [{ id: "dokumente", label: "Dokumente", icon: "📁" }] : []),
     { id: "wiki", label: "Wiki", icon: "📖" },
     { id: "kontakt", label: "Konto", icon: "⚙️" },
   ];
@@ -919,7 +948,8 @@
     const wrap = $("#portalRoot2");
     if (istEltern() && P.tab === "kleidung") P.tab = "start"; // Tab existiert für Eltern nicht
     const inhalt = { start: tabStart, termine: tabTermine, mithelfen: tabMithelfen,
-                     kleidung: tabKleidung, wiki: tabWiki, kontakt: tabKontakt }[P.tab] || tabStart;
+                     kleidung: tabKleidung, wiki: tabWiki, kontakt: tabKontakt,
+                     dokumente: tabDokumente }[P.tab] || tabStart;
     wrap.innerHTML = `
       <header class="portal-kopf">
         <div class="portal-logo"><svg viewBox="0 0 512 512" width="22" height="22" aria-hidden="true" style="vertical-align:-4px"><g fill="#F1662A"><path d="M346 64A213 213 0 0 0 105 405A55 55 0 0 0 187 330A300 300 0 0 1 346 64Z"/><path transform="rotate(180 256 256)" d="M346 64A213 213 0 0 0 105 405A55 55 0 0 0 187 330A300 300 0 0 1 346 64Z"/></g></svg> SKV Müritz Volleyball</div>

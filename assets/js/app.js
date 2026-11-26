@@ -12,6 +12,7 @@
     { id: "departments", label: "Mannschaften", icon: "🏟️" },
     { id: "players", label: "Spielerverwaltung", icon: "🧑‍🤝‍🧑" },
     { id: "announcements", label: "Ankündigungen", icon: "📣" },
+    { id: "dokumente", label: "Dokumente", icon: "📁" },
     { id: "birthdays", label: "Geburtstage", icon: "🎂" },
     { id: "consents", label: "Einverständnis", icon: "📝" },
     { id: "zugaenge", label: "Portal-Zugänge", icon: "🔑" },

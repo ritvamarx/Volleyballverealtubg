@@ -95,6 +95,17 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
 - `/api/state` netz-zuerst mit Cache und Warteschlange fürs Speichern; die Versionsprüfung
   gegen Konflikte gibt es dort schon.
 
+## Teil C: Dokumentenablage mit Freigabe – UMGESETZT 2026-11-26
+- Trainer-Ansicht „📁 Dokumente“: Upload (mehrere Dateien, PDF/Bilder/Office/CSV/ICS/ZIP,
+  max. 20 MB je Datei), Ordner, Freigabe (Nur Trainerteam / Spieler:innen / Eltern / beide),
+  Kurzbeschreibung, optional Push an die Freigegebenen; Umbenennen, Ordner/Freigabe ändern, Löschen.
+- Portal: Tab „📁 Dokumente“ erscheint nur, wenn für die Rolle etwas freigegeben ist; Link
+  `/#dokumente` (aus dem Push) öffnet den Tab direkt; „neu“-Markierung 14 Tage.
+- Technik: Dateien einzeln unter `data/dokumente/`, Metadaten in Tabelle `dokumente`;
+  Auslieferung nur nach Rechteprüfung, `Cache-Control: private` (einmal laden, dann vom Gerät);
+  `manage.py backup` sichert den Ordner mit.
+- Offen: bestehende Einverständnis-Uploads (Base64 im App-Datenpaket) in die Ablage überführen.
+
 ## Reihenfolge und Freigaben
 1. A1 + A2 auf Test → Freigabe → live.
 2. B1 auf Test (Messwerte) → Freigabe → live.
