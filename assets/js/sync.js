@@ -66,7 +66,7 @@
     if (me.status === 401) {
       const err = (me.data && me.data.error) || "";
       if (/Zwei-Faktor/i.test(err)) { show("totp"); return; }
-      if (!prefillInviteCode()) show("login");
+      if (!prefillInviteCode() && !prefillResetCode()) show("login");
       return;
     }
     if (!me.data || !me.data.user || !me.data.csrf) {
@@ -89,6 +89,20 @@
     const inp = $("#regCode");
     if (inp) inp.value = code;
     show("register");
+    return true;
+  }
+
+  // Link aus der „Passwort vergessen“-Mail: /?reset=CODE → direkt neues Passwort setzen
+  function prefillResetCode() {
+    const code = new URLSearchParams(location.search).get("reset");
+    if (!code) return false;
+    $("#resetCode").value = code.trim().toUpperCase();
+    $("#resetAnfrage").hidden = true;
+    $("#resetLinkHinweis").hidden = false;
+    show("reset");
+    setTimeout(() => $("#resetPass").focus(), 50);
+    // Code aus der Adresszeile nehmen (Verlauf/Teilen), Seite bleibt
+    try { history.replaceState(null, "", location.pathname + location.hash); } catch (e) { /* leer */ }
     return true;
   }
 
@@ -165,13 +179,14 @@
   $("#auth-reset").addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const username = $("#resetUser").value.trim();
-    if (!username) { authMsg("Bitte den Benutzernamen angeben", true); return; }
+    if (!username) { authMsg("Bitte E-Mail-Adresse oder Benutzernamen angeben", true); return; }
     authMsg("Anfrage wird gesendet …");
     const res = await api("/api/passwort-vergessen", {
       method: "POST", body: JSON.stringify({ username }),
     });
-    authMsg(res.ok ? "✅ " + (res.data.hint || "Das Trainerteam wurde informiert.")
+    authMsg(res.ok ? "✅ " + (res.data.hint || "Anfrage gesendet.")
                    : (res.data.error || "Anfrage nicht möglich"), !res.ok);
+    if (res.ok) { $("#resetAnfrage").hidden = false; $("#resetLinkHinweis").hidden = true; }
   });
   $("#resetSetzen").addEventListener("click", async () => {
     const code = $("#resetCode").value.trim();
@@ -185,9 +200,11 @@
     });
     if (!res.ok) { authMsg(res.data.error || "Code ungültig oder abgelaufen", true); return; }
     show("login");
-    if (res.data.username) $("#loginUser").value = res.data.username;
+    $("#loginUser").value = res.data.email || res.data.username || "";
     $("#loginPass").value = "";
+    $("#resetAnfrage").hidden = false; $("#resetLinkHinweis").hidden = true;
     authMsg("✅ Passwort geändert – bitte neu anmelden.");
+    setTimeout(() => $("#loginPass").focus(), 50);
   });
   $("#auth-register").addEventListener("submit", async (ev) => {
     ev.preventDefault();
@@ -197,13 +214,14 @@
       body: JSON.stringify({
         code: $("#regCode").value,
         name: $("#regName").value.trim(),
+        email: $("#regEmail").value.trim(),
         username: $("#regUser").value.trim(),
         password: $("#regPass").value,
       }),
     });
     if (!res.ok) { authMsg(res.data.error || "Registrierung fehlgeschlagen", true); return; }
     show("login");
-    $("#loginUser").value = $("#regUser").value.trim();
+    $("#loginUser").value = $("#regEmail").value.trim() || $("#regUser").value.trim();
     authMsg("Konto angelegt – bitte anmelden. " + (res.data.hint || ""));
   });
 

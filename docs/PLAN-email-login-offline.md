@@ -23,7 +23,7 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
 
 ## Teil A: Login mit E-Mail und Passwort
 
-### A1 Grundlage (keine Verhaltensänderung für Bestandsnutzer)
+### A1 Grundlage (keine Verhaltensänderung für Bestandsnutzer) – UMGESETZT 2026-11-26
 1. Schema: `users.email TEXT UNIQUE COLLATE NOCASE` (nullable), `users.email_verified INTEGER`.
 2. `/api/login`: Feld heißt künftig „Benutzername oder E-Mail“. Enthält die Eingabe ein `@`,
    wird nach `email` gesucht, sonst wie bisher nach `username`. Passwort bleibt Pflicht.
@@ -33,7 +33,7 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
    das Feld leer und wird in der Trainerliste als „ohne E-Mail“ markiert.
 4. Trainer „Portal-Zugänge“: Spalte E-Mail, bearbeitbar, Status verifiziert/unverifiziert.
 
-### A2 Passwort vergessen per E-Mail (ersetzt den Codeweg für Konten mit Adresse)
+### A2 Passwort vergessen per E-Mail (ersetzt den Codeweg für Konten mit Adresse) – UMGESETZT 2026-11-26
 1. `/api/passwort-vergessen` nimmt Benutzername oder E-Mail. Hat das Konto eine Adresse,
    geht eine Mail mit Link `…/#/reset?code=…` raus (Code in `reset_codes`, `created_by="email"`,
    60 Minuten gültig, einmalig). Antwort bleibt neutral.
@@ -46,7 +46,7 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
 ### A3 Komfort
 1. Registrierung mit Einladungscode fragt die E-Mail ab (aus Spielerdaten vorbelegt).
 2. Konto-Tab im Portal: eigene E-Mail sehen und ändern, neue Adresse per Bestätigungslink.
-3. Sitzungsdauer von 30 auf 180 Tage für Spieler/Eltern, damit seltener Passwörter nötig sind.
+3. Sitzungsdauer von 30 auf 180 Tage für Spieler/Eltern, damit seltener Passwörter nötig sind. – UMGESETZT (mit A1)
 4. Login-Hinweis „Benutzername, nicht dein Name“ entfällt, weil die E-Mail eindeutig ist.
 
 ### A4 Später, nach Freigabe
@@ -91,6 +91,6 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
 4. A3, dann B4.
 
 ## Offene Entscheidungen
-- Welches SMTP-Postfach (z. B. info@skv-mueritz.de)? Eintrag in die Live-`.env` durch dich.
-- E-Mail-Adressen aus den Spielerdaten automatisch übernehmen: ja (empfohlen) oder nur von Hand?
-- Sitzungsdauer 180 Tage für Spieler/Eltern: ok?
+- Entschieden: Versand über Brevo-SMTP als skv.volleyball@nettverwaltet.de (Test-Instanz eingerichtet, Live folgt mit der Freigabe).
+- Entschieden: Adressen werden automatisch aus den Spielerdaten übernommen (beim Start, bei jedem Öffnen der Portal-Zugänge, per `manage.py email-import`).
+- Entschieden: 180 Tage Sitzung für Spieler/Eltern, Trainer bleiben bei 30 Tagen mit 2FA.

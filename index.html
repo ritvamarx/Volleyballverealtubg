@@ -110,7 +110,7 @@
       <div id="auth-checking"><p class="auth-hint">Verbindung wird geprüft …</p></div>
 
       <form id="auth-login" hidden>
-        <div class="field"><label>Benutzername</label><input id="loginUser" autocomplete="username" required></div>
+        <div class="field"><label>E-Mail-Adresse oder Benutzername</label><input id="loginUser" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="z. B. name@beispiel.de" required></div>
         <div class="field"><label>Passwort</label><input id="loginPass" type="password" autocomplete="current-password" required></div>
         <button class="btn auth-btn" type="submit">Anmelden</button>
         <p class="auth-hint"><a href="#" id="gotoRegister">Mit Einladungscode registrieren</a> ·
@@ -118,13 +118,16 @@
       </form>
 
       <form id="auth-reset" hidden>
-        <p class="auth-hint"><strong>Passwort vergessen?</strong> Kein Problem: Sag dem Trainerteam
-        Bescheid – du bekommst einen Wiederherstellungscode (z. B. per WhatsApp).</p>
-        <div class="field"><label>Dein Benutzername</label><input id="resetUser" autocomplete="username"></div>
-        <button class="btn auth-btn" type="submit">Trainerteam informieren</button>
+        <div id="resetAnfrage">
+        <p class="auth-hint"><strong>Passwort vergessen?</strong> Kein Problem: Du bekommst einen Link
+        per E-Mail. Ist zu deinem Konto keine Adresse hinterlegt, meldet sich das Trainerteam mit einem Code.</p>
+        <div class="field"><label>Deine E-Mail-Adresse oder dein Benutzername</label><input id="resetUser" autocomplete="username" autocapitalize="none" spellcheck="false"></div>
+        <button class="btn auth-btn" type="submit">Neues Passwort anfordern</button>
         <hr style="margin:16px 0;border:none;border-top:1px solid #e2e8f0">
         <p class="auth-hint"><strong>Code schon erhalten?</strong> Dann hier direkt ein neues Passwort setzen:</p>
-        <div class="field"><label>Wiederherstellungscode</label><input id="resetCode" placeholder="XXXX-XXXX-XXXX" autocomplete="one-time-code"></div>
+        </div>
+        <p class="auth-hint" id="resetLinkHinweis" hidden><strong>Neues Passwort wählen</strong> – der Link aus der E-Mail ist gültig, der Code steht schon drin.</p>
+        <div class="field"><label>Wiederherstellungscode</label><input id="resetCode" placeholder="XXXX-XXXX-XXXX" autocomplete="one-time-code" autocapitalize="characters"></div>
         <div class="field"><label>Neues Passwort (mind. 8 Zeichen)</label><input id="resetPass" type="password" minlength="8" autocomplete="new-password"></div>
         <button class="btn auth-btn" type="button" id="resetSetzen">Neues Passwort speichern</button>
         <p class="auth-hint"><a href="#" id="gotoLogin2">Zurück zur Anmeldung</a></p>
@@ -155,7 +158,8 @@
       <form id="auth-register" hidden>
         <div class="field"><label>Einladungscode</label><input id="regCode" placeholder="XXXX-XXXX-XXXX" required></div>
         <div class="field"><label>Dein Name</label><input id="regName" autocomplete="name"></div>
-        <div class="field"><label>Benutzername</label><input id="regUser" autocomplete="username" required></div>
+        <div class="field"><label>E-Mail-Adresse (für Anmeldung und „Passwort vergessen“)</label><input id="regEmail" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="name@beispiel.de"></div>
+        <div class="field"><label>Benutzername</label><input id="regUser" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>
         <div class="field"><label>Passwort (mind. 8 Zeichen)</label><input id="regPass" type="password" minlength="8" autocomplete="new-password" required></div>
         <button class="btn auth-btn" type="submit">Konto anlegen</button>
         <p class="auth-hint"><a href="#" id="gotoLogin">Zurück zur Anmeldung</a></p>

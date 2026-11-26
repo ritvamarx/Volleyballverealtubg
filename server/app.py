@@ -23,7 +23,9 @@ import mail
 
 APP_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 SESSION_COOKIE = "skv_session"
-SESSION_DAYS = 30
+SESSION_DAYS = 30            # Trainer (mit 2FA)
+SESSION_DAYS_PORTAL = 180    # Spieler:innen und Eltern – seltener neu anmelden
+RESET_MAIL_MINUTES = 60      # Gültigkeit des Passwort-Links per E-Mail
 PRE2FA_MINUTES = 15
 STATE_MAX_BYTES = 15 * 1024 * 1024
 LOGIN_MAX_FAILS = 8
@@ -36,6 +38,12 @@ def create_app() -> Flask:
     app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "")
     app.config["MAX_CONTENT_LENGTH"] = STATE_MAX_BYTES + 1024 * 1024
     db.init_db()
+    try:
+        _c = db.connect()
+        db.emails_aus_spielerdaten(_c)  # Adressen aus den Spielerdaten übernehmen
+        _c.close()
+    except Exception:  # noqa: BLE001 – darf den Start nie verhindern
+        pass
 
     # ---------- Hilfen ----------
 
@@ -87,9 +95,9 @@ def create_app() -> Flask:
         con().commit()
         return row, token
 
-    def start_session(resp, user_id: int, pre_2fa: bool):
+    def start_session(resp, user_id: int, pre_2fa: bool, tage: int = SESSION_DAYS):
         token = auth.new_session_token()
-        lifetime = PRE2FA_MINUTES * 60 if pre_2fa else SESSION_DAYS * 86400
+        lifetime = PRE2FA_MINUTES * 60 if pre_2fa else tage * 86400
         con().execute(
             "INSERT INTO sessions (token_hash, user_id, csrf, pre_2fa, created_at, last_seen,"
             " expires_at, ip, ua) VALUES (?,?,?,?,?,?,?,?,?)",
@@ -168,16 +176,14 @@ def create_app() -> Flask:
         username = (body.get("username") or "").strip()
         password = body.get("password") or ""
         if not username or not password:
-            return err(400, "Benutzername und Passwort angeben")
+            return err(400, "E-Mail-Adresse oder Benutzername und Passwort angeben")
         wait = rate_limited(username)
         if wait:
             return err(429, f"Zu viele Fehlversuche – bitte {wait // 60 + 1} Min. warten")
-        user = con().execute(
-            "SELECT * FROM users WHERE username = ? AND active = 1", (username,)
-        ).fetchone()
+        user = konto_finden(username)
         if user is None or not auth.verify_password(password, user["pw_hash"]):
             log_login(username, False)
-            return err(401, "Benutzername oder Passwort falsch")
+            return err(401, "Anmeldedaten falsch – E-Mail-Adresse oder Benutzername und Passwort prüfen")
         log_login(username, True)
 
         resp = jsonify({})
@@ -187,9 +193,37 @@ def create_app() -> Flask:
             need = "totp" if user["totp_enabled"] else "totp-setup"
             resp.set_data(db.to_json({"need": need, "user": public_user(user)}))
             return resp
-        start_session(resp, user["id"], pre_2fa=False)
+        start_session(resp, user["id"], pre_2fa=False, tage=SESSION_DAYS_PORTAL)
         resp.set_data(db.to_json({"need": None, "user": public_user(user)}))
         return resp
+
+    def konto_finden(kennung: str):
+        """Aktives Konto zu Benutzername oder E-Mail-Adresse (Groß-/Kleinschreibung egal)."""
+        kennung = (kennung or "").strip()
+        if not kennung:
+            return None
+        user = con().execute("SELECT * FROM users WHERE username = ? AND active = 1",
+                             (kennung,)).fetchone()
+        if user is None and "@" in kennung:
+            suche = lambda: con().execute(  # noqa: E731
+                "SELECT * FROM users WHERE lower(email) = lower(?) AND active = 1",
+                (kennung,)).fetchone()
+            user = suche()
+            if user is None and db.emails_aus_spielerdaten(con()):
+                user = suche()  # Adresse erst kürzlich in den Spielerdaten eingetragen
+        return user
+
+    def basis_url() -> str:
+        """Öffentliche Adresse für Links in E-Mails – nie aus einem fremden Host-Header."""
+        fest = os.environ.get("APP_URL", "").strip().rstrip("/")
+        if fest:
+            return fest
+        host = (request.host or "").lower()
+        if re.fullmatch(r"[a-z0-9.-]+\.nettverwaltet\.de", host):
+            return "https://" + host
+        if re.fullmatch(r"(127\.0\.0\.1|localhost)(:\d+)?", host):
+            return "http://" + host
+        return "https://volleyball.nettverwaltet.de"
 
     def public_user(u):
         return {"username": u["username"], "name": u["name"], "role": u["role"]}
@@ -283,6 +317,10 @@ def create_app() -> Flask:
         username = (body.get("username") or "").strip()
         password = body.get("password") or ""
         name = (body.get("name") or "").strip()
+        email_roh = (body.get("email") or "").strip()
+        email = db.email_normal(email_roh)
+        if email_roh and not email:
+            return err(400, "Die E-Mail-Adresse sieht nicht gültig aus")
         if not code or not username or len(password) < 8:
             return err(400, "Code, Benutzername und Passwort (mind. 8 Zeichen) angeben")
         if len(username) < 3 or len(username) > 40:
@@ -299,19 +337,23 @@ def create_app() -> Flask:
         exists = con().execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone()
         if exists:
             return err(400, "Benutzername ist bereits vergeben")
+        if email and con().execute("SELECT 1 FROM users WHERE lower(email) = ?", (email,)).fetchone():
+            return err(400, "Diese E-Mail-Adresse gehört schon zu einem anderen Konto")
         with con() as c:
             cur = c.execute(
-                "INSERT INTO users (username, name, role, pw_hash, player_ids, created_at)"
-                " VALUES (?,?,?,?,?,?)",
+                "INSERT INTO users (username, name, role, pw_hash, player_ids, created_at, email)"
+                " VALUES (?,?,?,?,?,?,?)",
                 (
                     username, name or inv["name"] or username, inv["role"],
-                    auth.hash_password(password), inv["player_ids"], db.now(),
+                    auth.hash_password(password), inv["player_ids"], db.now(), email or None,
                 ),
             )
             c.execute(
                 "UPDATE invites SET used_by = ?, used_at = ? WHERE id = ?",
                 (cur.lastrowid, db.now(), inv["id"]),
             )
+        if not email:
+            db.emails_aus_spielerdaten(con())
         return jsonify({"ok": True, "role": inv["role"],
                         "hint": "Jetzt anmelden" + (" – 2FA wird eingerichtet" if inv["role"] == "trainer" else "")})
 
@@ -1725,9 +1767,10 @@ def create_app() -> Flask:
         _sess, failure = require(role="trainer")
         if failure:
             return failure
+        db.emails_aus_spielerdaten(con())
         rows = con().execute(
             "SELECT u.id, u.username, u.name, u.role, u.player_ids, u.active,"
-            " u.totp_enabled, u.created_at, u.last_login,"
+            " u.totp_enabled, u.created_at, u.last_login, u.email, u.email_verified,"
             " (SELECT COUNT(*) FROM push_abos p WHERE p.user_id = u.id) AS push_abos"
             " FROM users u ORDER BY u.role, u.name"
         ).fetchall()
@@ -1758,7 +1801,9 @@ def create_app() -> Flask:
                 "aktiv30": len([k for k in aktive if (k["last_login"] or 0) > jetzt - 30 * 86400]),
                 "pushAbos": sum(k["push_abos"] for k in konten),
                 "offeneCodes": offene_codes,
+                "ohneEmail": len([k for k in aktive if k["role"] != "trainer" and not k["email"]]),
             },
+            "mailMoeglich": mail.konfiguriert(),
         })
 
     @app.post("/api/accounts/<int:user_id>")
@@ -1782,6 +1827,16 @@ def create_app() -> Flask:
         if not isinstance(player_ids, list):
             player_ids = []
         player_ids = [str(p)[:60] for p in player_ids][:20]
+        email = ziel["email"]
+        if "email" in body:
+            roh = str(body.get("email") or "").strip()
+            email = db.email_normal(roh)  # "" = bewusst ohne Adresse
+            if roh and not email:
+                return err(400, "Die E-Mail-Adresse sieht nicht gültig aus")
+            if email and con().execute(
+                    "SELECT 1 FROM users WHERE lower(email) = ? AND id != ?",
+                    (email, user_id)).fetchone():
+                return err(400, "Diese E-Mail-Adresse gehört schon zu einem anderen Konto")
         andere = con().execute(
             "SELECT id FROM users WHERE lower(username) = lower(?) AND id != ?",
             (username, user_id)).fetchone()
@@ -1793,9 +1848,11 @@ def create_app() -> Flask:
                 (user_id,)).fetchone()
             if rest["n"] < 1:
                 return err(400, "Das letzte aktive Trainerkonto muss Trainer:in bleiben")
+        geaendert = (email or "") != (ziel["email"] or "").lower()
         con().execute(
-            "UPDATE users SET name = ?, username = ?, role = ?, player_ids = ? WHERE id = ?",
-            (name, username, role, db.to_json(player_ids), user_id))
+            "UPDATE users SET name = ?, username = ?, role = ?, player_ids = ?, email = ?,"
+            " email_verified = CASE WHEN ? THEN 0 ELSE email_verified END WHERE id = ?",
+            (name, username, role, db.to_json(player_ids), email, 1 if geaendert else 0, user_id))
         con().commit()
         return jsonify({"ok": True})
 
@@ -1834,45 +1891,89 @@ def create_app() -> Flask:
         con().commit()
         return jsonify({"ok": True})
 
+    PASSWORT_HINWEIS = ("Falls zu deinem Konto eine E-Mail-Adresse hinterlegt ist, kommt gleich ein Link"
+                        " (bitte auch im Spam-Ordner nachsehen). Sonst meldet sich das Trainerteam mit einem Code.")
+
+    def reset_mail_senden(nutzer) -> bool:
+        """Einmal-Link zum Passwortsetzen an die hinterlegte Adresse schicken."""
+        adresse = (nutzer["email"] or "").strip()
+        if not adresse or not mail.konfiguriert():
+            return False
+        jetzt = db.now()
+        # Drossel: je Konto höchstens 3 Links pro Stunde, insgesamt 30
+        je_konto = con().execute(
+            "SELECT COUNT(*) AS n FROM reset_codes WHERE user_id = ? AND created_by = 'email'"
+            " AND created_at > ?", (nutzer["id"], jetzt - 3600)).fetchone()["n"]
+        gesamt = con().execute(
+            "SELECT COUNT(*) AS n FROM reset_codes WHERE created_by = 'email' AND created_at > ?",
+            (jetzt - 3600,)).fetchone()["n"]
+        if je_konto >= 3 or gesamt >= 30:
+            return True  # still ablehnen – nach außen wie versendet
+        code = auth.new_code()
+        con().execute(
+            "UPDATE reset_codes SET used_at = ? WHERE user_id = ? AND used_at IS NULL"
+            " AND created_by = 'email'", (jetzt, nutzer["id"]))
+        con().execute(
+            "INSERT INTO reset_codes (user_id, code_hash, created_by, created_at, expires_at)"
+            " VALUES (?,?,?,?,?)",
+            (nutzer["id"], auth.hash_code(code), "email", jetzt, jetzt + RESET_MAIL_MINUTES * 60))
+        con().commit()
+        link = f"{basis_url()}/?reset={urllib.parse.quote(code)}"
+        vorname = (nutzer["name"] or "").split(" ")[0]
+        text = (f"Hallo {vorname},\n\n"
+                "für dein Konto in der SKV-Volleyball-App wurde ein neues Passwort angefordert.\n"
+                f"Über diesen Link setzt du es selbst neu (gültig {RESET_MAIL_MINUTES} Minuten, nur einmal):\n\n"
+                f"{link}\n\n"
+                f"Anmelden kannst du dich danach mit deiner E-Mail-Adresse ({adresse})"
+                f" oder mit deinem Benutzernamen „{nutzer['username']}“.\n\n"
+                "Du hast nichts angefordert? Dann ignoriere diese Mail einfach –"
+                " dein bisheriges Passwort bleibt gültig.")
+        return mail.senden(adresse, "SKV Müritz Volleyball – neues Passwort", text)
+
     @app.post("/api/passwort-vergessen")
     def api_passwort_vergessen():
-        """Öffentlich: Anfrage hinterlegen + Trainerteam per Push informieren.
+        """Öffentlich: Passwort-Hilfe anfordern.
 
-        Antwortet immer neutral, damit Benutzernamen nicht erraten werden können.
+        Hat das Konto eine E-Mail-Adresse, geht ein Einmal-Link per Mail raus.
+        Sonst (oder wenn der Versand scheitert) wie bisher: Anfrage hinterlegen
+        und Trainerteam per Push informieren. Antwortet immer neutral, damit
+        weder Benutzernamen noch Adressen erraten werden können.
         """
         body = request.get_json(silent=True) or {}
-        username = str(body.get("username") or "").strip()[:80]
+        username = str(body.get("username") or "").strip()[:120]
         if not username:
-            return err(400, "Bitte Benutzernamen angeben")
+            return err(400, "Bitte E-Mail-Adresse oder Benutzernamen angeben")
+        nutzer = konto_finden(username)
+        if nutzer is not None and reset_mail_senden(nutzer):
+            return jsonify({"ok": True, "hint": PASSWORT_HINWEIS})
         jetzt = db.now()
         con().execute("DELETE FROM passwort_anfragen WHERE created_at < ?",
                       (jetzt - 7 * 86400,))
+        # Anfrage unter dem Benutzernamen ablegen (auch wenn per E-Mail gesucht wurde),
+        # damit das Trainerteam sie in den Portal-Zugängen dem Konto zuordnen kann
+        anzeige = nutzer["username"] if nutzer is not None else username
         neulich = con().execute(
             "SELECT COUNT(*) AS n FROM passwort_anfragen"
             " WHERE lower(username) = lower(?) AND created_at > ?",
-            (username, jetzt - 3600)).fetchone()["n"]
+            (anzeige, jetzt - 3600)).fetchone()["n"]
         gesamt = con().execute(
             "SELECT COUNT(*) AS n FROM passwort_anfragen WHERE created_at > ?",
             (jetzt - 3600,)).fetchone()["n"]
         if neulich < 3 and gesamt < 30:
             con().execute(
                 "INSERT INTO passwort_anfragen (username, created_at) VALUES (?, ?)",
-                (username, jetzt))
+                (anzeige, jetzt))
             con().commit()
-            nutzer = con().execute(
-                "SELECT id FROM users WHERE lower(username) = lower(?) AND active = 1",
-                (username,)).fetchone()
-            if nutzer:
+            if nutzer is not None:
                 trainer_ids = [r["id"] for r in con().execute(
                     "SELECT id FROM users WHERE active = 1 AND role = 'trainer'").fetchall()]
                 import push
                 push.senden(
                     con(), "🔑 Passwort-Hilfe angefragt",
-                    f"„{username}“ hat das Passwort vergessen – bitte in den Portal-Zugängen"
+                    f"„{anzeige}“ hat das Passwort vergessen – bitte in den Portal-Zugängen"
                     " einen Wiederherstellungscode erzeugen und weitergeben.",
                     "/#/zugaenge", trainer_ids)
-        return jsonify({"ok": True,
-                        "hint": "Das Trainerteam wurde informiert und meldet sich mit einem Code."})
+        return jsonify({"ok": True, "hint": PASSWORT_HINWEIS})
 
     @app.post("/api/passwort-reset")
     def api_passwort_reset():
@@ -1896,8 +1997,10 @@ def create_app() -> Flask:
         if nutzer is None:
             return err(400, "Konto ist nicht verfügbar")
         with con() as c:
-            c.execute("UPDATE users SET pw_hash = ? WHERE id = ?",
-                      (auth.hash_password(password), nutzer["id"]))
+            c.execute("UPDATE users SET pw_hash = ?, email_verified = CASE WHEN ? THEN 1"
+                      " ELSE email_verified END WHERE id = ?",
+                      (auth.hash_password(password), 1 if row["created_by"] == "email" else 0,
+                       nutzer["id"]))
             c.execute("UPDATE reset_codes SET used_at = ? WHERE id = ?",
                       (db.now(), row["id"]))
             c.execute("DELETE FROM sessions WHERE user_id = ?", (nutzer["id"],))
@@ -1905,6 +2008,7 @@ def create_app() -> Flask:
                       (nutzer["username"],))
         log_login("reset", True)
         return jsonify({"ok": True, "username": nutzer["username"],
+                        "email": nutzer["email"] or "",
                         "hint": "Passwort geändert – jetzt anmelden"})
 
     @app.post("/api/accounts/<int:user_id>/active")

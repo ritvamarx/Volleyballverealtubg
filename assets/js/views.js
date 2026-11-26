@@ -4444,6 +4444,7 @@
       body: `<form id="kf"><div class="form-grid">
         <div class="field"><label>Anzeigename</label><input name="name" value="${esc(k.name)}" required></div>
         <div class="field"><label>Benutzername (für die Anmeldung)</label><input name="username" value="${esc(k.username)}" required></div>
+        <div class="field"><label>E-Mail-Adresse (Anmeldung + „Passwort vergessen“)</label><input name="email" type="email" value="${esc(k.email || "")}" placeholder="leer = nur Benutzername"></div>
         <div class="field"><label>Rolle</label><select name="role">
           ${["trainer", "spieler", "eltern"].map((r) => `<option value="${r}" ${k.role === r ? "selected" : ""}>${r === "trainer" ? "Trainer:in" : r === "spieler" ? "Spieler:in" : "Eltern"}</option>`).join("")}
         </select></div>
@@ -4456,7 +4457,8 @@
           </div></div>
       </div>
       <p class="soft" style="font-size:.8rem">Rollenwechsel zu Trainer:in verlangt beim nächsten Login die 2FA-Einrichtung.
-      Passwort ändern geht über den 🔑-Wiederherstellungscode.</p></form>`,
+      Passwort ändern geht über „Passwort vergessen“ (Link per E-Mail) oder den 🔑-Wiederherstellungscode.
+      Fehlt die Adresse, wird sie automatisch aus den Spielerdaten übernommen, sobald dort eine steht.</p></form>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
       onOpen(m) {
         m.querySelector("[data-x]").onclick = closeModal;
@@ -4465,7 +4467,7 @@
           const d = formData(f);
           const playerIds = Array.from(m.querySelectorAll("[data-kfpid]:checked")).map((c) => c.dataset.kfpid);
           const r = await apiZugang(`/api/accounts/${k.id}`, {
-            name: d.name, username: d.username, role: d.role, playerIds });
+            name: d.name, username: d.username, email: d.email, role: d.role, playerIds });
           if (!r.ok) { toast(r.data.error || "Speichern fehlgeschlagen", "bad"); return; }
           closeModal(); toast("Konto gespeichert", "good");
           if (fertig) fertig();
@@ -4655,7 +4657,12 @@
         ${stat("👥", "Portal-Konten", st.portalKonten != null ? st.portalKonten : "—", `${st.konten || 0} Konten gesamt`)}
         ${stat("📈", "Aktiv (7 Tage)", st.aktiv7 != null ? st.aktiv7 : "—", `${st.aktiv30 || 0} in 30 Tagen`)}
         ${stat("🔔", "Push-Abos", st.pushAbos != null ? st.pushAbos : "—", "Mitteilungen aktiviert")}
-        ${stat("🎟️", "Offene Codes", st.offeneCodes != null ? st.offeneCodes : "—", "noch nicht eingelöst")}`;
+        ${stat("🎟️", "Offene Codes", st.offeneCodes != null ? st.offeneCodes : "—", "noch nicht eingelöst")}
+        ${stat("✉️", "Ohne E-Mail", st.ohneEmail != null ? st.ohneEmail : "—", st.ohneEmail ? "Passwort nur per Code" : "alle können sich per Mail helfen")}`;
+      if (res.data.mailMoeglich === false) {
+        $("#zgStat", el).insertAdjacentHTML("beforeend", `<p class="soft" style="font-size:.82rem;margin:6px 0 0">
+          ⚠️ Auf diesem Server ist kein E-Mail-Versand eingerichtet – „Passwort vergessen“ läuft nur über Codes.</p>`);
+      }
       // Offene Passwort-Anfragen prominent über der Kontenliste
       const anfragen = res.data.anfragen || [];
       const konten = res.data.accounts;
@@ -4676,6 +4683,7 @@
       ziel.innerHTML = anfrageHTML + konten.map((k) => `
         <div class="list-item"><div class="grow">
           <div class="title" style="font-size:.9rem">${esc(k.name)} <span class="soft">(${esc(k.username)})</span></div>
+          <div class="sub">${k.email ? `✉️ ${esc(k.email)}${k.email_verified ? " ✔" : ""}` : (k.role === "trainer" ? "" : '<span class="badge warn" title="Keine E-Mail-Adresse – Passwort-Hilfe nur per Code. Adresse in den Spielerdaten oder hier per ✏️ eintragen.">ohne E-Mail</span>')}</div>
           <div class="sub">${k.player_ids.length ? "verknüpft: " + k.player_ids.map(spielerName).map(esc).join(", ") : "keine Spieler:in verknüpft"}${k.totp_enabled ? " · 2FA ✔" : ""}${k.push_abos ? ` · 🔔 ${k.push_abos}` : ""}</div>
           <div class="sub">${zuletztAktiv(k.last_login)}</div>
         </div>

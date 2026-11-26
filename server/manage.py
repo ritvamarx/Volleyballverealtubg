@@ -102,14 +102,30 @@ def cmd_reset_password(args) -> None:
 
 
 def cmd_list_users(_args) -> None:
+    db.init_db()
     con = db.connect()
     rows = con.execute(
-        "SELECT username, name, role, totp_enabled, active, created_at FROM users ORDER BY role, username"
+        "SELECT username, name, role, email, totp_enabled, active, created_at FROM users ORDER BY role, username"
     ).fetchall()
     for r in rows:
         ts = time.strftime("%d.%m.%Y", time.localtime(r["created_at"]))
-        print(f"{r['role']:<8} {r['username']:<20} {r['name']:<24} "
+        print(f"{r['role']:<8} {r['username']:<20} {r['name']:<24} {(r['email'] or '-'):<30} "
               f"2FA={'ja' if r['totp_enabled'] else 'nein'} aktiv={'ja' if r['active'] else 'nein'} seit {ts}")
+
+
+def cmd_email_import(_args) -> None:
+    """Leere E-Mail-Felder der Portal-Konten aus den Spielerdaten füllen."""
+    db.init_db()
+    con = db.connect()
+    n = db.emails_aus_spielerdaten(con)
+    offen = con.execute(
+        "SELECT username, name FROM users WHERE role != 'trainer' AND active = 1"
+        " AND (email IS NULL OR email = '') ORDER BY name").fetchall()
+    print(f"{n} Adresse(n) übernommen.")
+    if offen:
+        print("Noch ohne E-Mail (in den Spielerdaten nachtragen oder in Portal-Zugängen eintragen):")
+        for r in offen:
+            print(f"  {r['name']} ({r['username']})")
 
 
 def cmd_backup(args) -> None:
@@ -171,6 +187,9 @@ def main() -> None:
     s.add_argument("username")
     s.add_argument("--password", default="")
     s.set_defaults(func=cmd_reset_password)
+
+    s = sub.add_parser("email-import", help="E-Mail-Adressen der Konten aus den Spielerdaten übernehmen")
+    s.set_defaults(func=cmd_email_import)
 
     s = sub.add_parser("list-users", help="Konten anzeigen")
     s.set_defaults(func=cmd_list_users)

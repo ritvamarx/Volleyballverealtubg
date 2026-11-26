@@ -133,26 +133,26 @@ holt sich alle 10 Minuten den `main`-Stand von GitHub (`deploy/auto-update.sh`,
 Cron `/etc/cron.d/volleyball-test-update`, Log `data/update.log`). Die
 Live-Instanz wird davon nie berührt – Live-Updates nur per `deploy.sh`.
 
-## E-Mail-Versand (Postfach skv.volleyball@nettverwaltet.de)
+## E-Mail-Versand (Absender skv.volleyball@nettverwaltet.de über Brevo)
 
-Die Mails von nettverwaltet.de laufen über das Hetzner-Webhosting (MX
-`www4.your-server.de`). Das Postfach wird einmalig in **konsoleH**
-(https://konsoleh.your-server.de) angelegt: Domain *nettverwaltet.de* →
-*E-Mail* → *Postfächer* → *Neues Postfach*: `skv.volleyball`, eigenes langes
-Passwort. Optional dort unter *E-Mail → DKIM* die Signatur für die Domain
-einschalten (bessere Zustellbarkeit).
+Die Domain nettverwaltet.de ist bei Brevo authentifiziert (DKIM `brevo1/2._domainkey`),
+ein echtes Postfach gibt es nicht. In Brevo einmalig: Absender
+`skv.volleyball@nettverwaltet.de` anlegen und unter *SMTP & API → SMTP* einen
+SMTP-Schlüssel „Volleyball-App“ erzeugen (Login steht auf derselben Seite,
+`…@smtp-brevo.com`).
 
 Danach auf dem Server in `/opt/volleyball/.env` (und für die Test-Instanz in
-`/opt/volleyball-test/.env`) ergänzen – Passwort nur dort, nie im Chat:
+`/opt/volleyball-test/.env`) ergänzen – Schlüssel nur dort, nie im Chat:
 
 ```
-MAIL_HOST=www4.your-server.de
+MAIL_HOST=smtp-relay.brevo.com
 MAIL_PORT=587
 MAIL_SECURITY=starttls
-MAIL_USER=skv.volleyball@nettverwaltet.de
-MAIL_PASS=…
-MAIL_FROM=SKV Müritz Volleyball <skv.volleyball@nettverwaltet.de>
-MAIL_REPLY_TO=…            # Adresse des Trainerteams; weglassen = „bitte nicht antworten"
+MAIL_USER=…@smtp-brevo.com     # Brevo-SMTP-Login
+MAIL_PASS=…                    # Brevo-SMTP-Schlüssel
+MAIL_FROM=SKV Mueritz Volleyball <skv.volleyball@nettverwaltet.de>
+MAIL_REPLY_TO=…                # Adresse des Trainerteams; weglassen = „bitte nicht antworten"
+APP_URL=https://volleyball.nettverwaltet.de   # Basis für Links in Mails (Test: volleyball-test.…)
 ```
 
 Container neu starten und Versand prüfen:
@@ -162,6 +162,15 @@ cd /opt/volleyball && docker compose up -d volleyball
 docker compose exec volleyball ./manage.py mail-test deine@adresse.de
 ```
 
-`www4.your-server.de` ist zugleich der MX der Domain und damit vom bestehenden
-SPF-Eintrag (`v=spf1 +a +mx ?all`) abgedeckt. Jede Mail trägt `Auto-Submitted`
-und eine Fußzeile mit Antwort-Hinweis.
+Jede Mail trägt `Auto-Submitted` und eine Fußzeile mit Antwort-Hinweis.
+
+### Anmeldung per E-Mail / Passwort-Link
+
+Konten haben eine E-Mail-Adresse (`users.email`). Sie wird automatisch aus den
+Spielerdaten übernommen (Spieler: `playerEmail`, Eltern: `parentEmail`), sobald
+die Adresse eindeutig einem Konto zuzuordnen ist – beim Start, beim Öffnen der
+Portal-Zugänge und per `./manage.py email-import` (zeigt auch, wer noch ohne
+Adresse ist). Anmelden geht mit E-Mail-Adresse oder Benutzername.
+„Passwort vergessen“ schickt einen Einmal-Link (60 Minuten) an die hinterlegte
+Adresse; ohne Adresse läuft weiterhin der Code-Weg über das Trainerteam.
+Sitzungen von Spieler-/Elternkonten gelten 180 Tage, Trainer 30 Tage (2FA).

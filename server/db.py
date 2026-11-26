@@ -7,6 +7,7 @@ App-Datenbestand als versioniertes JSON-Dokument mit Verlauf.
 from __future__ import annotations
 
 import json
+import re
 import os
 import sqlite3
 import time
@@ -128,11 +129,16 @@ def init_db() -> None:
                        "users ADD COLUMN notify_prefs TEXT NOT NULL DEFAULT '{}'",
                        "quiz_stand ADD COLUMN wochen_punkte INTEGER NOT NULL DEFAULT 0",
                        "quiz_stand ADD COLUMN woche TEXT NOT NULL DEFAULT ''",
-                       "quiz_stand ADD COLUMN fehlversuche TEXT NOT NULL DEFAULT '{}'"):
+                       "quiz_stand ADD COLUMN fehlversuche TEXT NOT NULL DEFAULT '{}'",
+                       "users ADD COLUMN email TEXT",
+                       "users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 0"):
             try:
                 con.execute("ALTER TABLE " + spalte)
             except sqlite3.OperationalError:
                 pass  # Spalte existiert bereits
+        # Eine E-Mail-Adresse gehört höchstens zu einem Konto (leer erlaubt)
+        con.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email"
+                    " ON users(lower(email)) WHERE email IS NOT NULL AND email != ''")
     con.close()
 
 
@@ -228,3 +234,65 @@ def get_history_version(con: sqlite3.Connection, version: int):
 
 def to_json(value) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+# ---------- E-Mail-Adressen der Konten ----------
+
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def email_normal(adresse) -> str:
+    """Adresse vereinheitlichen; leerer String, wenn sie nicht gültig aussieht."""
+    a = str(adresse or "").strip().lower()
+    return a if len(a) <= 120 and _EMAIL_RE.match(a) else ""
+
+
+def emails_aus_spielerdaten(con: sqlite3.Connection) -> int:
+    """Leere E-Mail-Felder von Spieler-/Eltern-Konten aus den Spielerdaten füllen.
+
+    Spieler:innen bekommen ``playerEmail``, Eltern ``parentEmail`` (sonst
+    ``parent2Email``) der verknüpften Spieler:innen. Vorhandene Adressen werden
+    nie überschrieben, ein vom Trainerteam geleertes Feld ("") bleibt leer. Eine Adresse, die für mehrere Konten in Frage käme
+    (z. B. Geschwister mit derselben Adresse), wird keinem automatisch
+    zugeordnet – das klärt das Trainerteam von Hand. Rückgabe: Anzahl gefüllt.
+    """
+    row = get_state(con)
+    try:
+        daten = json.loads(row["data"]) if row else {}
+    except (ValueError, TypeError):
+        daten = {}
+    spieler = {p.get("id"): p for p in daten.get("players", []) if isinstance(p, dict)}
+    konten = con.execute(
+        "SELECT id, role, player_ids, email FROM users WHERE role IN ('spieler','eltern')").fetchall()
+    vergeben = {r["e"] for r in con.execute(
+        "SELECT lower(email) AS e FROM users WHERE email IS NOT NULL AND email != ''").fetchall()}
+    kandidaten = {}   # konto_id -> [adressen in Reihenfolge]
+    anspruch = {}     # adresse -> {konto_ids}
+    for k in konten:
+        try:
+            pids = json.loads(k["player_ids"] or "[]")
+        except (ValueError, TypeError):
+            pids = []
+        felder = ("parentEmail", "parent2Email") if k["role"] == "eltern" else ("playerEmail",)
+        liste = []
+        for pid in pids:
+            for feld in felder:
+                a = email_normal((spieler.get(pid) or {}).get(feld))
+                if a and a not in liste:
+                    liste.append(a)
+        for a in liste:
+            anspruch.setdefault(a, set()).add(k["id"])
+        if k["email"] is None:  # "" = vom Trainerteam bewusst geleert → nicht neu füllen
+            kandidaten[k["id"]] = liste
+    gefuellt = 0
+    for kid, liste in kandidaten.items():
+        for a in liste:
+            if a in vergeben or anspruch.get(a) != {kid}:
+                continue
+            con.execute("UPDATE users SET email = ?, email_verified = 0 WHERE id = ?", (a, kid))
+            vergeben.add(a)
+            gefuellt += 1
+            break
+    if gefuellt:
+        con.commit()
+    return gefuellt
