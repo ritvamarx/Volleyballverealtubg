@@ -136,6 +136,46 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
   Jobs mit Uhrzeit, Fahrer-Angebot gilt für alle Spiele des Tages, motivierende Texte je Job-Art.
 - Konto: nach abgegebener Erklärung „Erklärungen ändern oder widerrufen“ mit vorbelegten Entscheidungen.
 
+## Teil F: Eltern-Kommunikation – UMGESETZT 2026-11-26
+- Push-Nachfrage bei jedem Öffnen des Elternportals, solange keine Mitteilungen aktiv sind
+  (iPhone: Hinweis auf Installation). Teilnehmerzahl „👥 n dabei“ (Zusagen + Trainer:in) in den nächsten Terminen.
+- Nachrichten ans Trainerteam: Karte auf der Eltern-Startseite (`/api/portal/nachricht`, Datenbestand
+  `nachrichten[]`, Push an alle Trainer). Trainer-Ansicht „📨 Nachrichten“ (ungelesen zuerst, Antworten,
+  gelesen/ungelesen, löschen), Dashboard-Karte „Neue Nachrichten“; Antwort geht per Push ans Elternkonto
+  (`/api/nachrichten/push`) und erscheint im Portal unter der Nachricht. Link `/#nachrichten`.
+
+## Teil G: Wertschätzende Rückmeldung Eltern → Kind – KONZEPT (noch nicht gebaut)
+
+**Ziel:** Eltern geben ihrem Kind nach Training oder Spiel eine kurze, positive Rückmeldung in der
+App, die motiviert statt bewertet. Kein Leistungsdruck, keine Vergleiche, keine Noten.
+
+**Grundregeln (aus Sportpsychologie und Kinderschutz):**
+1. Nur Positives und Konkretes: Einsatz, Haltung, Fairness, Fortschritt – nie Ergebnis oder Fehler.
+2. Nur eigene Kinder, nur sichtbar für Kind und Eltern; das Trainerteam sieht nichts davon
+   (Privatsphäre in der Familie), außer das Kind teilt es bewusst.
+3. Freiwillig, kein Zwang, keine Streaks mit Verlustangst; Erinnerung höchstens dezent.
+4. Kind kann reagieren (Emoji), aber nicht „zurückbewerten“.
+
+**Umsetzung „Mutmacher“ (Arbeitstitel):**
+- Eltern-Portal: nach einem Termin, an dem das Kind zugesagt hatte (bis 48 h danach), Karte
+  „💌 Mutmacher für Ben schicken“ mit drei Wegen: (a) Wertschätzungs-Kacheln zum Antippen, max. 2
+  („Du hast nie aufgegeben“, „Tolle Teamkollegin“, „Fair gespielt“, „Mutig angenommen“, „Gut
+  vorbereitet“, „Konzentriert von Anfang bis Ende“), (b) ein Satz frei (max. 140 Zeichen) mit Hilfe
+  „Ich habe gesehen, dass du …“, (c) ein Emoji. Nie Pflichtfeld.
+- Spieler-Portal: Startseite zeigt neue Mutmacher als Karte mit Herz-Animation (einmalig), danach
+  im Konto-Tab „💌 Meine Mutmacher“ als Sammlung (chronologisch, mit Datum und Termin). Reaktion
+  mit ❤️ 👍 😄 zurück an die Eltern.
+- Saisonrückblick: am Saisonende eine Seite „Dein Jahr“ für das Kind (Anzahl Trainings, Spiele,
+  Abzeichen, alle Mutmacher), teilbar als PDF/Bild in der Familie.
+- Trainer-Baustein (optional, getrennt): „Lob vom Trainerteam“ nach Spielen mit denselben Kacheln,
+  für alle Spieler:innen sichtbar nur als eigene Nachricht; Trainer sieht nur eigene Lobe.
+- Technik: Datenbestand `mutmacher[]` {id, playerId, vonUserId, terminId, kacheln[], text, emoji, at,
+  reaktion}; Portal-Routen `POST /api/portal/mutmacher`, `POST /api/portal/mutmacher/reaktion`;
+  Push ans Spielerkonto („💌 Ein Mutmacher von Mama/Papa“) mit Kategorie „allgemein“; Server filtert
+  strikt nach eigenem Kind; Texte werden auf Länge geprüft, keine Weitergabe an Dritte.
+- Aufwand: ein Arbeitstag inkl. Tests. Offene Entscheidungen: Kachel-Texte, ob Trainer-Lob
+  dazu soll, ob der Saisonrückblick im ersten Schritt dabei ist.
+
 ## Reihenfolge und Freigaben
 1. A1 + A2 auf Test → Freigabe → live.
 2. B1 auf Test (Messwerte) → Freigabe → live.

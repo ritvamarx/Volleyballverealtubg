@@ -206,7 +206,13 @@
     const rot = offenePunkte().filter((x) => x.art === "rot").length;
     if (rot) toast(`🔴 ${rot} dringende${rot === 1 ? "r Punkt" : " Punkte"} – Ampel oben antippen`, "bad");
     // Push-Abo-Prüfung nicht blockierend (nur fürs Konto-Tab relevant)
-    pushAbo().then((abo) => { if (abo) { P.pushAktiv = true; render(); } }).catch(() => {});
+    pushAbo().then((abo) => {
+      if (abo) { P.pushAktiv = true; render(); return; }
+      // Eltern: bei jedem Öffnen ohne aktive Mitteilungen nachfragen – Push ist der
+      // Kanal für Absagen, Jobs, Antworten des Trainerteams
+      if (istEltern() && pushMoeglich() && !P.pushGefragt) { P.pushGefragt = true; pushNachfragen(); }
+    }).catch(() => {});
+    if (location.hash === "#nachrichten") setTimeout(() => { const z = document.querySelector("#nachrichtenKarte"); if (z) z.scrollIntoView({ behavior: "smooth", block: "start" }); }, 300);
     // Wetter für die Begrüßung (Spieler:innen UND Eltern), Quiz nur für Spieler:innen
     api("/api/portal/wetter").then((r) => { if (r.ok) { P.wetter = r.data; P.grussText = null; render(); } });
     if (P.daten.user.role === "spieler") {
@@ -393,9 +399,21 @@
           <button class="btn sm ghost" data-pkspaeter>Später</button>
         </div>
       </div>` : "";
+    const nachrichtenKarte = istEltern() ? `<div class="card" id="nachrichtenKarte"><h3>📨 Nachricht ans Trainerteam</h3>
+        <p class="soft" style="margin-top:0">Frage, Hinweis, Krankmeldung, Lob – schreib direkt hier. Das Trainerteam bekommt eine Push-Mitteilung und antwortet dir an dieser Stelle.</p>
+        <textarea id="nmText" rows="3" maxlength="1000" placeholder="Deine Nachricht …" style="width:100%"></textarea>
+        <div class="portal-fahrer"><button class="btn sm" id="nmSenden">📨 Senden</button></div>
+        ${(d.nachrichten || []).length ? `<div class="list" style="margin-top:10px">${d.nachrichten.slice().reverse().slice(0, 5).map((n) => `
+          <div class="list-item" style="flex-direction:column;align-items:stretch;gap:4px">
+            <div><div class="sub">Du · ${fmtDateShort(n.at)}</div><div style="font-size:.9rem">${esc(n.text)}</div></div>
+            ${(n.antworten || []).map((a) => `<div style="background:var(--surface-2);border-radius:10px;padding:6px 10px"><div class="sub">💬 ${esc(a.von)} · ${fmtDateShort(a.at)}</div><div style="font-size:.9rem">${esc(a.text)}</div></div>`).join("")
+              || '<div class="sub">⏳ noch keine Antwort</div>'}
+          </div>`).join("")}</div>` : ""}
+      </div>` : "";
     return `
       ${hallo}
       ${einwKarteStart}
+      ${nachrichtenKarte}
       ${istEltern() ? elternAbzeichenKarte() : ""}
       ${passkeyKarte}
       ${istEltern() ? aufgabenKarte : ""}
@@ -429,6 +447,7 @@
             <div class="title">${e.art === "misc" ? esc(e.kategorie) + ": " : (ICON[e.art] || "📌") + " "}${esc(e.title || "")}${e.opponent ? " gegen " + esc(e.opponent) : ""}
               ${e.abgesagt ? '<span class="badge bad">abgesagt</span>' : ""}
               ${offen.length ? `<span class="badge warn" title="Noch keine Rückmeldung${d.spieler.length > 1 ? ": " + esc(offen.map((x) => x.name.split(" ")[0]).join(", ")) : ""}">🟡 Rückmeldung fehlt</span>` : ""}
+              ${(spiel || e.art === "training") && !e.abgesagt ? `<span class="badge" title="Zusagen inkl. Trainer:in">👥 ${((e.zusagen || {}).yes || 0) + 1} dabei</span>` : ""}
               ${spiel && !e.abgesagt ? `<span class="badge accent" data-countdown="${esc(e.start)}">${countdownText(e.start)}</span>` : ""}</div>
             <div class="sub">${fmtDate(e.start)} · ${fmtTime(e.start)} Uhr${e.location ? " · " + esc(e.location) : ""}</div>
             ${ortZeile(e)}
@@ -949,6 +968,27 @@
       </div>`;
   }
 
+  // ---------- Push-Nachfrage beim Öffnen (Eltern) ----------
+  function pushNachfragen() {
+    const ios = istIosOhneApp();
+    U.modal({
+      title: "🔔 Mitteilungen einschalten?",
+      body: `<p class="soft" style="margin-top:0">Absagen, Terminänderungen, gesuchte Helfer:innen und Antworten des Trainerteams kommen dann sofort aufs Handy – ohne die App öffnen zu müssen.</p>
+        ${ios ? `<p class="soft"><strong>iPhone:</strong> Dafür muss die App zuerst installiert sein: Teilen-Menü → „Zum Home-Bildschirm“. Danach hier einmal auf „Einschalten“ tippen.</p>` : ""}`,
+      footer: `<button class="btn ghost" data-x>Später</button>${ios ? "" : `<button class="btn" data-pushjetzt>🔔 Jetzt einschalten</button>`}`,
+      onOpen(m) {
+        m.querySelector("[data-x]").onclick = U.closeModal;
+        const b = m.querySelector("[data-pushjetzt]");
+        if (b) b.onclick = async () => {
+          U.closeModal();
+          await pushAktivieren();
+          P.pushAktiv = !!(await pushAbo());
+          render();
+        };
+      },
+    });
+  }
+
   // ---------- Countdown bis zum Spiel, Kompakttabelle, Eltern-Abzeichen ----------
   function countdownText(start) {
     const diff = new Date(start) - Date.now();
@@ -1420,6 +1460,18 @@
     });
     wrap.querySelectorAll("[data-fotoweg]").forEach((b) => b.onclick = () =>
       aktion("/api/portal/profilbild", { playerId: b.dataset.fotoweg, fotoLoeschen: true }, "Foto entfernt", true));
+    const nmSenden = wrap.querySelector("#nmSenden");
+    if (nmSenden) nmSenden.onclick = async () => {
+      const ta = wrap.querySelector("#nmText");
+      const text = (ta.value || "").trim();
+      if (text.length < 2) { toast("Bitte eine Nachricht eingeben", "bad"); return; }
+      nmSenden.disabled = true;
+      const res = await api("/api/portal/nachricht", { text });
+      nmSenden.disabled = false;
+      if (!res.ok) { toast(res.data.error || "Senden fehlgeschlagen", "bad"); return; }
+      toast("Nachricht ans Trainerteam geschickt 📨", "good");
+      await neuLaden(false);
+    };
     const ampel = wrap.querySelector("[data-ampel]");
     if (ampel) ampel.onclick = ampelListe;
     const gehKonto = wrap.querySelector("[data-gehkonto]");

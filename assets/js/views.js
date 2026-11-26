@@ -157,6 +157,12 @@
     el.innerHTML = `
       ${head("Übersicht", `Willkommen zurück im Trainer-Cockpit des ${esc(s.club)}`)}
       <div id="dringend"></div>
+      ${(() => { const u = (s.nachrichten || []).filter((n) => !n.gelesen); return u.length ? `
+      <div class="card mb" style="border:1.5px solid var(--primary-2,#2563eb)">
+        <div class="card-head"><h3>📨 Neue Nachrichten (${u.length})</h3><span class="spacer"></span><a class="btn sm" href="#/nachrichten">Lesen &amp; antworten</a></div>
+        <div class="list">${u.slice(-3).reverse().map((n) => `<a class="list-item" href="#/nachrichten"><div class="grow">
+          <div class="title">${esc(n.von)}</div><div class="sub">${esc(String(n.text).slice(0, 120))}${String(n.text).length > 120 ? "…" : ""}</div></div><span class="arr">›</span></a>`).join("")}</div>
+      </div>` : ""; })()}
       <div id="passkeyAngebot"></div>
       <div class="grid grid-4 mb">
         ${stat("🏐", "Aktive Spieler", s.players.filter((p) => p.membershipStatus !== "inaktiv").length, `${s.players.length} gesamt`, "#/players")}
@@ -318,6 +324,52 @@
   function prioBadge(p) {
     const m = { hoch: "bad", mittel: "warn", niedrig: "" };
     return `<span class="badge ${m[p] || ""}">${esc(p)}</span>`;
+  }
+
+  /* ======================================================================
+     NACHRICHTEN – Eltern schreiben dem Trainerteam, Antworten mit Push
+     ====================================================================== */
+  function nachrichten(el) {
+    const s = S();
+    const liste = (s.nachrichten || []).slice().sort((a, b) => (a.gelesen === b.gelesen ? String(b.at).localeCompare(String(a.at)) : a.gelesen ? 1 : -1));
+    const ungelesen = liste.filter((n) => !n.gelesen).length;
+    const kinder = (n) => (n.playerIds || []).map(playerName).filter(Boolean).join(", ");
+    const wann = (iso) => iso ? new Date(iso).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+    el.innerHTML = `
+      ${head("Nachrichten", "Nachrichten aus dem Elternportal – antworten, als gelesen markieren", "")}
+      <div class="grid grid-3 mb">
+        ${stat("📨", "Ungelesen", ungelesen, ungelesen ? "bitte beantworten" : "alles gelesen")}
+        ${stat("💬", "Gesamt", liste.length, "Nachrichten")}
+        ${stat("✅", "Beantwortet", liste.filter((n) => (n.antworten || []).length).length, "mit Antwort")}
+      </div>
+      ${liste.length ? liste.map((n) => `
+        <div class="card mb" style="${n.gelesen ? "" : "border:1.5px solid var(--primary-2,#2563eb)"}">
+          <div class="card-head"><h3 style="font-size:1rem">${n.gelesen ? "" : "🔵 "}${esc(n.von)} <span class="soft" style="font-weight:400">· ${n.rolle === "eltern" ? "Eltern" : esc(n.rolle || "")}${kinder(n) ? " von " + esc(kinder(n)) : ""}</span></h3>
+            <span class="spacer"></span><span class="soft">${wann(n.at)}</span></div>
+          <p style="white-space:pre-line;margin:0 0 10px">${esc(n.text)}</p>
+          ${(n.antworten || []).map((a) => `<div style="background:var(--surface-2);border-radius:10px;padding:8px 12px;margin-bottom:6px">
+            <div class="sub">💬 ${esc(a.von)} · ${wann(a.at)}</div><div style="white-space:pre-line">${esc(a.text)}</div></div>`).join("")}
+          <div class="flex" style="gap:8px;flex-wrap:wrap;align-items:flex-start">
+            <textarea data-antwort="${n.id}" rows="2" placeholder="Antwort schreiben … (geht per Push ans Elternkonto)" style="flex:1;min-width:200px"></textarea>
+            <button class="btn sm" data-senden="${n.id}">💬 Antworten</button>
+            ${n.gelesen ? `<button class="btn sm ghost" data-ungelesen="${n.id}">Als ungelesen</button>` : `<button class="btn sm outline" data-gelesen="${n.id}">✔️ Gelesen</button>`}
+            <button class="btn sm ghost" data-ndel="${n.id}" title="Nachricht löschen">🗑️</button>
+          </div>
+        </div>`).join("") : `<div class="card">${empty("📨", "Noch keine Nachrichten – Eltern schreiben über die Startseite ihres Portals.")}</div>`}`;
+    $$("[data-gelesen]", el).forEach((b) => b.onclick = () => { Store.update("nachrichten", b.dataset.gelesen, { gelesen: true }); reload(); });
+    $$("[data-ungelesen]", el).forEach((b) => b.onclick = () => { Store.update("nachrichten", b.dataset.ungelesen, { gelesen: false }); reload(); });
+    $$("[data-ndel]", el).forEach((b) => b.onclick = () => confirmDialog("Nachricht samt Antworten löschen?", () => { Store.remove("nachrichten", b.dataset.ndel); reload(); }));
+    $$("[data-senden]", el).forEach((b) => b.onclick = async () => {
+      const n = Store.byId("nachrichten", b.dataset.senden);
+      const ta = $(`[data-antwort="${n.id}"]`, el);
+      const text = (ta.value || "").trim();
+      if (text.length < 2) { toast("Bitte eine Antwort schreiben", "bad"); return; }
+      const von = (window.Sync && Sync.user && Sync.user.name) || "Trainerteam";
+      Store.update("nachrichten", n.id, { gelesen: true, antworten: [...(n.antworten || []), { text, von, at: new Date().toISOString() }] });
+      const r = await apiZugang("/api/nachrichten/push", { userId: n.userId, text: text.slice(0, 140) });
+      toast(r.ok ? (r.data.zugestellt ? "Antwort gespeichert und per Push zugestellt" : "Antwort gespeichert – Elternkonto hat kein Push, sieht sie beim nächsten Öffnen") : "Antwort gespeichert, Push nicht möglich", r.ok ? "good" : "bad");
+      reload();
+    });
   }
 
   /* ======================================================================
@@ -5370,6 +5422,6 @@
   window.Views = {
     dashboard, players, departments, calendar, training, analyse, drivers, jobs, consents,
     birthdays, finances, clothing, sponsors, standings, wiki,
-    announcements, tasks, inventory, verbandsmeldung, backup, zugaenge, dokumente,
+    announcements, tasks, inventory, verbandsmeldung, backup, zugaenge, dokumente, nachrichten,
   };
 })();

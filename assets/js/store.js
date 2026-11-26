@@ -381,6 +381,7 @@
       jobs: includeDemo ? jobs : [],
       consents: includeDemo ? consents : [],
       einwilligungen: [],
+      nachrichten: [],
       calendarFeeds: includeDemo ? calendarFeeds : [],
       finances: includeDemo ? finances : [],
       clothingRequests: includeDemo ? clothingRequests : [],

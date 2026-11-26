@@ -900,6 +900,11 @@ def create_app() -> Flask:
             "fahrer": fahrer,
             "jobs": jobs,
             "elternAbzeichen": eltern_abzeichen(),
+            "nachrichten": [{"id": n.get("id"), "text": n.get("text") or "", "at": n.get("at"),
+                             "antworten": [{"text": a.get("text") or "", "von": a.get("von") or "Trainerteam",
+                                            "at": a.get("at")} for a in (n.get("antworten") or [])]}
+                            for n in daten.get("nachrichten", [])
+                            if isinstance(n, dict) and n.get("userId") == sess["user_id"]][-20:],
             "quizFragen": [{k: q.get(k) for k in ("id", "kapitel", "f", "a", "r", "stufe")}
                            for q in daten.get("quizFragen", [])],
             "kleidung": [dict({k: c.get(k) for k in ("id", "name", "description", "price", "sizes", "kind", "color")},
@@ -1132,6 +1137,65 @@ def create_app() -> Flask:
                              "erledigt": sess["user_id"] in (t.get("erledigtVon") or [])})
         ergebnis.sort(key=lambda t: (t["erledigt"], str(t["due"] or "")))
         return ergebnis
+
+    @app.post("/api/portal/nachricht")
+    def api_portal_nachricht():
+        """Eltern schreiben dem Trainerteam. Landet im Datenbestand (nachrichten[]) + Push an alle Trainer."""
+        sess, failure = require_portal()
+        if failure:
+            return failure
+        if sess["role"] != "eltern":
+            return err(403, "Nachrichten ans Trainerteam gibt es im Elternkonto")
+        body = request.get_json(silent=True) or {}
+        text = str(body.get("text") or "").strip()[:1000]
+        if len(text) < 2:
+            return err(400, "Bitte eine Nachricht eingeben")
+        jetzt = db.now()
+        neulich = con().execute(
+            "SELECT COUNT(*) AS n FROM login_log WHERE username = ? AND ts > ?",
+            (f"nachricht:{sess['user_id']}", jetzt - 3600)).fetchone()["n"]
+        if neulich >= 20:
+            return err(429, "Sehr viele Nachrichten in kurzer Zeit – bitte später noch einmal")
+        log_login(f"nachricht:{sess['user_id']}", True)
+        eintrag = {"id": neue_id("nm"), "userId": sess["user_id"], "von": sess["name"], "rolle": sess["role"],
+                   "playerIds": sorted(sess_player_ids(sess)), "text": text, "at": iso_jetzt(),
+                   "gelesen": False, "antworten": []}
+
+        def mut(d):
+            d.setdefault("nachrichten", []).append(eintrag)
+
+        if speichere_portal_aenderung(mut, f"{sess['name']} (Portal)") is None:
+            return err(409, "Senden gerade nicht möglich – bitte erneut versuchen")
+        trainer_ids = [r["id"] for r in con().execute(
+            "SELECT id FROM users WHERE active = 1 AND role = 'trainer'").fetchall()]
+        if _push is not None:
+            try:
+                _push.senden(con(), f"📨 Nachricht von {sess['name']}",
+                             text[:140] + ("…" if len(text) > 140 else ""), "/#/nachrichten", trainer_ids,
+                             kategorie="allgemein")
+            except Exception:  # noqa: BLE001
+                pass
+        return jsonify({"ok": True, "id": eintrag["id"]})
+
+    @app.post("/api/nachrichten/push")
+    def api_nachrichten_push():
+        """Trainer hat geantwortet (Antwort steht schon im Datenbestand) – Elternkonto per Push informieren."""
+        sess, failure = require(role="trainer")
+        if failure:
+            return failure
+        body = request.get_json(silent=True) or {}
+        try:
+            ziel = int(body.get("userId") or 0)
+        except (TypeError, ValueError):
+            ziel = 0
+        text = str(body.get("text") or "").strip()[:140]
+        if not ziel or not text:
+            return err(400, "userId und Text nötig")
+        if _push is None:
+            return jsonify({"ok": True, "zugestellt": 0})
+        res = _push.senden(con(), f"💬 Antwort vom Trainerteam ({sess['name']})", text, "/#nachrichten", [ziel],
+                           kategorie="allgemein")
+        return jsonify({"ok": True, "zugestellt": res["ok"]})
 
     @app.post("/api/portal/aufgabe")
     def api_portal_aufgabe():
