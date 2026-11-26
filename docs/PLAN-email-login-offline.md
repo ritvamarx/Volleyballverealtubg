@@ -207,7 +207,7 @@ Pflegbar in der Trainer-Ansicht (Liste `rueckenwindKacheln`), max. 12.
 1. ✅ Datenmodell, Routen (`server/rueckenwind.py`), Opt-in-Logik mit Altersregel, Limits, Pushs, Tests.
 2. ✅ Elternkarte nach Termin + „einfach so“ (Konto-Tab), Spielerkarte mit Anfrage/Reaktion/Antwort, Sammlung, Schalter.
 3. ✅ Kachelpflege in der Trainer-Ansicht „Nachrichten“ (Trainer sieht keine Inhalte).
-4. ⏳ „Dein Jahr“ zum Saisonende (offen).
+4. ✅ „Dein Jahr“: PDF-Saisonrückblick (`server/dein_jahr.py`, `/api/portal/dein-jahr.pdf`, nur eigenes Spielerkonto) mit Zahlen, Abzeichen, Quizpunkten, Tabellenplatz und Rückenwind; Karte im Juni/Juli auf der Startseite, Knopf immer im Konto-Tab. Spieler-Rückenwind-Karte kompakt (eine Zeile je Eintrag, Antwort einklappbar).
 Freigabe nach Test auf der Test-Instanz; Start am besten mit einer Ankündigung an die Eltern, was
 Rückenwind ist und was nicht (keine Kritik, keine Ratschläge).
 

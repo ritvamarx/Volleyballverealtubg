@@ -1736,6 +1736,11 @@ def create_app() -> Flask:
         "neue_id": neue_id, "iso_jetzt": iso_jetzt, "client_ip": client_ip, "log_login": log_login,
         "push": _push, "auth": auth, "pdf_brief": __import__("pdf_brief")})
 
+    # Saisonrückblick „Dein Jahr" als PDF – siehe server/dein_jahr.py
+    import dein_jahr as _dj
+    _dj.register(app, con, require_portal, err, {
+        "sess_player_ids": sess_player_ids, "lade_state": lade_state, "pdf_brief": __import__("pdf_brief")})
+
     # Rückenwind (Eltern → Spieler:in) – siehe server/rueckenwind.py
     import rueckenwind as _rw
     _rw.register(app, con, require_portal, err, {

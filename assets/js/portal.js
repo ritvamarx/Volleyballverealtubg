@@ -413,6 +413,7 @@
       </div>` : "";
     return `
       ${hallo}
+      ${deinJahrKarte()}
       ${rwSpielerStart()}
       ${einwKarteStart}
       ${rwElternStart()}
@@ -1030,28 +1031,41 @@
     if (istEltern()) return "";
     const rw = P.daten.rueckenwind; if (!rw) return "";
     const teile = [];
-    (rw.anfragen || []).forEach((a) => teile.push(`<div class="portal-termin">
-      <div class="title">💬 ${esc(a.name)} möchte dir Rückenwind schicken</div>
-      <p class="soft" style="margin:6px 0">Kurze, positive Rückmeldungen nach Terminen – nur du siehst sie, das Trainerteam nicht. Du entscheidest und kannst es jederzeit wieder ausschalten.</p>
-      <div class="portal-fahrer"><button class="btn sm" data-rwerlauben="${a.userId}" data-ok="1">Erlauben</button>
-        <button class="btn sm ghost" data-rwerlauben="${a.userId}" data-ok="0">Lieber nicht</button></div></div>`));
-    (rw.neu || []).forEach((x) => teile.push(`<div class="portal-termin" data-rwid="${x.id}">
-      <div class="title">💬 Rückenwind von ${esc(x.vonName)}</div>
-      <div class="sub">${x.terminTitel ? esc(x.terminTitel) + " · " : ""}${fmtDateShort(x.at)}</div>
-      <div style="margin:8px 0;font-size:1rem">${(x.kacheln || []).map((k) => `<div>✨ ${esc(k)}</div>`).join("")}${x.text ? `<div style="margin-top:4px">„${esc(x.text)}“</div>` : ""}${x.emoji ? `<div style="font-size:1.6rem;margin-top:4px">${esc(x.emoji)}</div>` : ""}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        ${RW_REAKT.map((r) => `<button class="btn sm ghost" data-rwreakt="${x.id}" data-r="${r}" style="font-size:1.1rem">${r}</button>`).join("")}
-        <input data-rwantwort="${x.id}" maxlength="140" placeholder="kurz antworten (optional)" style="flex:1;min-width:140px">
-        <button class="btn sm" data-rwantwortsenden="${x.id}">Senden</button>
-      </div></div>`));
+    (rw.anfragen || []).forEach((a) => teile.push(`<div class="list-item" style="gap:6px;padding:8px 10px">
+      <div class="grow"><div class="title" style="font-size:.88rem">${esc(a.name)} möchte dir Rückenwind schicken</div>
+        <div class="sub">kurze positive Rückmeldungen · nur du siehst sie · jederzeit abschaltbar</div></div>
+      <button class="btn sm" data-rwerlauben="${a.userId}" data-ok="1">OK</button>
+      <button class="btn sm ghost" data-rwerlauben="${a.userId}" data-ok="0">Nein</button></div>`));
+    (rw.neu || []).forEach((x) => teile.push(`<div class="list-item rw-zeile" data-rwid="${x.id}" style="flex-wrap:wrap;gap:4px 8px;padding:8px 10px">
+      <div class="grow" style="min-width:160px">
+        <div style="font-size:.9rem;line-height:1.5">${(x.kacheln || []).map((k) => `<span class="badge good">${esc(k)}</span>`).join(" ")}${x.text ? ` „${esc(x.text)}“` : ""} ${esc(x.emoji || "")}</div>
+        <div class="sub">${esc(x.vonName)} · ${x.terminTitel ? esc(x.terminTitel) + " · " : ""}${fmtDateShort(x.at)}</div></div>
+      <div style="display:flex;gap:2px;align-items:center">
+        ${RW_REAKT.map((r) => `<button class="btn sm ghost" data-rwreakt="${x.id}" data-r="${r}" style="padding:2px 6px;font-size:1rem">${r}</button>`).join("")}
+        <button class="btn sm ghost" data-rwantwortzeigen="${x.id}" title="kurz antworten" style="padding:2px 6px">↩︎</button></div>
+      <div data-rwantwortbox="${x.id}" style="flex-basis:100%;display:none;gap:6px">
+        <input data-rwantwort="${x.id}" maxlength="140" placeholder="kurz antworten" style="flex:1">
+        <button class="btn sm" data-rwantwortsenden="${x.id}">Senden</button></div>
+    </div>`));
     if (!teile.length) return "";
-    return `<div class="card rw-neu" id="rwKarte"><h3>💬 Rückenwind</h3>${teile.join("")}</div>`;
+    return `<div class="card rw-neu" id="rwKarte" style="padding:10px 12px"><h3 style="font-size:.95rem;margin:0 0 6px">💬 Rückenwind</h3><div class="list">${teile.join("")}</div></div>`;
   }
+  // „Dein Jahr": Rückblick-PDF – Karte im Juni/Juli, Knopf immer im Konto-Tab
+  function deinJahrKarte() {
+    if (istEltern()) return "";
+    const m = new Date().getMonth() + 1;
+    if (m !== 6 && m !== 7) return "";
+    return `<div class="card"><h3>🏐 Dein Jahr mit Volleyball</h3>
+      <p class="soft" style="margin-top:0">Die Saison ist (fast) rum: Trainings, Spiele, Abzeichen, Quizpunkte und dein gesammelter Rückenwind auf einer Seite – zum Behalten und Teilen.</p>
+      <a class="btn" style="text-decoration:none" href="/api/portal/dein-jahr.pdf${m === 7 ? "?saison=vorige" : ""}" target="_blank" rel="noopener">📄 PDF öffnen</a></div>`;
+  }
+
   function rwSpielerKonto() {
     if (istEltern()) return "";
     const rw = P.daten.rueckenwind; if (!rw) return "";
     return `<div class="card"><h3>💬 Rückenwind</h3>
       <p class="soft" style="margin-top:0">Deine Eltern können dir nach Terminen kurze, positive Rückmeldungen schicken. Nur du siehst sie. Du bestimmst, ob und von wem.</p>
+      <p style="margin:0 0 8px"><a class="btn sm outline" style="text-decoration:none" href="/api/portal/dein-jahr.pdf" target="_blank" rel="noopener">📄 Dein Jahr mit Volleyball (Saisonrückblick als PDF)</a></p>
       <button class="toggle-item ${rw.an ? "an" : ""}" data-rwan aria-pressed="${rw.an ? "true" : "false"}"><span class="check">✓</span>
         <div class="g"><div class="t">Rückenwind empfangen</div><div class="s">${rw.an ? "an – Eltern können nach Freigabe schicken" : "aus – niemand kann dir Rückenwind schicken"}</div></div></button>
       ${(rw.sammlung || []).length ? `<div class="sub" style="margin-top:10px">Deine Sammlung (${rw.sammlung.length})</div><div class="list">${rw.sammlung.map((x) => `<div class="list-item" style="flex-direction:column;align-items:stretch;gap:2px">
@@ -1596,6 +1610,11 @@
       if (!res.ok) { toast(res.data.error || "Fehler", "bad"); return; }
       toast("Reaktion geschickt " + b.dataset.r, "good");
       await neuLaden(false);
+    });
+    wrap.querySelectorAll("[data-rwantwortzeigen]").forEach((b) => b.onclick = () => {
+      const box = wrap.querySelector(`[data-rwantwortbox="${b.dataset.rwantwortzeigen}"]`);
+      const offen = box.style.display !== "none";
+      box.style.display = offen ? "none" : "flex"; if (!offen) box.querySelector("input").focus();
     });
     wrap.querySelectorAll("[data-rwantwortsenden]").forEach((b) => b.onclick = async () => {
       const id = b.dataset.rwantwortsenden;
