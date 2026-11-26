@@ -2202,7 +2202,8 @@
 
   function jobForm(eventId, j, presetCat) {
     const isEdit = !!j;
-    j = j || { category: presetCat || "catering", title: "", assignee: "", done: false };
+    j = j || { category: presetCat || "catering", title: "", assignee: "", done: false, dauerMin: 60 };
+    const DAUER = [[15, "ca. 15 Min"], [30, "ca. 30 Min"], [60, "ca. 1 Std"], [90, "ca. 1,5 Std"], [120, "ca. 2 Std"], [180, "ca. 3 Std"], [300, "ganzer Spieltag"]];
     modal({
       title: isEdit ? "Job bearbeiten" : "Neuer Job",
       body: `<form id="jf"><div class="form-grid">
@@ -2210,6 +2211,8 @@
           ${Object.entries(jobCat).map(([k, v]) => `<option value="${k}" ${k === j.category ? "selected" : ""}>${v.label}</option>`).join("")}</select></div>
         <div class="field"><label>Zuständig (Name)</label><input name="assignee" value="${esc(j.assignee)}" placeholder="offen lassen = unbesetzt"></div>
         <div class="field full"><label>Aufgabe</label><input name="title" value="${esc(j.title)}" required></div>
+        <div class="field"><label>Ungefähre Dauer (sehen die Eltern)</label><select name="dauerMin">
+          ${DAUER.map(([m, l]) => `<option value="${m}" ${Number(j.dauerMin || 60) === m ? "selected" : ""}>${l}</option>`).join("")}</select></div>
       </div></form>`,
       footer: `<button class="btn ghost" data-x>Abbrechen</button><button class="btn" data-s>Speichern</button>`,
       onOpen(m) {
@@ -2217,6 +2220,7 @@
         m.querySelector("[data-s]").onclick = () => {
           const f = m.querySelector("#jf"); if (!f.reportValidity()) return;
           const d = formData(f);
+          d.dauerMin = parseInt(d.dauerMin, 10) || 60;
           if (isEdit) Store.update("jobs", j.id, d); else Store.add("jobs", Object.assign({ eventId, done: false }, d));
           closeModal(); toast("Gespeichert", "good"); reload();
         };

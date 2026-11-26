@@ -454,9 +454,9 @@
           </div><span class="arr">›</span>
           ${jobsHier.length ? `<div style="flex-basis:100%;margin-top:6px"><div class="sub" style="margin-bottom:4px">🙌 Hilfe gesucht – einfach übernehmen:</div>
             ${jobsHier.map((j) => `<div class="flex" style="justify-content:space-between;align-items:center;gap:8px;padding:4px 0;border-top:1px dashed var(--border)">
-              <span style="font-size:.86rem">${JOB_KAT[j.category] || "📌"} ${esc(j.title)}${j.meiner ? ' <span class="badge good">deiner 💪</span>' : ""}</span>
+              <span style="font-size:.86rem">${JOB_KAT[j.category] || "📌"} ${esc(j.title)}${jobDauer(j)}${j.meiner ? ' <span class="badge good">deiner 💪</span>' : ""}</span>
               ${j.meiner ? `<button class="btn sm ghost" data-jobab="${j.id}">Abgeben</button>` : `<button class="btn sm" data-job="${j.id}">Übernehmen</button>`}
-            </div>`).join("")}</div>` : ""}
+            </div>`).join("")}${helferZeile([e.id])}</div>` : ""}
           ${e.art === "away" && istEltern() && !e.abgesagt ? `<div style="flex-basis:100%;margin-top:6px" class="sub">🚗 ${fahrt && fahrt.seats ? `Du bietest ${fahrt.seats} Mitfahrplätze an – danke!` : `Mitfahrplätze gesucht – <a href="#" data-gehtab="mithelfen">jetzt anbieten</a>`}</div>` : ""}
           </div>`;
         }).join("") : `<p class="soft">Aktuell stehen keine Termine an.</p>`}
@@ -798,13 +798,14 @@
           ${kats.map((k) => `<div class="sub" style="margin-top:4px">${JOB_KAT[k] || "📌"} ${esc(JOB_TEXT[k] || JOB_TEXT.other)}</div>`).join("")}
           <div class="list" style="margin-top:8px">
           ${jobs.map((j) => `<div class="list-item"><div class="grow">
-              <div class="title" style="font-size:.9rem">${JOB_KAT[j.category] || "📌"} ${esc(j.title)}${zeit(j)}</div>
+              <div class="title" style="font-size:.9rem">${JOB_KAT[j.category] || "📌"} ${esc(j.title)}${zeit(j)}${jobDauer(j)}</div>
               ${j.meiner ? `<div class="sub">Du hast diesen Job übernommen – danke! 💪</div>` : ""}
             </div>
             ${j.meiner ? `<button class="btn sm ghost" data-jobab="${j.id}">Abgeben</button>`
                        : `<button class="btn sm" data-job="${j.id}">Übernehmen</button>`}
           </div>`).join("")}
           </div>
+          ${helferZeile(evs.map((e) => e.id))}
         </div>`;
       }).join("") : `<p class="soft">Aktuell sind keine offenen Jobs eingetragen.</p>`}
       </div>`;
@@ -1000,6 +1001,14 @@
     return `⏳ noch ${min} Min`;
   }
   const JOB_KAT = { catering: "🥗", helper: "🙌", other: "📌" };
+  const jobDauer = (j) => !j.dauerMin ? "" : ` <span class="soft">⏱️ ${j.dauerMin >= 300 ? "ganzer Spieltag" : j.dauerMin >= 60 ? "ca. " + (j.dauerMin / 60).toLocaleString("de-DE", { maximumFractionDigits: 1 }) + " Std" : "ca. " + j.dauerMin + " Min"}</span>`;
+  const helferZeile = (eventIds) => {
+    const h = eventIds.flatMap((eid) => (P.daten.helfer || {})[eid] || []);
+    if (!h.length) return "";
+    const seen = new Set();
+    return `<div class="sub" style="margin-top:6px">🤝 Mit dir dabei: ${h.filter((x) => { const k = x.name + "|" + x.job; if (seen.has(k)) return false; seen.add(k); return true; })
+      .map((x) => `<strong>${esc(x.name)}</strong> (${esc(x.job)})`).join(", ")} – sprecht euch gern ab.</div>`;
+  };
   const JOB_TEXT = {
     catering: "Kuchen, Brötchen, Getränke: Mit dem Buffet finanzieren wir Bälle, Netze und Trikots – und Gäste wie Spieler lieben es.",
     helper: "Auf- und Abbau, Kampfgericht, Einlass, Anschreiben: Ohne helfende Hände findet kein Heimspiel statt.",

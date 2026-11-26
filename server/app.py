@@ -702,15 +702,24 @@ def create_app() -> Flask:
                 if d.get("userId") == sess["user_id"]:
                     fahrer.append({"eventId": d.get("eventId"), "seats": d.get("seats") or 0,
                                    "phone": d.get("phone") or ""})
-            for j in daten.get("jobs", []):
-                if j.get("done"):
-                    continue
+            alle_jobs = [j for j in daten.get("jobs", []) if not j.get("done")]
+            meine_events = {j.get("eventId") for j in alle_jobs if j.get("userId") == sess["user_id"]}
+            for j in alle_jobs:
                 offen = not str(j.get("assignee") or "").strip()
                 meiner = j.get("userId") == sess["user_id"]
                 if offen or meiner:
                     jobs.append({"id": j.get("id"), "eventId": j.get("eventId"),
                                  "category": j.get("category") or "other",
-                                 "title": j.get("title") or "", "meiner": meiner})
+                                 "title": j.get("title") or "", "meiner": meiner,
+                                 "dauerMin": int(j.get("dauerMin") or 0) or None})
+            # Wer hilft noch mit? Nur sichtbar für Eltern, die beim selben Termin selbst einen Job haben
+            # (zum Vernetzen untereinander) – Namen und Aufgabe, keine Kontaktdaten.
+            helfer = {}
+            for j in alle_jobs:
+                eid = j.get("eventId")
+                if eid in meine_events and str(j.get("assignee") or "").strip() and j.get("userId") != sess["user_id"]:
+                    helfer.setdefault(eid, []).append({"name": str(j.get("assignee")).strip()[:60],
+                                                       "job": j.get("title") or ""})
 
         # Eltern-Abzeichen: übernommene Heimspiel-Jobs und Fahrten der laufenden Saison.
         # Zählt erst, wenn der Termin vorbei ist (also wirklich geholfen wurde).
@@ -899,6 +908,7 @@ def create_app() -> Flask:
                       for l in daten.get("links", [])],
             "fahrer": fahrer,
             "jobs": jobs,
+            "helfer": (helfer if rolle == "eltern" else {}),
             "elternAbzeichen": eltern_abzeichen(),
             "nachrichten": [{"id": n.get("id"), "text": n.get("text") or "", "at": n.get("at"),
                              "antworten": [{"text": a.get("text") or "", "von": a.get("von") or "Trainerteam",

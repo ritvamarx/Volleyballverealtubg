@@ -133,7 +133,9 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
 - Abzeichen der Kinder mit Beschreibung; Helfer-Abzeichen für Eltern (Jobs: 🤝/🥉/🥈/🥇,
   Fahrten: 🚗/🚐/🚌, gesamt: ⭐/🏆) mit Fortschritt zum nächsten Abzeichen; zählt erst nach dem Termin.
 - Mithelfen: Spieltage mit mehreren Spielen (gleicher Tag + Ort) zu einem Block zusammengefasst,
-  Jobs mit Uhrzeit, Fahrer-Angebot gilt für alle Spiele des Tages, motivierende Texte je Job-Art.
+  Jobs mit Uhrzeit und ungefährer Dauer (vom Trainerteam je Job gesetzt), Fahrer-Angebot gilt für
+  alle Spiele des Tages, motivierende Texte je Job-Art. Wer selbst einen Job am Termin hat, sieht die
+  anderen Helfer:innen mit Aufgabe (Namen, keine Kontaktdaten) zum Absprechen.
 - Konto: nach abgegebener Erklärung „Erklärungen ändern oder widerrufen“ mit vorbelegten Entscheidungen.
 
 ## Teil F: Eltern-Kommunikation – UMGESETZT 2026-11-26
@@ -144,37 +146,70 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
   gelesen/ungelesen, löschen), Dashboard-Karte „Neue Nachrichten“; Antwort geht per Push ans Elternkonto
   (`/api/nachrichten/push`) und erscheint im Portal unter der Nachricht. Link `/#nachrichten`.
 
-## Teil G: Wertschätzende Rückmeldung Eltern → Kind – KONZEPT (noch nicht gebaut)
+## Teil G: „Rückenwind“ – wertschätzende Rückmeldung Eltern → Spieler:in (UMSETZUNGSPLAN)
 
-**Ziel:** Eltern geben ihrem Kind nach Training oder Spiel eine kurze, positive Rückmeldung in der
-App, die motiviert statt bewertet. Kein Leistungsdruck, keine Vergleiche, keine Noten.
+**Zielgruppe:** Jugendliche und junge Erwachsene (ca. 13–20). Daraus folgt der Ton: auf Augenhöhe,
+kurz, konkret, nie kindlich, nie bewertend. Die Spieler:innen behalten die Kontrolle.
 
-**Grundregeln (aus Sportpsychologie und Kinderschutz):**
-1. Nur Positives und Konkretes: Einsatz, Haltung, Fairness, Fortschritt – nie Ergebnis oder Fehler.
-2. Nur eigene Kinder, nur sichtbar für Kind und Eltern; das Trainerteam sieht nichts davon
-   (Privatsphäre in der Familie), außer das Kind teilt es bewusst.
-3. Freiwillig, kein Zwang, keine Streaks mit Verlustangst; Erinnerung höchstens dezent.
-4. Kind kann reagieren (Emoji), aber nicht „zurückbewerten“.
+### Leitplanken
+1. **Opt-in der Spieler:in.** Beim ersten Rückenwind fragt die App: „Petra möchte dir nach Terminen
+   kurze Rückmeldungen schicken – erlauben?“ Ja / Nein / Später. Im Konto-Tab jederzeit abschaltbar
+   („Rückenwind empfangen: an/aus“). Bei „aus“ sehen Eltern nur „derzeit nicht aktiviert“, keine
+   Begründung. Ab 18 ist der Standard „aus“, bis die Person es einschaltet.
+2. **Nur positiv, nur konkret.** Kacheln und Hilfesatz lenken auf Einsatz, Haltung, Fairness,
+   Entwicklung. Kein Ergebnis, keine Fehler, kein Vergleich mit anderen, keine Ratschläge.
+3. **Privat.** Sichtbar nur für Absender:in und Empfänger:in. Trainerteam sieht nichts, auch keine
+   Anzahl. Kein Teilen in Gruppen; Export nur durch die Spieler:in selbst.
+4. **Keine Gamification für Eltern.** Keine Abzeichen, keine Streaks fürs Senden – sonst wird es
+   Pflichtübung statt Wertschätzung. Begrenzung: 1 Rückenwind je Termin und je Elternteil,
+   zusätzlich höchstens 1 „einfach so“ pro Woche.
+5. **Dialog erlaubt.** Die Spieler:in kann mit 👍 ❤️ 🙌 reagieren oder kurz antworten (140 Zeichen).
+   So fühlt es sich nach Gespräch an, nicht nach Lob von oben.
+6. **Sprache.** Vorname statt „Mama/Papa“ in Push und Karte („Rückenwind von Petra“). Kacheln als
+   kurze Sätze unter Erwachsenen, siehe unten. Frei formulierter Text hat den Hilfesatz
+   „Mir ist aufgefallen, dass du …“, nicht „Du warst so brav“.
 
-**Umsetzung „Mutmacher“ (Arbeitstitel):**
-- Eltern-Portal: nach einem Termin, an dem das Kind zugesagt hatte (bis 48 h danach), Karte
-  „💌 Mutmacher für Ben schicken“ mit drei Wegen: (a) Wertschätzungs-Kacheln zum Antippen, max. 2
-  („Du hast nie aufgegeben“, „Tolle Teamkollegin“, „Fair gespielt“, „Mutig angenommen“, „Gut
-  vorbereitet“, „Konzentriert von Anfang bis Ende“), (b) ein Satz frei (max. 140 Zeichen) mit Hilfe
-  „Ich habe gesehen, dass du …“, (c) ein Emoji. Nie Pflichtfeld.
-- Spieler-Portal: Startseite zeigt neue Mutmacher als Karte mit Herz-Animation (einmalig), danach
-  im Konto-Tab „💌 Meine Mutmacher“ als Sammlung (chronologisch, mit Datum und Termin). Reaktion
-  mit ❤️ 👍 😄 zurück an die Eltern.
-- Saisonrückblick: am Saisonende eine Seite „Dein Jahr“ für das Kind (Anzahl Trainings, Spiele,
-  Abzeichen, alle Mutmacher), teilbar als PDF/Bild in der Familie.
-- Trainer-Baustein (optional, getrennt): „Lob vom Trainerteam“ nach Spielen mit denselben Kacheln,
-  für alle Spieler:innen sichtbar nur als eigene Nachricht; Trainer sieht nur eigene Lobe.
-- Technik: Datenbestand `mutmacher[]` {id, playerId, vonUserId, terminId, kacheln[], text, emoji, at,
-  reaktion}; Portal-Routen `POST /api/portal/mutmacher`, `POST /api/portal/mutmacher/reaktion`;
-  Push ans Spielerkonto („💌 Ein Mutmacher von Mama/Papa“) mit Kategorie „allgemein“; Server filtert
-  strikt nach eigenem Kind; Texte werden auf Länge geprüft, keine Weitergabe an Dritte.
-- Aufwand: ein Arbeitstag inkl. Tests. Offene Entscheidungen: Kachel-Texte, ob Trainer-Lob
-  dazu soll, ob der Saisonrückblick im ersten Schritt dabei ist.
+### Kacheln (Vorschlag, vom Trainerteam änderbar)
+Starker Einsatz bis zum Schluss · Respekt, wie du drangeblieben bist · Fair gespielt ·
+Mutig angenommen · Ruhig geblieben, als es eng wurde · Gut für das Team gesprochen ·
+Konzentriert von Anfang an · Sichtbar besser als letzte Woche · Du hast andere mitgezogen.
+Pflegbar in der Trainer-Ansicht (Liste `rueckenwindKacheln`), max. 12.
+
+### Ablauf Eltern (Elternportal)
+- Nach einem Termin, an dem das Kind zugesagt hatte, erscheint ab 1 Stunde nach Ende bis 48 Stunden
+  danach auf der Startseite die Karte „💬 Rückenwind für Ben“ mit: bis zu 2 Kacheln, optional ein
+  Satz (140 Zeichen), optional ein Emoji. Senden ohne Pflichtfelder außer mindestens Kachel oder Satz.
+- Danach zeigt die Karte „gesendet“, später die Reaktion/Antwort des Kindes.
+- Karte „einfach so“ im Konto-Tab (1× pro Woche), gleiche Felder.
+- Ist Rückenwind abgeschaltet oder noch nicht erlaubt: kurzer Hinweis, keine Karte.
+
+### Ablauf Spieler:in (Spielerportal)
+- Push „💬 Rückenwind von Petra“ (Kategorie „allgemein“, abschaltbar wie alle Pushs).
+- Startseite: Karte mit Kacheln/Satz, dezente Animation einmalig, Reaktionsknöpfe und Antwortfeld.
+  Nach Reaktion rutscht sie in „Meine Rückenwind-Sammlung“ im Konto-Tab (chronologisch, mit Termin).
+- Konto-Tab: Schalter „Rückenwind empfangen“, Opt-in-Status je Elternkonto, Sammlung löschen.
+- Später: „Dein Jahr“ zum Saisonende (Trainings, Spiele, Abzeichen, Rückenwind), nur für die
+  Spieler:in, Export als Bild/PDF.
+
+### Technik
+- Datenbestand: `rueckenwind[]` {id, playerId, vonUserId, vonName, terminId|null, kacheln[], text,
+  emoji, at, reaktion, antwort, antwortAt}; `rueckenwindKacheln[]`; Opt-in je Spieler:in in
+  `users.notify_prefs` (`rueckenwindAn`, `rueckenwindErlaubt: [elternUserIds]`).
+- Routen: `POST /api/portal/rueckenwind` (Eltern; prüft Kind-Zuordnung, Fenster, Limits, Opt-in),
+  `POST /api/portal/rueckenwind/reaktion` (Spieler:in; Reaktion/Antwort), `POST /api/portal/rueckenwind/einstellung`
+  (Spieler:in; an/aus/erlauben). Payload `/api/portal`: Eltern bekommen eigene gesendete Einträge mit
+  Reaktion, Spieler:innen ihre empfangenen; Server filtert strikt, Trainer-Routen liefern nichts davon.
+- Pushs: an Spielerkonto bei Eingang, an Elternkonto bei Reaktion/Antwort.
+- Datenschutz: Löschen mit Konto/Spieler:in (Aufräumen wie bei Einwilligungen), Export in der
+  Datensicherung ohne Texte (nur Anzahl), Längenlimits, keine Links in Texten (werden entschärft).
+
+### Schritte und Aufwand
+1. Datenmodell, Routen, Opt-in-Logik, Tests (halber Tag).
+2. Elternkarte nach Termin + „einfach so“, Spielerkarte mit Reaktion/Antwort, Sammlung, Schalter (halber Tag).
+3. Kachelpflege in der Trainer-Ansicht (1 Stunde).
+4. „Dein Jahr“ (später, 1 Tag).
+Freigabe nach Test auf der Test-Instanz; Start am besten mit einer Ankündigung an die Eltern, was
+Rückenwind ist und was nicht (keine Kritik, keine Ratschläge).
 
 ## Reihenfolge und Freigaben
 1. A1 + A2 auf Test → Freigabe → live.
