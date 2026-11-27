@@ -817,3 +817,6 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
 /* Offline-Hinweis im Portal (Teil B) */
 .offline-leiste { background: #fef3c7; color: #78350f; font-size: .8rem; padding: 6px 16px; text-align: center; border-bottom: 1px solid #fcd34d; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; }
 .offline-leiste .btn { font-size: .75rem; }
+
+/* Hinweis nach „Meine Änderungen durchsetzen“ (Rückweg zum überschriebenen Stand) */
+.wh-hinweis { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 630; background: #fff7ed; color: #7c2d12; border: 1px solid #fdba74; border-radius: 12px; padding: 8px 12px; display: flex; gap: 8px; align-items: center; font-size: .85rem; box-shadow: 0 6px 24px rgba(0,0,0,.15); max-width: calc(100vw - 32px); flex-wrap: wrap; }

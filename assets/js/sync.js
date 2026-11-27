@@ -660,14 +660,62 @@
           updateStatus("☁️ Aktueller Stand geladen (v" + Sync.version + ")");
         };
         m.querySelector("[data-m]").onclick = async () => {
-          if (!confirm(`Wirklich? Der Stand von ${who} wird damit überschrieben.`)) return;
-          Sync.version = info.currentVersion || Sync.version;   // auf den Serverstand aufsetzen und überschreiben
+          if (!confirm(`Wirklich? Der Stand von ${who} wird damit überschrieben. Er bleibt im Verlauf (Datensicherung) und lässt sich dort wiederherstellen.`)) return;
+          const ueberschrieben = info.currentVersion || Sync.version;
+          Sync.version = ueberschrieben;   // auf den Serverstand aufsetzen und überschreiben
           U.closeModal();
           await pushNow(false);
+          if (!Sync.pending) {
+            Sync.ueberschrieben = { version: ueberschrieben, wer: who, wann: when };
+            wiederherstellenAngebot();
+          }
         };
       },
     });
   }
+
+  // Nach „durchsetzen": kleiner Hinweis mit Rückweg (überschriebener Stand liegt im Verlauf)
+  function wiederherstellenAngebot() {
+    const u = Sync.ueberschrieben;
+    if (!u) return;
+    const alt = document.getElementById("wiederherstellenHinweis");
+    if (alt) alt.parentNode.removeChild(alt);
+    const box = document.createElement("div");
+    box.id = "wiederherstellenHinweis";
+    box.className = "wh-hinweis";
+    box.innerHTML = `<span>↩️ Stand von <strong>${u.wer}</strong> (v${u.version}) wurde überschrieben.</span>
+      <button class="btn sm" data-wh>Doch wiederherstellen</button><button class="btn sm ghost" data-whx title="Hinweis schließen">✕</button>`;
+    document.body.appendChild(box);
+    const weg = () => { if (box.parentNode) box.parentNode.removeChild(box); };
+    box.querySelector("[data-whx]").onclick = weg;
+    box.querySelector("[data-wh]").onclick = async () => {
+      if (!confirm(`Version ${u.version} (${u.wer}) wiederherstellen? Deine durchgesetzten Änderungen bleiben als eigene Version im Verlauf.`)) return;
+      weg();
+      await Sync.wiederherstellen(u.version);
+    };
+  }
+
+  // Serverstand einer früheren Version zurückholen (wird selbst eine neue Version) und laden
+  Sync.wiederherstellen = async function (version) {
+    const r = await api("/api/state/restore", { method: "POST", body: JSON.stringify({ version }) });
+    if (!r.ok) { if (window.U) U.toast(r.data.error || "Wiederherstellen fehlgeschlagen", "bad"); return false; }
+    const res = await api("/api/state");
+    if (res.ok && res.data.state) {
+      Sync.version = res.data.version;
+      Store.replaceAll(res.data.state);
+      metaSchreiben({ version: Sync.version, pending: false });
+    }
+    Sync.ueberschrieben = null;
+    App.reload();
+    updateStatus("☁️ Version " + version + " wiederhergestellt (jetzt v" + Sync.version + ")");
+    if (window.U) U.toast("Version " + version + " wiederhergestellt", "good");
+    return true;
+  };
+
+  Sync.verlauf = async function () {
+    const r = await api("/api/state/history");
+    return r.ok ? (r.data.history || []) : [];
+  };
 
   function updateStatus(text) {
     const el = $("#syncStatus");

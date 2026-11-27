@@ -126,8 +126,9 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
   nachgetragen (online-Ereignis, 20-s-Intervall).
 - Konfliktdialog (409) mit zwei Wegen: „Aktuellen Stand laden“ (eigene Änderungen verwerfen) oder
   „Meine Änderungen durchsetzen“ (überschreibt den Stand des anderen Trainerkontos, mit Rückfrage).
-- Offen (klein): Verlaufsfunktion zeigt nach „durchsetzen“ den überschriebenen Stand weiterhin an
-  (Wiederherstellen möglich).
+- Rückweg (27.11.): nach „durchsetzen“ erscheint unten ein Hinweis „Stand von X (vN) wurde überschrieben –
+  Doch wiederherstellen“; außerdem neue Karte „🕘 Verlauf auf dem Server“ in der Datensicherung mit den
+  letzten Versionen (wer, wann, Größe) und „Wiederherstellen“ je Version (wird selbst eine neue Version).
 
 ## Teil C: Dokumentenablage mit Freigabe – UMGESETZT 2026-11-26
 - Trainer-Ansicht „📁 Dokumente“: Upload (mehrere Dateien, PDF/Bilder/Office/CSV/ICS/ZIP,

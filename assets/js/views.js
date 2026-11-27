@@ -4681,6 +4681,13 @@
           <div id="backupResult" class="mt"></div>
         </div>
       </div>
+      ${window.Sync && Sync.active ? `<div class="card mt" id="verlaufKarte">
+        <div class="card-head"><h3>🕘 Verlauf auf dem Server</h3></div>
+        <p class="soft" style="font-size:.88rem;margin-top:0">Jedes Speichern legt eine Version an. Wurde ein Stand
+        versehentlich überschrieben (z. B. nach „Meine Änderungen durchsetzen“ bei einem Konflikt), lässt er sich hier
+        zurückholen. Das Wiederherstellen wird selbst eine neue Version – es geht also nichts verloren.</p>
+        <div id="verlaufListe" class="soft" style="font-size:.85rem">Lade Verlauf …</div>
+      </div>` : ""}
       <div class="card mt">
         <div class="card-head"><h3>🔐 Verschlüsselte Sicherung – für die Cloud & Gerätewechsel</h3></div>
         <p class="soft" style="font-size:.88rem;margin-top:0">Erstellt eine <strong>passwortgeschützte Datei</strong>
@@ -4777,6 +4784,24 @@
     $("[data-demo]", el).onclick = () => confirmDialog("Alle Daten durch Demo-Beispieldaten ersetzen?", () => {
       Store.resetDemo(); toast("Demo-Daten geladen", "good"); reload();
     }, "Laden");
+    // Verlauf vom Server (nur im Server-Betrieb)
+    const vl = $("#verlaufListe", el);
+    if (vl && window.Sync && Sync.verlauf) {
+      Sync.verlauf().then((liste) => {
+        if (!liste.length) { vl.textContent = "Noch kein Verlauf vorhanden."; return; }
+        const zeit = (t) => new Date(t * 1000).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+        vl.innerHTML = `<div class="list">${liste.slice(0, 12).map((h, idx) => `<div class="list-item" style="padding:7px 10px">
+            <div class="grow"><div class="title" style="font-size:.88rem">v${h.version}${idx === 0 ? ' <span class="badge good">aktuell</span>' : ""} · ${zeit(h.updated_at)} Uhr</div>
+            <div class="sub">${esc(h.updated_by || "–")} · ${Math.round((h.size || 0) / 1024)} KB</div></div>
+            ${idx === 0 ? "" : `<button class="btn sm ghost" data-wiederher="${h.version}">↩️ Wiederherstellen</button>`}</div>`).join("")}</div>
+          ${liste.length > 12 ? `<div class="soft" style="font-size:.78rem;margin-top:6px">… und ${liste.length - 12} ältere Versionen</div>` : ""}`;
+        $$("[data-wiederher]", vl).forEach((b) => b.onclick = async () => {
+          const v = parseInt(b.dataset.wiederher, 10);
+          if (!confirm(`Version ${v} wiederherstellen? Der aktuelle Stand bleibt als eigene Version im Verlauf erhalten.`)) return;
+          if (await Sync.wiederherstellen(v)) reload();
+        });
+      }).catch(() => { vl.textContent = "Verlauf konnte nicht geladen werden."; });
+    }
   }
 
   // ---- Portal-Zugänge (Phase 3): Einladungscodes je Spieler:in + Kontenliste ----
