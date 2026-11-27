@@ -49,7 +49,23 @@
     const res = await fetch(path, opts);
     let data = null;
     try { data = await res.json(); } catch (e) { /* leer */ }
-    return { status: res.status, ok: res.ok, data: data || {} };
+    // X-Offline-Stand setzt der Service Worker, wenn er den gespeicherten Stand liefert
+    return { status: res.status, ok: res.ok, data: data || {}, offlineStand: res.headers.get("X-Offline-Stand") || null };
+  }
+
+  // Merker über Neuladen hinweg: letzte bekannte Server-Version und ob lokale Änderungen
+  // noch nicht gesendet wurden (Teil B4 – Trainer offline). Ohne diesen Merker würde ein
+  // Neuladen den Serverstand über ungesendete Offline-Änderungen schreiben.
+  const META_KEY = "skv_sync_meta";
+  function metaLesen() {
+    try { return JSON.parse(localStorage.getItem(META_KEY) || "{}") || {}; } catch (e) { return {}; }
+  }
+  function metaSchreiben(obj) {
+    try { localStorage.setItem(META_KEY, JSON.stringify(Object.assign(metaLesen(), obj))); } catch (e) { /* leer */ }
+  }
+  function uhrzeit(iso) {
+    const z = iso ? new Date(iso) : new Date();
+    return isNaN(z) ? "" : String(z.getHours()).padStart(2, "0") + ":" + String(z.getMinutes()).padStart(2, "0");
   }
 
   // ---------- Boot ----------
@@ -356,37 +372,64 @@
       show("portal");
       return;
     }
-    const res = await api("/api/state");
-    if (!res.ok) { authMsg(res.data.error || "Daten konnten nicht geladen werden", true); show("login"); return; }
-    Sync.version = res.data.version || 0;
-    if (res.data.state) {
-      Store.replaceAll(res.data.state);
+    let res = null;
+    try { res = await api("/api/state"); } catch (e) { res = null; }   // kein Netz, kein gespeicherter Stand
+    const meta = metaLesen();
+    const local = Store.get();
+    const hasLocal = (local.players || []).length || (local.events || []).length;
+    Sync.offlineStand = null;
+    if (!res) {
+      if (!hasLocal) { authMsg("Offline – und auf diesem Gerät ist noch kein Stand gespeichert. Bitte mit Netz anmelden.", true); show("login"); return; }
+      // Offline mit lokalem Stand: weiterarbeiten, Änderungen werden nachgetragen
+      Sync.version = meta.version || 0;
+      Sync.pending = !!meta.pending;
+      Sync.offlineStand = "gerät";
+    } else if (!res.ok) {
+      authMsg(res.data.error || "Daten konnten nicht geladen werden", true); show("login"); return;
+    } else if (meta.pending && hasLocal) {
+      // Lokale Änderungen warten noch auf den Server → NICHT überschreiben, gleich senden
+      Sync.version = meta.version || 0;
+      Sync.pending = true;
+      Sync.offlineStand = res.offlineStand;
     } else {
-      // Frischer Server: vorhandene lokale Daten anbieten
-      const local = Store.get();
-      const hasLocal = (local.players || []).length || (local.events || []).length;
-      if (hasLocal && confirm("Der Server ist noch leer. Lokale Daten dieses Browsers jetzt zum Server übertragen?")) {
-        await pushNow(true);
+      Sync.version = res.data.version || 0;
+      Sync.offlineStand = res.offlineStand;
+      if (res.data.state) {
+        Store.replaceAll(res.data.state);
+        metaSchreiben({ version: Sync.version, pending: false });
+      } else if (hasLocal && confirm("Der Server ist noch leer. Lokale Daten dieses Browsers jetzt zum Server übertragen?")) {
+        await pushNow(true);   // Frischer Server: vorhandene lokale Daten anbieten
       } else if (!hasLocal) {
-        await pushNow(true); // leere Struktur als Version 1 anlegen
+        await pushNow(true);   // leere Struktur als Version 1 anlegen
       }
     }
     Sync.active = true;
     gate.hidden = true;
     installSyncHooks();
     App.reload();
-    updateStatus("☁️ Verbunden als " + (Sync.user.name || Sync.user.username));
+    if (Sync.offlineStand) {
+      updateStatus("📴 Offline – Stand vom Gerät" + (Sync.offlineStand !== "gerät" ? " (" + uhrzeit(Sync.offlineStand) + ")" : "")
+        + (Sync.pending ? " · Änderungen werden nachgetragen" : ""));
+    } else {
+      updateStatus(Sync.pending ? "☁️ Sende Offline-Änderungen …" : "☁️ Verbunden als " + (Sync.user.name || Sync.user.username));
+    }
+    if (Sync.pending && navigator.onLine !== false) setTimeout(() => pushNow(false), 500);
   }
 
   // ---------- Laufender Abgleich ----------
   let debounceTimer = 0;
   function installSyncHooks() {
     Store.setOnSave(() => {
+      metaSchreiben({ version: Sync.version, pending: true });   // bis der Server bestätigt hat
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => { pushNow(false); }, 1200);
     });
     setInterval(() => { if (Sync.pending && navigator.onLine !== false) pushNow(false); }, 20000);
-    window.addEventListener("online", () => { if (Sync.pending) pushNow(false); });
+    window.addEventListener("online", () => {
+      Sync.offlineStand = null;
+      if (Sync.pending) pushNow(false); else updateStatus("☁️ Wieder online");
+    });
+    window.addEventListener("offline", () => updateStatus("📴 Offline – Änderungen werden nachgetragen"));
 
     // Abmelden-Knopf + Status in der Seitenleiste
     const foot = document.querySelector(".sidebar-foot");
@@ -566,6 +609,7 @@
     } catch (e) {
       Sync.saving = false;
       Sync.pending = true;
+      metaSchreiben({ version: Sync.version, pending: true });
       updateStatus("📴 Offline – Änderungen werden nachgetragen");
       return;
     }
@@ -588,8 +632,9 @@
     }
     Sync.version = res.data.version;
     Sync.pending = false;
-    const t = new Date();
-    updateStatus("☁️ Gespeichert " + String(t.getHours()).padStart(2, "0") + ":" + String(t.getMinutes()).padStart(2, "0"));
+    Sync.offlineStand = null;
+    metaSchreiben({ version: Sync.version, pending: false });
+    updateStatus("☁️ Gespeichert " + uhrzeit());
     if (initial) App.reload();
   }
 
@@ -598,19 +643,27 @@
     const when = info.updatedAt ? new Date(info.updatedAt * 1000).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }) + " Uhr" : "";
     U.modal({
       title: "Neuerer Stand auf dem Server",
-      body: `<p><strong>${who}</strong> hat ${when ? "um " + when + " " : ""}gespeichert, während du gearbeitet hast.</p>
-        <p>Deine letzte Änderung wurde <strong>nicht</strong> übernommen. Lade den aktuellen Stand und trage sie erneut ein.</p>`,
-      footer: `<button class="btn" data-r>Aktuellen Stand laden</button>`,
+      body: `<p><strong>${who}</strong> hat ${when ? "um " + when + " " : ""}gespeichert, während du gearbeitet hast${metaLesen().pending ? " (z. B. während du offline warst)" : ""}.</p>
+        <p>Deine Änderungen wurden <strong>noch nicht</strong> übernommen. Entweder den aktuellen Stand laden und sie erneut eintragen –
+        oder deine Änderungen durchsetzen; dann ist der Stand von ${who} überschrieben.</p>`,
+      footer: `<button class="btn ghost" data-m>Meine Änderungen durchsetzen</button><button class="btn" data-r>Aktuellen Stand laden</button>`,
       onOpen(m) {
         m.querySelector("[data-r]").onclick = async () => {
           const res = await api("/api/state");
           if (res.ok && res.data.state) {
             Sync.version = res.data.version;
             Store.replaceAll(res.data.state);
+            metaSchreiben({ version: Sync.version, pending: false });
           }
           U.closeModal();
           App.reload();
           updateStatus("☁️ Aktueller Stand geladen (v" + Sync.version + ")");
+        };
+        m.querySelector("[data-m]").onclick = async () => {
+          if (!confirm(`Wirklich? Der Stand von ${who} wird damit überschrieben.`)) return;
+          Sync.version = info.currentVersion || Sync.version;   // auf den Serverstand aufsetzen und überschreiben
+          U.closeModal();
+          await pushNow(false);
         };
       },
     });

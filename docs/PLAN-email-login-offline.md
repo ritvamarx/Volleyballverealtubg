@@ -117,9 +117,17 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
    (z. B. Termin vorbei) als Hinweis.
 4. Hinweis im Konto-Tab „n Änderungen warten auf Netz“, sonst keine Bedienung nötig.
 
-### B4 Traineransicht (später)
-- `/api/state` netz-zuerst mit Cache und Warteschlange fürs Speichern; die Versionsprüfung
-  gegen Konflikte gibt es dort schon.
+### B4 Traineransicht – UMGESETZT 2026-11-27
+- `/api/state` (GET) mit ETag (`"st-<version>-<zeit>"`) + `private, no-cache` → unverändert 304;
+  Service Worker liefert ihn offline aus dem Daten-Cache (`X-Offline-Stand`).
+- Offline-Start: App öffnet mit dem Stand vom Gerät, Status „📴 Offline – Stand vom Gerät (hh:mm)“.
+- Merker `skv_sync_meta` (letzte Server-Version, `pending`): ungesendete Offline-Änderungen überleben
+  ein Neuladen (der Serverstand überschreibt sie nicht mehr) und werden bei Netz automatisch
+  nachgetragen (online-Ereignis, 20-s-Intervall).
+- Konfliktdialog (409) mit zwei Wegen: „Aktuellen Stand laden“ (eigene Änderungen verwerfen) oder
+  „Meine Änderungen durchsetzen“ (überschreibt den Stand des anderen Trainerkontos, mit Rückfrage).
+- Offen (klein): Verlaufsfunktion zeigt nach „durchsetzen“ den überschriebenen Stand weiterhin an
+  (Wiederherstellen möglich).
 
 ## Teil C: Dokumentenablage mit Freigabe – UMGESETZT 2026-11-26
 - Trainer-Ansicht „📁 Dokumente“: Upload (mehrere Dateien, PDF/Bilder/Office/CSV/ICS/ZIP,

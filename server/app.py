@@ -479,11 +479,16 @@ def create_app() -> Flask:
         row = db.get_state(con())
         if row is None:
             return jsonify({"version": 0, "state": None, "updatedAt": None, "updatedBy": None})
-        return app.response_class(
-            '{"version":%d,"updatedAt":%d,"updatedBy":%s,"state":%s}'
-            % (row["version"], row["updated_at"], db.to_json(row["updated_by"]), row["data"]),
-            mimetype="application/json",
-        )
+        body = ('{"version":%d,"updatedAt":%d,"updatedBy":%s,"state":%s}'
+                % (row["version"], row["updated_at"], db.to_json(row["updated_by"]), row["data"]))
+        # ETag aus Version + Zeitstempel: unverändert → 304 ohne den großen Datenbestand (Teil B4)
+        etag = '"st-%d-%d"' % (row["version"], row["updated_at"])
+        wenn = [t.strip() for t in (request.headers.get("If-None-Match") or "").split(",") if t.strip()]
+        resp = app.response_class(status=304) if etag in wenn else app.response_class(body, mimetype="application/json")
+        resp.headers["ETag"] = etag
+        resp.headers["Cache-Control"] = "private, no-cache"
+        resp.headers["Vary"] = "Cookie"
+        return resp
 
     @app.put("/api/state")
     def api_state_put():

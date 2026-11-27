@@ -41,7 +41,7 @@ self.addEventListener("message", (e) => {
 // (gemeinsam genutzte Geräte: nie den Stand einer anderen Person zeigen).
 const DATEN = "skv-daten-v1";
 const DATEN_PFADE = ["/api/me", "/api/portal", "/api/portal/wetter", "/api/portal/quiz",
-  "/api/dokumente", "/api/passkey/liste", "/api/portal/helfer"];
+  "/api/dokumente", "/api/passkey/liste", "/api/portal/helfer", "/api/state"];
 const AUTH_PFADE = /^\/api\/(login|logout|register|passkey\/login\/finish|reset)/;
 
 function mitKopf(antwort, kopf) {
