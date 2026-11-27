@@ -1,6 +1,15 @@
 # Plan: Automatisch „ruhend“ nach 4 Trainingswochen ohne Rückmeldung
 
-Stand 2026-11-27 – Planung abgestimmt (Antworten des Trainerteams eingearbeitet), noch nicht umgesetzt.
+Stand 2026-11-27 – **UMGESETZT** (Schritte 1–6 in einem Zug; Regel wie unten).
+
+Umgesetzt: Status `ruhend` + Filter-Helfer (`Store.aktiv`, `db.spieler_aktiv`) an allen Stellen;
+Prüf-Job `server/ruhend.py` (`manage.py ruhend-pruefen [--trocken]`, Cron `deploy/cron/volleyball-ruhend`
+täglich 07:20); Einstellungen unter Trainingsrückmeldung („Automatik ruhend“: an/aus, Wochen, Mindestanzahl,
+Vorwarnung) mit Kurzprotokoll; Vorwarnung per Push/E-Mail mit Ein-Tipp `/#dabei`; Rückkehr-Karte im Portal
+(nur Spieler:innen-Konto), Zu-/Absage bis dahin gesperrt; Termine der Ruhezeit werden bei Rückkehr als
+„nicht nominiert“ nachgetragen; Trainer:innen: Chip „⏸️ ruhend“, Badge, manuell ruhend/aktiv im Formular,
+„Automatik aussetzen bis“ (Verletzung); Push ans Trainerteam bei ruhend/zurück.
+Noch zu tun auf dem Server: Cron-Datei einmalig installieren (siehe deploy/README-DEPLOY.md).
 
 ## Ziel (Wunsch Trainerteam)
 

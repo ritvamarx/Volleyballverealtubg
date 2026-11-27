@@ -119,7 +119,7 @@
   function rsvpStand(e) {
     if (!["training", "home", "away"].includes(e.type)) return "";
     if (e.abgesagt) return `<div class="sub"><span class="badge bad">🚫 abgesagt</span></div>`;
-    const aktive = S().players.filter((p) => p.membershipStatus !== "inaktiv").length;
+    const aktive = S().players.filter((p) => Store.aktiv(p)).length;
     const z = { yes: 0, no: 0, maybe: 0 };
     let nichtnom = 0;
     S().responses.forEach((r) => {
@@ -147,7 +147,7 @@
      ====================================================================== */
   function dashboard(el) {
     const s = S();
-    const openConsents = s.players.filter((p) => p.membershipStatus !== "inaktiv" && !p.consentOnFile).length;
+    const openConsents = s.players.filter((p) => Store.aktiv(p) && !p.consentOnFile).length;
     const openFees = s.finances.filter((f) => f.type === "fee" && !f.paid);
     const openJobs = s.jobs.filter((j) => !j.assignee || !j.done).length;
     const next = upcomingEvents(5);
@@ -166,7 +166,7 @@
       </div>` : ""; })()}
       <div id="passkeyAngebot"></div>
       <div class="grid grid-4 mb">
-        ${stat("🏐", "Aktive Spieler", s.players.filter((p) => p.membershipStatus !== "inaktiv").length, `${s.players.length} gesamt`, "#/players")}
+        ${stat("🏐", "Aktive Spieler", s.players.filter((p) => Store.aktiv(p)).length, `${s.players.length} gesamt${(() => { const r = s.players.filter((p) => p.membershipStatus === "ruhend").length; return r ? ` · ${r} ruhend` : ""; })()}`, "#/players")}
         ${stat("📅", "Nächste Termine", next.length, next[0] ? `${labelForType(next[0].type)} ${relDays(next[0].start)}` : "—", "#/calendar")}
         ${stat("📝", "Offene Einverständnis.", openConsents, openConsents ? "Bitte einholen" : "alles vollständig", "#/consents")}
         ${stat("💶", "Offene Beiträge", fmtMoney(openFees.reduce((a, f) => a + f.amount, 0)), `${openFees.length} Positionen`, "#/finances")}
@@ -530,8 +530,11 @@
     const s = S();
     const filter = players._team || "alle";
     let list = s.players.slice().sort((a, b) => a.lastName.localeCompare(b.lastName));
-    if (filter !== "alle") list = list.filter((p) => inDept(p, filter));
+    if (filter === "ruhend") list = list.filter((p) => p.membershipStatus === "ruhend");
+    else if (filter !== "alle") list = list.filter((p) => inDept(p, filter));
+    const nRuhend = s.players.filter((p) => p.membershipStatus === "ruhend").length;
     const chips = [`<button class="chip ${filter === "alle" ? "active" : ""}" data-team="alle">alle (${s.players.length})</button>`]
+      .concat(nRuhend ? [`<button class="chip ${filter === "ruhend" ? "active" : ""}" data-team="ruhend">⏸️ ruhend (${nRuhend})</button>`] : [])
       .concat(s.departments.map((d) => {
         const n = s.players.filter((p) => inDept(p, d.id)).length;
         return `<button class="chip ${filter === d.id ? "active" : ""}" data-team="${d.id}">${esc(d.name)} (${n})</button>`;
@@ -725,6 +728,7 @@
     if (st === "aktiv") return '<span class="badge good">aktiv</span>';
     if (st === "beitragsrückstand") return '<span class="badge warn">Rückstand</span>';
     if (st === "inaktiv") return '<span class="badge">inaktiv</span>';
+    if (st === "ruhend") return '<span class="badge warn" title="Automatik: vier Trainingswochen ohne Rückmeldung – zurück nur durch eigene Bestätigung im Portal">⏸️ ruhend</span>';
     return `<span class="badge">${esc(st)}</span>`;
   }
 
@@ -756,7 +760,9 @@
           ${Object.entries(genderLabel).map(([k, v]) => `<option value="${k}" ${k === p.gender ? "selected" : ""}>${v}</option>`).join("")}</select></div>
         <div class="field"><label>Passnummer (Verband)</label><input name="passNumber" value="${esc(p.passNumber || "")}" placeholder="z. B. MV202512345"></div>
         <div class="field"><label>Status</label><select name="membershipStatus">
-          ${["aktiv", "beitragsrückstand", "inaktiv"].map((x) => `<option ${x === p.membershipStatus ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+          ${["aktiv", "beitragsrückstand", "ruhend", "inaktiv"].map((x) => `<option ${x === p.membershipStatus ? "selected" : ""}>${x}</option>`).join("")}</select></div>
+        ${p.membershipStatus === "ruhend" ? `<div class="field"><label>⏸️ Ruhend seit</label><input value="${esc(p.ruhendSeit || "")} · ${esc(p.ruhendGrund || "")}" disabled></div>` : ""}
+        <div class="field"><label>Automatik „ruhend“ aussetzen bis <span class="soft" style="font-weight:400">(z. B. Verletzung)</span></label><input type="date" name="ruhendAusnahmeBis" value="${esc(p.ruhendAusnahmeBis || "")}"></div>
         <div class="field"><label>⭐ Erstkontakt (wer wird zuerst angeschrieben?)</label><select name="contactPreference">
           ${Object.entries(prefLabel).map(([k, v]) => `<option value="${k}" ${k === p.contactPreference ? "selected" : ""}>${v}</option>`).join("")}</select></div>
         ${sect("📱 Kontakt Spieler")}
@@ -786,6 +792,16 @@
           data.departmentIds = Object.keys(data).filter((k) => k.startsWith("dp_") && data[k]).map((k) => k.slice(3));
           Object.keys(data).forEach((k) => { if (k.startsWith("dp_")) delete data[k]; });
           data.departmentId = data.departmentIds[0] || null;
+          // Statuswechsel von/zu „ruhend“ im Verlauf festhalten (manuell durch Trainer:in)
+          const heute = new Date().toISOString().slice(0, 10);
+          if (data.membershipStatus === "ruhend" && p.membershipStatus !== "ruhend") {
+            data.statusVorRuhend = p.membershipStatus || "aktiv"; data.ruhendSeit = heute; data.ruhendGrund = "manuell (Trainerteam)";
+            data.ruhendZeiten = (p.ruhendZeiten || []).concat([{ von: heute, bis: null, grund: "manuell" }]);
+          } else if (data.membershipStatus !== "ruhend" && p.membershipStatus === "ruhend") {
+            data.ruhendZeiten = (p.ruhendZeiten || []).map((z) => (z.bis ? z : Object.assign({}, z, { bis: heute })));
+            data.reaktiviertAm = heute;
+          }
+          if (!isEdit) data.angelegtAm = heute;
           if (isEdit) Store.update("players", p.id, data);
           else Store.add("players", data);
           closeModal(); toast(isEdit ? "Gespeichert" : "Spieler angelegt", "good"); reload();
@@ -1159,7 +1175,7 @@
     const st2 = sportstaetteZuOrt(e.location);
     const nameOf = (pid) => { const p = Store.byId("players", pid); return p ? `${p.firstName} ${p.lastName}` : "Unbekannt"; };
     const namesBy = (st) => responses.filter((r) => r.status === st).map((r) => nameOf(r.playerId)).sort((a, b) => a.localeCompare(b));
-    const roster = S().players.filter((p) => p.membershipStatus !== "inaktiv");
+    const roster = S().players.filter((p) => Store.aktiv(p));
     const answered = new Set(responses.map((r) => r.playerId));
     const openNames = roster.filter((p) => !answered.has(p.id)).map((p) => `${p.firstName} ${p.lastName}`).sort((a, b) => a.localeCompare(b));
     const rsvpRow = (icon, label, names) => names.length
@@ -1550,6 +1566,7 @@
     const sel = training._sel && trainings.find((t) => t.id === training._sel) ? training._sel : (upcoming[0] || trainings[0] || {}).id;
     const evt = Store.byId("events", sel);
     const ter = S().trainingErinnerung || { aktiv: true, zeit: "06:30" };
+    const rr = Object.assign({ aktiv: true, wochen: 4, mindestens: 3, vorwarnung: true }, S().ruhendRegel || {});
 
     // Zähler: bereits durchgeführte Trainings (gesamt + laufende Saison ab 1. Juli),
     // aufgeschlüsselt nach Trainer:in, damit bei mehreren klar ist, wer was übernimmt
@@ -1592,6 +1609,16 @@
             <button class="btn sm" data-tersave>Speichern</button>
           </div>
         </div>
+        <div class="card-head" style="margin-top:12px"><h3>⏸️ Automatik „ruhend“</h3></div>
+        <p class="soft" style="font-size:.82rem;margin:0 0 8px">Wer ${rr.wochen} Trainingswochen lang gar keine Rückmeldung abgibt (auch keine Absage), wird automatisch auf <strong>ruhend</strong> gestellt und zählt in keiner Statistik mehr. Ferien- und trainingsfreie Wochen zählen nicht; „nicht nominiert“ und gemeldete Abwesenheiten sind entschuldigt. Zurück geht es nur durch die eigene Bestätigung im Portal. Eine Woche vorher gibt es eine Vorwarnung.</p>
+        <div class="flex" style="gap:10px;flex-wrap:wrap;align-items:center">
+          <label class="flex" style="gap:6px;font-weight:600;font-size:.85rem"><input type="checkbox" id="rrAktiv" ${rr.aktiv !== false ? "checked" : ""} style="width:auto"> aktiv</label>
+          <label class="flex" style="gap:6px;font-size:.85rem">Wochen <input type="number" id="rrWochen" min="2" max="12" value="${rr.wochen}" style="width:64px"></label>
+          <label class="flex" style="gap:6px;font-size:.85rem">mind. Trainings <input type="number" id="rrMind" min="1" max="10" value="${rr.mindestens}" style="width:64px"></label>
+          <label class="flex" style="gap:6px;font-size:.85rem"><input type="checkbox" id="rrWarn" ${rr.vorwarnung !== false ? "checked" : ""} style="width:auto"> Vorwarnung</label>
+          <button class="btn sm" data-rrsave>Speichern</button>
+        </div>
+        ${(S().ruhendProtokoll || []).length ? `<div class="soft" style="font-size:.78rem;margin-top:8px">Zuletzt: ${(S().ruhendProtokoll || []).slice(-5).reverse().map((e) => `${fmtDateShort(e.at)} ${playerName(e.playerId)} – ${{ ruhend: "ruhend gestellt", vorwarnung: "vorgewarnt", zurueck: "wieder dabei" }[e.art] || e.art}`).join(" · ")}</div>` : ""}
       </div>`;
 
     $("#tsel", el).onchange = (ev) => { training._sel = ev.target.value; reload(); };
@@ -1602,12 +1629,20 @@
       Store.save();
       toast(aktiv ? `Erinnerung aktiv – täglich um ${zeit} Uhr` : "Automatische Erinnerung ausgeschaltet", "good");
     };
+    $("[data-rrsave]", el).onclick = () => {
+      const regel = { aktiv: $("#rrAktiv", el).checked, wochen: Math.max(2, Math.min(12, parseInt($("#rrWochen", el).value, 10) || 4)),
+        mindestens: Math.max(1, Math.min(10, parseInt($("#rrMind", el).value, 10) || 3)), vorwarnung: $("#rrWarn", el).checked };
+      S().ruhendRegel = regel;
+      Store.save();
+      toast(regel.aktiv ? `Automatik „ruhend“ aktiv – ${regel.wochen} Trainingswochen` : "Automatik „ruhend“ ausgeschaltet", "good");
+      reload();
+    };
     renderTrainingBody($("#tbody", el), evt);
   }
 
   function renderTrainingBody(box, evt) {
     if (!evt) { box.innerHTML = empty("🏐", "Kein Training vorhanden"); return; }
-    const roster = S().players.filter((p) => p.membershipStatus !== "inaktiv")
+    const roster = S().players.filter((p) => Store.aktiv(p))
       .sort((a, b) => a.lastName.localeCompare(b.lastName));
     const resp = {};
     const gruende = {};
@@ -2057,7 +2092,7 @@
     const list = S().drivers.filter((d) => d.eventId === evt.id);
     const seats = list.reduce((a, d) => a + Number(d.seats || 0), 0);
     const assigned = list.reduce((a, d) => a + d.playerIds.length, 0);
-    const roster = S().players.filter((p) => p.membershipStatus !== "inaktiv");
+    const roster = S().players.filter((p) => Store.aktiv(p));
     const assignedIds = new Set(list.flatMap((d) => d.playerIds));
     const needRide = roster.filter((p) => !assignedIds.has(p.id));
 
@@ -2130,7 +2165,7 @@
   function assignRider(evt, d) {
     const list = S().drivers.filter((x) => x.eventId === evt.id);
     const assigned = new Set(list.flatMap((x) => x.playerIds));
-    const avail = S().players.filter((p) => p.membershipStatus !== "inaktiv" && !assigned.has(p.id));
+    const avail = S().players.filter((p) => Store.aktiv(p) && !assigned.has(p.id));
     if (!avail.length) { toast("Alle Spieler sind bereits zugeordnet"); return; }
     modal({
       title: `Mitfahrer → ${esc(d.name)}`,
@@ -2382,7 +2417,7 @@
 
   function consents(el) {
     const s = S();
-    const aktive = s.players.filter((p) => p.membershipStatus !== "inaktiv");
+    const aktive = s.players.filter((p) => Store.aktiv(p));
     const stat_ = (p) => einwStatus(s, p.id);
     const voll = aktive.filter((p) => stat_(p).vollstaendig);
     const offen = aktive.filter((p) => !stat_(p).vollstaendig);
@@ -3215,7 +3250,7 @@
   // Serienbrief: Spieler auswählen, ein personalisierter Brief pro Spieler
   function serialLetterModal(l) {
     const s = S();
-    const active = s.players.filter((p) => p.membershipStatus !== "inaktiv")
+    const active = s.players.filter((p) => Store.aktiv(p))
       .sort((a, b) => a.lastName.localeCompare(b.lastName));
     if (!active.length) { toast("Keine aktiven Spieler vorhanden", "bad"); return; }
     modal({
@@ -4188,7 +4223,7 @@
   function taskForm(t, alsKopie) {
     const isEdit = !!t && !alsKopie;
     t = t || { title: "", due: new Date().toISOString(), priority: "mittel", zielRolle: "trainer", zielPlayerIds: [] };
-    const aktive = S().players.filter((p) => p.membershipStatus !== "inaktiv")
+    const aktive = S().players.filter((p) => Store.aktiv(p))
       .sort((a, b) => a.lastName.localeCompare(b.lastName));
     modal({
       title: isEdit ? "Aufgabe bearbeiten" : alsKopie ? "Aufgabe duplizieren" : "Neue Aufgabe",
@@ -4480,7 +4515,7 @@
         m.querySelector("[data-x]").onclick = closeModal;
         m.querySelector("[data-s]").onclick = () => {
           const data = formData(m.querySelector("#mf"));
-          const roster = S().players.filter((p) => inDept(p, data.departmentId) && p.membershipStatus !== "inaktiv");
+          const roster = S().players.filter((p) => inDept(p, data.departmentId) && Store.aktiv(p));
           const entries = roster.map((p) => ({
             playerId: p.id, passNumber: p.passNumber || "",
             jahrgang: jahrgang(p.birthDate), role: p.position === "Libero" ? "Libero" : "Spieler",
@@ -4958,7 +4993,7 @@
 
   // Konto bearbeiten: Name, Benutzername, Rolle und verknüpfte Spieler:innen
   function kontoForm(k, fertig) {
-    const aktive = S().players.filter((p) => p.membershipStatus !== "inaktiv")
+    const aktive = S().players.filter((p) => Store.aktiv(p))
       .sort((a, b) => a.lastName.localeCompare(b.lastName));
     modal({
       title: `Konto bearbeiten – ${esc(k.name)}`,
@@ -5030,7 +5065,7 @@
       return;
     }
     const s = S();
-    const aktive = s.players.filter((p) => p.membershipStatus !== "inaktiv")
+    const aktive = s.players.filter((p) => Store.aktiv(p))
       .sort((a, b) => a.lastName.localeCompare(b.lastName));
     el.innerHTML = `
       ${head("Portal-Zugänge", "Einladungscodes je Spieler:in erzeugen, per WhatsApp verschicken und Konten verwalten")}
@@ -5298,7 +5333,7 @@
   }
 
   function analyseStatistik(evs) {
-    const roster = S().players.filter((p) => p.membershipStatus !== "inaktiv")
+    const roster = S().players.filter((p) => Store.aktiv(p))
       .sort((a, b) => a.lastName.localeCompare(b.lastName));
     const respByEvent = {};
     S().responses.forEach((r) => { (respByEvent[r.eventId] = respByEvent[r.eventId] || {})[r.playerId] = r.status; });

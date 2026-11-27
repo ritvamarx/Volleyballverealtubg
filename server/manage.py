@@ -291,6 +291,10 @@ def main() -> None:
     s = sub.add_parser("trainings-erinnern", help="06:30-Erinnerung an heutige Trainings (Push/E-Mail)")
     s.set_defaults(func=lambda _a: print(__import__("trainingserinnerung").lauf()))
 
+    s = sub.add_parser("ruhend-pruefen", help="Automatik „ruhend“: 4 Trainingswochen ohne Rückmeldung (täglich per Cron)")
+    s.add_argument("--trocken", action="store_true", help="nur anzeigen, wen es treffen würde – nichts speichern")
+    s.set_defaults(func=lambda a: print(__import__("ruhend").lauf(trocken=a.trocken)))
+
     s = sub.add_parser("mail-test", help="Test-E-Mail verschicken (SMTP-Konfiguration prüfen)")
     s.add_argument("adresse")
     s.set_defaults(func=lambda a: print("gesendet ✓" if __import__("mail").senden(

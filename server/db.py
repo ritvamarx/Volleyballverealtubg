@@ -232,6 +232,11 @@ def list_history(con: sqlite3.Connection):
 
 # ---------- Gemeinsame Helfer (von App und Cron-Läufen genutzt) ----------
 
+def spieler_aktiv(p) -> bool:
+    """Zählt die Person zum aktiven Kader? (nicht ausgetreten, nicht ruhend)"""
+    return isinstance(p, dict) and p.get("membershipStatus") not in ("inaktiv", "ruhend")
+
+
 def parse_iso(s):
     """ISO-Zeitstring → tz-bewusste datetime (UTC-normalisiert); None bei ungültig.
 

@@ -891,7 +891,7 @@ def create_app() -> Flask:
         def eltern_statistik(pids: list) -> dict:
             past, antworten = _saison_termine_antworten()
             aktive = [p for p in daten.get("players", [])
-                      if p.get("membershipStatus") != "inaktiv"]
+                      if db.spieler_aktiv(p)]
 
             def quoten(pid):
                 # Termine mit „nicht nominiert" (x) zählen für diese Person nicht mit
@@ -956,7 +956,7 @@ def create_app() -> Flask:
                        "foto": (bild_url("foto", p["id"], p.get("foto"))
                                 if (p["id"] in meine_ids or _einw.foto_erlaubt(daten, p["id"])) else "")}
                       for p in daten.get("players", [])
-                      if p.get("membershipStatus") != "inaktiv"]
+                      if db.spieler_aktiv(p)]
                      if rolle == "spieler" else []),
             # Spieler:innen: alle erreichbaren Abzeichen (kurz) – motiviert, zeigt das Ziel
             "abzeichenDefs": ([{k: d.get(k) for k in ("id", "name", "emoji", "typ", "schwelle", "bereich")}
@@ -969,6 +969,9 @@ def create_app() -> Flask:
                          "name": f"{p.get('firstName', '')} {p.get('lastName', '')}".strip(),
                          "avatarEmoji": p.get("avatarEmoji") or "",
                          "foto": bild_url("foto", p["id"], p.get("foto")),
+                         "ruhend": ({"seit": p.get("ruhendSeit"), "grund": p.get("ruhendGrund") or ""}
+                                    if p.get("membershipStatus") == "ruhend" else None),
+                         "gewarntAm": p.get("ruhendGewarntAm") or "",
                          "abzeichen": abz.get(p["id"], []),
                          "abteilung": ", ".join(
                              n for n in (abt.get(i) for i in (
@@ -1363,7 +1366,7 @@ def create_app() -> Flask:
         ev = next((e for e in daten.get("events", []) if e.get("id") == eid), None)
         if ev is None or ev.get("type") not in ("training", "home", "away"):
             return err(404, "Termin nicht gefunden")
-        roster = {p["id"] for p in daten.get("players", []) if p.get("membershipStatus") != "inaktiv"}
+        roster = {p["id"] for p in daten.get("players", []) if db.spieler_aktiv(p)}
         if nur_pid:
             offene = {nur_pid} & roster
         else:
@@ -1835,6 +1838,10 @@ def create_app() -> Flask:
         "sess_player_ids": sess_player_ids, "lade_state": lade_state,
         "speichere_portal_aenderung": speichere_portal_aenderung, "neue_id": neue_id,
         "iso_jetzt": iso_jetzt, "push": _push, "log_login": log_login})
+
+    # Automatik „ruhend" (4 Trainingswochen ohne Rückmeldung) – siehe server/ruhend.py
+    import ruhend as _ruh
+    _ruh.register(app, con, require_portal, err, sess_player_ids, iso_jetzt, neue_id)
 
 
     # ---------- Benachrichtigungs-Einstellungen (Portal) ----------

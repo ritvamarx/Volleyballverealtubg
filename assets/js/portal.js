@@ -330,6 +330,14 @@
     P.daten = res.data;
     P.pushAktiv = false;
     if (location.hash === "#einverstaendnis") P.tab = "kontakt";
+    // Antwort auf die Vorwarnung („Ja, ich bin dabei") – ein Tipp aus der Mitteilung heraus
+    if (location.hash === "#dabei" && !istEltern()) {
+      const sp0 = (P.daten.spieler || [])[0];
+      if (sp0 && !sp0.ruhend) {
+        api("/api/portal/noch-dabei", { playerId: sp0.id }).then((r) => { if (r.ok) toast("Danke – schön, dass du dabei bist! 🏐", "good"); });
+      }
+      try { history.replaceState(null, "", location.pathname); } catch (e) { /* leer */ }
+    }
     await wsZaehlen();
     if (P.wartend) { (await wsAlle()).forEach((e) => lokalAnwenden(e.pfad, e.body)); warteschlangeAbarbeiten(); }
     render();  // sofort anzeigen – Push-Status/Wetter/Quiz ziehen im Hintergrund nach
@@ -422,6 +430,22 @@
   }
 
   // ---------- Ansichten ----------
+
+  // Ruhend: Karte über allem, zurück nur durch eigene Bestätigung (nur Spieler:innen-Konto)
+  function ruhendKarte() {
+    const d = P.daten;
+    const ruhende = (d.spieler || []).filter((sp) => sp.ruhend);
+    if (!ruhende.length) return "";
+    return ruhende.map((sp) => `<div class="card" style="border:2px solid var(--warn);background:#fffbeb">
+      <h3>⏸️ ${istEltern() ? esc(sp.name) + " ist" : "Du bist"} zurzeit „ruhend“</h3>
+      <p style="margin:6px 0">Seit ${fmtDateShort(sp.ruhend.seit)} – ${esc(sp.ruhend.grund || "vier Trainingswochen ohne Rückmeldung")}.
+      Solange zählt ${istEltern() ? "das Konto" : "dein Konto"} nicht zum Kader und in keine Statistik.</p>
+      ${istEltern()
+        ? `<p class="soft" style="margin:0;font-size:.82rem">Zurück geht es nur über das eigene Konto: ${esc(sp.name)} meldet sich an und tippt „Ja, ich bin wieder dabei“.</p>`
+        : `<p style="margin:6px 0 10px"><strong>Bist du wieder dabei?</strong> Dann ein Tipp – das Trainerteam bekommt Bescheid, und du kannst wieder zu- und absagen.</p>
+           <button class="btn" data-wiederdabei="${sp.id}">🏐 Ja, ich bin wieder dabei</button>`}
+    </div>`).join("");
+  }
 
   function tabStart() {
     const d = P.daten;
@@ -558,7 +582,7 @@
               || '<div class="sub">⏳ noch keine Antwort</div>'}
           </div>`).join("")}</div>` : ""}
       </div>` : "";
-    return `
+    return `${ruhendKarte()}
       ${hallo}
       ${deinJahrKarte()}
       ${rwSpielerStart()}
@@ -1658,8 +1682,20 @@
     });
     wrap.querySelectorAll("[data-quiz]").forEach((b) => b.onclick = () => quizAntwort(b.dataset.qid, parseInt(b.dataset.quiz, 10)));
     wrap.querySelectorAll("[data-qkap]").forEach((b) => b.onclick = () => { P.quizKapitel = parseInt(b.dataset.qkap, 10); render(); });
+    wrap.querySelectorAll("[data-wiederdabei]").forEach((b) => b.onclick = () =>
+      aktion("/api/portal/wieder-dabei", { playerId: b.dataset.wiederdabei }, "Willkommen zurück! 🏐 Das Trainerteam weiß Bescheid.", true));
     wrap.querySelectorAll("[data-rsvp]").forEach((b) => b.onclick = () => {
       const status = b.dataset.status;
+      // Ruhend: erst die Rückkehr bestätigen, dann wieder zu-/absagen
+      const spR = (P.daten.spieler || []).find((x) => x.id === b.dataset.pid);
+      if (spR && spR.ruhend) {
+        if (istEltern()) { toast("Das Konto ist ruhend – die Rückkehr bestätigt die Spieler:in selbst im Portal", "bad"); return; }
+        U.modal({ title: "⏸️ Du bist zurzeit „ruhend“",
+          body: `<p>Seit ${fmtDateShort(spR.ruhend.seit)} kam keine Rückmeldung, deshalb zählt dein Konto gerade nicht zum Kader.</p><p><strong>Bist du wieder dabei?</strong> Danach kannst du sofort zu- oder absagen.</p>`,
+          footer: `<button class="btn ghost" data-x>Später</button><button class="btn" data-wd>🏐 Ja, ich bin wieder dabei</button>`,
+          onOpen(m) { m.querySelector("[data-wd]").onclick = async () => { U.closeModal(); await aktion("/api/portal/wieder-dabei", { playerId: spR.id }, "Willkommen zurück! 🏐", true); }; } });
+        return;
+      }
       if (status === "no" || status === "maybe") {
         // Erst kurz begründen, dann senden
         P.rsvpBegr = { eid: b.dataset.rsvp, pid: b.dataset.pid, status };

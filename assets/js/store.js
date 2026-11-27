@@ -550,6 +550,8 @@
     setOnSave(fn) { onSave = fn; },
     uid,
     // generische CRUD-Helfer für eine Collection
+    // Aktiver Kader: nicht ausgetreten (inaktiv) und nicht ruhend (Automatik nach 4 Trainingswochen)
+    aktiv(p) { return !!p && p.membershipStatus !== "inaktiv" && p.membershipStatus !== "ruhend"; },
     add(coll, obj) { obj.id = obj.id || uid(coll.slice(0, 2)); state[coll].push(obj); save(); return obj; },
     update(coll, id, patch) {
       const it = state[coll].find((x) => x.id === id);

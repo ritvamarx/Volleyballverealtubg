@@ -27,7 +27,7 @@ def lauf() -> str:
             return "Kein Datenbestand – nichts zu tun."
         daten = json.loads(row["data"])
         roster = [p for p in daten.get("players", [])
-                  if p.get("membershipStatus") != "inaktiv"]
+                  if db.spieler_aktiv(p)]
         if not roster:
             return "Keine aktiven Spieler:innen."
         antworten = {}

@@ -62,7 +62,7 @@ def lauf() -> str:
         if jetzt_lokal.strftime("%H:%M") < zeit:
             return f"Noch vor der eingestellten Zeit ({zeit} Uhr) – nichts zu tun."
 
-        roster = [p for p in daten.get("players", []) if p.get("membershipStatus") != "inaktiv"]
+        roster = [p for p in daten.get("players", []) if db.spieler_aktiv(p)]
         players_by_id = {p.get("id"): p for p in daten.get("players", [])}
         # Antworten je Event: Spieler-ID -> Status ("yes"/"no"/"maybe"/"x")
         antwort: dict = {}

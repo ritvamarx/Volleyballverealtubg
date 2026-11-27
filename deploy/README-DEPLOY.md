@@ -111,6 +111,13 @@ docker compose exec volleyball ./manage.py backup /app/data/backups
   Standard `VerbandsligaMänner`; Saison wird automatisch erkannt).
   Handpflege im Tabellen-Editor wird dabei überschrieben.
 
+- ✔ **Automatik „ruhend“:** `/etc/cron.d/volleyball-ruhend` (täglich 07:20,
+  `./manage.py ruhend-pruefen`, Trockenlauf mit `--trocken`): vier Trainingswochen
+  ohne Rückmeldung → Status `ruhend` (zählt in keiner Statistik), Vorwarnung nach
+  drei Wochen per Push/E-Mail, Rückkehr nur durch eigene Bestätigung im Portal.
+  Einstellungen (an/aus, Wochen, Mindestanzahl, Vorwarnung) in der App unter
+  Trainingsrückmeldung. Details: `docs/PLAN-ruhend-status.md`.
+
 ## Content-Hub-Anbindung (Stufe 3)
 
 Die App liefert dem Content-Hub (eigene VM, privates Hetzner-Netz) einen Feed

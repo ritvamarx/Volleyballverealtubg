@@ -1,0 +1,10 @@
+# /etc/cron.d/volleyball-ruhend – Automatik „ruhend“: wer vier Trainingswochen keine
+# Rückmeldung abgibt (Ferien/trainingsfreie Wochen zählen nicht), wird auf ruhend gestellt;
+# nach drei Wochen gibt es eine Vorwarnung. An/aus, Wochen und Mindestanzahl stellt das
+# Trainerteam in der App ein (Trainingsrückmeldung → „Automatik ruhend“).
+# Trockenlauf von Hand: docker compose exec volleyball ./manage.py ruhend-pruefen --trocken
+# Einmalig aktivieren:
+#   sudo cp deploy/cron/volleyball-ruhend /etc/cron.d/volleyball-ruhend && sudo chmod 644 /etc/cron.d/volleyball-ruhend
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+20 7 * * * root cd /opt/volleyball && docker compose exec -T volleyball ./manage.py ruhend-pruefen >> /var/log/volleyball-ruhend.log 2>&1
