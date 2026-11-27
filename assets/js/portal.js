@@ -36,13 +36,118 @@
   }
 
   function offlineLeiste() {
-    if (!P.offlineStand) return "";
+    const n = P.wartend || 0;
+    const warten = n ? `${n} ${n === 1 ? "Änderung wartet" : "Änderungen warten"} auf Netz` : "";
+    if (!P.offlineStand) {
+      return n ? `<div class="offline-leiste">⏳ ${warten} <button class="btn sm ghost" data-wsjetzt style="margin-left:8px;padding:2px 8px">Jetzt senden</button></div>` : "";
+    }
     const z = new Date(P.offlineStand);
     const wann = isNaN(z) ? "" : ` · Stand ${z.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} Uhr`;
-    return `<div class="offline-leiste">📴 Offline${wann} – Änderungen sind gerade nicht möglich</div>`;
+    return `<div class="offline-leiste">📴 Offline${wann} – ${n ? warten : "Änderungen werden gemerkt und später gesendet"}</div>`;
   }
 
-  window.addEventListener("online", () => { if (P.daten) neuLaden(true); });
+  // ---------- Offline-Warteschlange (Teil B3) ----------
+  // Änderungen ohne Netz landen in IndexedDB (auch für den Service Worker lesbar) und
+  // werden gesendet, sobald Netz da ist: beim „online"-Ereignis, beim Öffnen, alle 30 s,
+  // per Background Sync (Android/Chrome). Server gewinnt: nach dem Senden wird neu geladen,
+  // abgelehnte Änderungen (z. B. Termin vorbei) erscheinen als Hinweis.
+  const WS_DB = "skv-offline", WS_STORE = "warteschlange";
+  const WS_NICHT = [/^\/api\/portal\/profilbild/, /^\/api\/portal\/code/, /^\/api\/einverstaendnis/];
+  const WS_LABEL = { rsvp: "Rückmeldung", aufgabe: "Aufgabe", buffet: "Buffet-Beitrag", driver: "Mitfahrplätze",
+    job: "Job", clothing: "Kleidungsanfrage", contact: "Kontaktdaten", abwesenheit: "Abwesenheit", nachricht: "Nachricht" };
+  function wsDB() {
+    return new Promise((res, rej) => {
+      if (!("indexedDB" in window)) { rej(new Error("kein IndexedDB")); return; }
+      const r = indexedDB.open(WS_DB, 1);
+      r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(WS_STORE)) r.result.createObjectStore(WS_STORE, { keyPath: "id" }); };
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+  }
+  async function wsAlle() {
+    try {
+      const db = await wsDB();
+      return await new Promise((res, rej) => { const q = db.transaction(WS_STORE).objectStore(WS_STORE).getAll(); q.onsuccess = () => res((q.result || []).sort((a, b) => a.at - b.at)); q.onerror = () => rej(q.error); });
+    } catch (e) { return []; }
+  }
+  async function wsSchreiben(eintrag) {
+    const db = await wsDB();
+    return new Promise((res, rej) => { const t = db.transaction(WS_STORE, "readwrite"); t.objectStore(WS_STORE).put(eintrag); t.oncomplete = () => res(true); t.onerror = () => rej(t.error); });
+  }
+  async function wsLoeschen(id) {
+    try { const db = await wsDB(); await new Promise((res) => { const t = db.transaction(WS_STORE, "readwrite"); t.objectStore(WS_STORE).delete(id); t.oncomplete = res; t.onerror = res; }); } catch (e) { /* leer */ }
+  }
+  async function wsZaehlen() { P.wartend = (await wsAlle()).filter((x) => !x.fehler).length; return P.wartend; }
+  function wsErlaubt(pfad) { return !WS_NICHT.some((rx) => rx.test(pfad)); }
+  function wsLabel(pfad) { const k = (pfad.split("/").pop() || "").split("?")[0]; return WS_LABEL[k] || "Änderung"; }
+
+  // Lokale Vorschau: die wichtigsten Änderungen sofort anzeigen (Server bestätigt später)
+  function lokalAnwenden(pfad, body) {
+    const d = P.daten; if (!d) return;
+    if (/\/rsvp$/.test(pfad)) {
+      const ids = String(body.eventId || "").split(",");
+      [...(d.trainings || []), ...(d.spiele || [])].filter((e) => ids.includes(e.id)).forEach((e) => {
+        e.meine = e.meine || {};
+        if (body.status) e.meine[body.playerId] = body.status; else delete e.meine[body.playerId];
+        if (Array.isArray(e.dabeiIds)) {
+          e.dabeiIds = e.dabeiIds.filter((x) => x !== body.playerId);
+          if (body.status === "yes") e.dabeiIds.push(body.playerId);
+        }
+        e.wartet = true;
+      });
+    } else if (/\/aufgabe$/.test(pfad)) {
+      (d.aufgaben || []).filter((t) => t.id === body.taskId).forEach((t) => { t.erledigt = !!body.erledigt; });
+    }
+  }
+
+  async function merken(pfad, body) {
+    const eintrag = { id: "ws_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), pfad, body,
+      at: Date.now(), csrf: (window.Sync && Sync.csrf) || "", label: wsLabel(pfad) };
+    await wsSchreiben(eintrag);
+    lokalAnwenden(pfad, body);
+    await wsZaehlen();
+    try { const reg = await navigator.serviceWorker.ready; if (reg.sync) await reg.sync.register("skv-warteschlange"); } catch (e) { /* leer */ }
+    toast(`📴 Gemerkt – wird gesendet, sobald du Netz hast (${P.wartend} ${P.wartend === 1 ? "Änderung wartet" : "Änderungen warten"})`, "good");
+    render();
+  }
+
+  async function warteschlangeAbarbeiten(still) {
+    if (P.wsLaeuft || navigator.onLine === false) return;
+    const liste = await wsAlle();
+    if (!liste.length) { P.wartend = 0; return; }
+    P.wsLaeuft = true;
+    let gesendet = 0; const abgelehnt = [];
+    try {
+      for (const e of liste) {
+        if (e.fehler) { abgelehnt.push(`${e.label}: ${e.fehler}`); await wsLoeschen(e.id); continue; }
+        let res;
+        try {
+          res = await fetch(e.pfad, { method: "POST", credentials: "same-origin",
+            headers: { "Content-Type": "application/json", "X-CSRF-Token": (window.Sync && Sync.csrf) || e.csrf || "" },
+            body: JSON.stringify(e.body) });
+        } catch (err) { break; }                       // weiter kein Netz – später noch einmal
+        if (res.status === 401) break;                 // Sitzung weg: behalten, nach Anmeldung erneut
+        if (res.ok) { gesendet++; await wsLoeschen(e.id); continue; }
+        let txt = ""; try { txt = (await res.json()).error || ""; } catch (err) { /* leer */ }
+        abgelehnt.push(`${e.label}: ${txt || "abgelehnt"}`); await wsLoeschen(e.id);
+      }
+    } finally { P.wsLaeuft = false; }
+    await wsZaehlen();
+    if (gesendet && !still) toast(`✅ ${gesendet} ${gesendet === 1 ? "Änderung" : "Änderungen"} nachgesendet`, "good");
+    if (abgelehnt.length) toast(`⚠️ Nicht übernommen – ${abgelehnt.slice(0, 3).join(" · ")}`, "bad");
+    if (gesendet || abgelehnt.length) await neuLaden(true); else render();
+  }
+  P.warteschlangeAbarbeiten = warteschlangeAbarbeiten;
+
+  window.addEventListener("online", () => { if (P.daten) { P.offlineStand = null; warteschlangeAbarbeiten().then(() => neuLaden(true)); } });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && P.daten) warteschlangeAbarbeiten(); });
+  setInterval(() => { if (P.daten && P.wartend) warteschlangeAbarbeiten(true); }, 30000);
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("message", (e) => {
+      const typ = e.data && e.data.typ;
+      if (typ === "WARTESCHLANGE_FERTIG" && P.daten) { wsZaehlen().then(() => neuLaden(true)); }
+      if (typ === "WARTESCHLANGE_SENDEN" && P.daten) warteschlangeAbarbeiten();
+    });
+  }
 
   // ---------- Push-Mitteilungen (Phase 4) ----------
 
@@ -225,6 +330,8 @@
     P.daten = res.data;
     P.pushAktiv = false;
     if (location.hash === "#einverstaendnis") P.tab = "kontakt";
+    await wsZaehlen();
+    if (P.wartend) { (await wsAlle()).forEach((e) => lokalAnwenden(e.pfad, e.body)); warteschlangeAbarbeiten(); }
     render();  // sofort anzeigen – Push-Status/Wetter/Quiz ziehen im Hintergrund nach
     const rot = offenePunkte().filter((x) => x.art === "rot").length;
     if (rot) toast(`🔴 ${rot} dringende${rot === 1 ? "r Punkt" : " Punkte"} – Ampel oben antippen`, "bad");
@@ -1407,14 +1514,19 @@
     verdrahten(wrap);
   }
 
-  async function aktion(pfad, body, erfolg, voll) {
+  async function aktion(pfad, body, erfolg, voll, ohneNeuladen) {
     if (P.busy) return;
     P.busy = true;
-    const res = await api(pfad, body);
+    // Es warten schon Änderungen → der Reihe nach bleiben, neue ebenfalls einreihen
+    const res = (P.wartend && wsErlaubt(pfad)) ? { ok: false, offline: true, data: {} } : await api(pfad, body);
     P.busy = false;
-    if (!res.ok) { toast(res.offline ? "📴 Keine Verbindung – die Änderung wurde nicht gespeichert" : (res.data.error || "Aktion fehlgeschlagen"), "bad"); return; }
+    if (!res.ok) {
+      if (res.offline && wsErlaubt(pfad)) { try { await merken(pfad, body); return; } catch (e) { /* unten melden */ } }
+      toast(res.offline ? "📴 Keine Verbindung – die Änderung wurde nicht gespeichert" : (res.data.error || "Aktion fehlgeschlagen"), "bad");
+      return;
+    }
     if (erfolg) toast(erfolg, "good");
-    await neuLaden(voll);
+    if (!ohneNeuladen) await neuLaden(voll);
   }
 
   // Belohnung für Platz 1 der Wochen-Bestenliste: Schmetter-Show beim Tippen
@@ -1537,6 +1649,8 @@
         setTimeout(() => ziel.classList.remove("termin-blitz"), 2400);
       }
     });
+    const wsKnopf = wrap.querySelector("[data-wsjetzt]");
+    if (wsKnopf) wsKnopf.onclick = () => warteschlangeAbarbeiten();
     wrap.querySelectorAll("[data-aufg]").forEach((cb) => cb.onchange = () => {
       if (cb.checked) volleyballFlug();
       aktion("/api/portal/aufgabe", { taskId: cb.dataset.aufg, erledigt: cb.checked },
@@ -1584,8 +1698,8 @@
     if (rsvpFeld) rsvpFeld.onkeydown = (ev) => { if (ev.key === "Enter") { ev.preventDefault(); rsvpSenden.click(); } };
     const fuerAlle = async (ids, pfad, bodyFn, erfolg) => {
       for (let i = 0; i < ids.length; i++) {
-        if (i < ids.length - 1) { const r = await api(pfad, bodyFn(ids[i])); if (!r.ok) { toast(r.data.error || "Speichern fehlgeschlagen", "bad"); return; } }
-        else await aktion(pfad, bodyFn(ids[i]), erfolg);
+        const letzter = i === ids.length - 1;
+        await aktion(pfad, bodyFn(ids[i]), letzter ? erfolg : null, false, !letzter);
       }
     };
     wrap.querySelectorAll("[data-bufsave]").forEach((b) => b.onclick = () => {

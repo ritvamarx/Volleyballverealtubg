@@ -815,4 +815,5 @@ button.quiz-opt:hover { border-color: var(--accent); background: var(--accent-we
 @media (max-width: 360px) { .abz-grid { grid-template-columns: 1fr; } }
 
 /* Offline-Hinweis im Portal (Teil B) */
-.offline-leiste { background: #fef3c7; color: #78350f; font-size: .8rem; padding: 6px 16px; text-align: center; border-bottom: 1px solid #fcd34d; }
+.offline-leiste { background: #fef3c7; color: #78350f; font-size: .8rem; padding: 6px 16px; text-align: center; border-bottom: 1px solid #fcd34d; display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px; }
+.offline-leiste .btn { font-size: .75rem; }

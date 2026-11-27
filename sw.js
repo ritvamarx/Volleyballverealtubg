@@ -78,14 +78,65 @@ async function bildCacheZuerst(req) {
   return r;
 }
 
+// ------------------------------ Offline-Warteschlange (Teil B3) ----------
+// Gleiche IndexedDB wie das Portal (skv-offline/warteschlange). Background Sync
+// (Android/Chrome) sendet wartende Änderungen auch bei geschlossener App.
+const WS_DB = "skv-offline", WS_STORE = "warteschlange";
+function wsDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open(WS_DB, 1);
+    r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(WS_STORE)) r.result.createObjectStore(WS_STORE, { keyPath: "id" }); };
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function wsAlle() {
+  const db = await wsDB();
+  return new Promise((res, rej) => { const q = db.transaction(WS_STORE).objectStore(WS_STORE).getAll(); q.onsuccess = () => res((q.result || []).sort((a, b) => a.at - b.at)); q.onerror = () => rej(q.error); });
+}
+async function wsAendern(fn) {
+  const db = await wsDB();
+  return new Promise((res, rej) => { const t = db.transaction(WS_STORE, "readwrite"); fn(t.objectStore(WS_STORE)); t.oncomplete = () => res(true); t.onerror = () => rej(t.error); });
+}
+async function wsLeeren() { try { await wsAendern((st) => st.clear()); } catch (err) { /* leer */ } }
+async function warteschlangeSenden() {
+  let liste = [];
+  try { liste = await wsAlle(); } catch (err) { return; }
+  let getan = false;
+  for (const e of liste) {
+    if (e.fehler) continue;
+    let r;
+    try {
+      r = await fetch(e.pfad, { method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": e.csrf || "" }, body: JSON.stringify(e.body) });
+    } catch (err) { throw err; }                       // kein Netz → Sync versucht es später erneut
+    if (r.status === 401) break;                       // Sitzung weg: behalten
+    if (r.ok) { await wsAendern((st) => st.delete(e.id)); getan = true; continue; }
+    let txt = ""; try { txt = (await r.json()).error || ""; } catch (err) { /* leer */ }
+    e.fehler = txt || "abgelehnt";                     // Portal zeigt den Hinweis beim nächsten Öffnen
+    await wsAendern((st) => st.put(e)); getan = true;
+  }
+  if (getan) {
+    const cs = await clients.matchAll({ type: "window" });
+    cs.forEach((c) => c.postMessage({ typ: "WARTESCHLANGE_FERTIG" }));
+  }
+}
+self.addEventListener("sync", (e) => {
+  if (e.tag === "skv-warteschlange") e.waitUntil(warteschlangeSenden());
+});
+
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
   const pfad = url.pathname;
   if (e.request.method !== "GET") {
-    // An-/Abmeldung: Daten-Cache leeren, damit nie der Stand einer anderen Person erscheint
+    // An-/Abmeldung: Daten-Cache UND Warteschlange leeren, damit nie der Stand oder
+    // wartende Änderungen einer anderen Person weiterverwendet werden
     if (AUTH_PFADE.test(pfad)) {
-      e.respondWith(fetch(e.request).then(async (r) => { try { await caches.delete(DATEN); } catch (err) { /* leer */ } return r; }));
+      e.respondWith(fetch(e.request).then(async (r) => {
+        try { await caches.delete(DATEN); } catch (err) { /* leer */ }
+        await wsLeeren();
+        return r;
+      }));
     }
     return;
   }

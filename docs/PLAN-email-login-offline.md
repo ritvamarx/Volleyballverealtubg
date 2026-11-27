@@ -94,7 +94,20 @@ E-Mail-Weg im Alltag läuft und das ausdrücklich freigegeben wird.
 2. Ohne Netz startet das Portal aus dem Cache, kleiner Hinweis „Stand 14:32 · offline“.
 3. `/api/me` offline → zuletzt bekannter Nutzer, Portal öffnet trotzdem (Cookie ist 30/180 Tage gültig).
 
-### B3 Offline schreiben (Warteschlange) – NÄCHSTER SCHRITT
+### B3 Offline schreiben (Warteschlange) – UMGESETZT 2026-11-27
+- Portal-Aktionen (Zu-/Absage, Aufgabe, Buffet, Fahrer, Job, Kleidung, Kontakt, Abwesenheit, Nachricht)
+  landen ohne Netz in IndexedDB (`skv-offline/warteschlange`); Zusage/Aufgabe werden sofort lokal
+  angezeigt („Vorschau“), Toast „📴 Gemerkt – wird gesendet, sobald du Netz hast“.
+- Gesendet wird beim `online`-Ereignis, beim Öffnen/Sichtbarwerden, alle 30 s und per Background
+  Sync im Service Worker (Android/Chrome, auch bei geschlossener App). Danach lädt das Portal neu
+  (Server gewinnt); Abgelehntes erscheint als „⚠️ Nicht übernommen – Rückmeldung: Termin nicht gefunden“.
+- Gelbe Leiste „⏳ n Änderungen warten auf Netz · Jetzt senden“, solange etwas wartet; neue Aktionen
+  reihen sich dann hinten ein (Reihenfolge bleibt). Sitzung abgelaufen (401): Einträge bleiben bis
+  zur nächsten Anmeldung; An-/Abmeldung leert Warteschlange und Daten-Cache.
+- Nicht eingereiht (bewusst): Profilbild, Einladungscode, Einverständnis-Bestätigung (Passwort/Passkey).
+- Hinweis: Bei Netzabbruch genau nach dem Senden kann eine Abwesenheit doppelt ankommen (selten);
+  Rückmeldungen/Buffet/Fahrer sind idempotent.
+
 1. Alle Portal-Aktionen (Zu-/Absage, Abwesenheit, Fahrer, Aufgabe, Buffet, Job, Kleidung,
    Kontakt, Profilbild) landen bei Netzfehler in einer IndexedDB-Warteschlange; die Anzeige
    wird sofort lokal aktualisiert.
